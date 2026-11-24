@@ -21,11 +21,17 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Instalar Pillow para tarjetas PNG de Telegram
+        run: pip install pillow
+
       - name: Ejecutar liquidación, escaneo, Telegram y web estática
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           APIFOOTBALL_KEY: ${{ secrets.APIFOOTBALL_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python cloud_runner.py
 
       - name: Guardar cambios (historial y GitHub Pages)
