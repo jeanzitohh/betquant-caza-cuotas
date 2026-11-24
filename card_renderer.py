@@ -239,13 +239,18 @@ def render_match_card(m: dict) -> bytes:
 
     _glass_panel(img, (84, 632, 1116, 718), radius=18, fill=(124, 58, 237, 65), border=(167, 139, 250, 130))
     d = ImageDraw.Draw(img)
-    f_pk = _load_font(20, "bold")
-    if d.textlength(pick_txt, font=f_pk) > 740:
-        f_pk = _load_font(17, "bold")
-    d.text((108, 650), pick_txt, font=f_pk, fill=(255, 255, 255, 255))
-    f_ev = _load_font(19, "bold")
+    f_ev = _load_font(18, "bold")
     ew = d.textlength(ev_txt, font=f_ev)
-    d.text((1092 - ew, 652), ev_txt, font=f_ev, fill=ev_col)
+    max_pick_w = (1092 - ew - 28) - 108
+    f_pk = _load_font(19, "bold")
+    for sz in (19, 17, 15, 14, 13):
+        cand_f = _load_font(sz, "bold")
+        if d.textlength(pick_txt, font=cand_f) <= max_pick_w:
+            f_pk = cand_f
+            break
+        f_pk = cand_f
+    d.text((108, 648), pick_txt, font=f_pk, fill=(255, 255, 255, 255))
+    d.text((1092 - ew, 648), ev_txt, font=f_ev, fill=ev_col)
     d.text((108, 684), "Análisis estadístico Caza Cuotas (simulación educativa)", font=_load_font(14, "reg"), fill=(226, 232, 240, 255))
 
     buf = io.BytesIO()
