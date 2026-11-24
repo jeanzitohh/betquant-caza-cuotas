@@ -3,237 +3,240 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Caza Cuotas • Pronósticos &amp; Estadísticas</title>
+  <title>Caza Cuotas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #070812;
-      --glass: linear-gradient(145deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.035) 100%);
-      --glass-strong: linear-gradient(145deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.06) 100%);
-      --glass-border: rgba(255,255,255,0.16);
-      --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.28);
-      --text: #F8FAFC;
-      --sub: #CBD5E1;
-      --muted: #94A3B8;
-      --violet: #8B5CF6;
-      --orange: #F97316;
-      --green: #4ADE80;
-      --amber: #FBBF24;
-      --red: #F87171;
-      --blue: #38BDF8;
+      --bg: #FFFFFF;
+      --bg-soft: #F5F6FA;
+      --glass: rgba(255, 255, 255, 0.74);
+      --glass-strong: rgba(255, 255, 255, 0.90);
+      --border: rgba(15, 23, 42, 0.08);
+      --border-strong: rgba(15, 23, 42, 0.14);
+      --text: #0F172A;
+      --sub: #475569;
+      --muted: #64748B;
+      --violet: #7C3AED;
+      --orange: #EA580C;
+      --green: #15803D;
+      --green-bg: #DCFCE7;
+      --amber: #B45309;
+      --amber-bg: #FEF3C7;
+      --red: #B91C1C;
+      --red-bg: #FEE2E2;
+      --blue: #0369A1;
+      --blue-bg: #E0F2FE;
+      --shadow: 0 12px 36px rgba(15, 23, 42, 0.07);
+      --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95);
     }
 
     * { box-sizing: border-box; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; }
     body {
-      margin: 0;
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 13.5px;
-      line-height: 1.5;
-      overflow-x: hidden;
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+      font-size: 13.5px; line-height: 1.5; overflow-x: hidden;
     }
     .num { font-variant-numeric: tabular-nums; }
 
-    /* Apple Liquid Glass Ambient Orbs */
-    .ambient-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-    .orb {
-      position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.48;
-      animation: floatOrb 20s ease-in-out infinite alternate;
-    }
-    .orb-1 { width: 520px; height: 520px; background: radial-gradient(circle, #7C3AED, transparent 70%); top: -160px; left: -120px; }
-    .orb-2 { width: 460px; height: 460px; background: radial-gradient(circle, #F97316, transparent 70%); top: 6%; right: -140px; animation-delay: -6s; }
-    .orb-3 { width: 520px; height: 520px; background: radial-gradient(circle, #2563EB, transparent 70%); bottom: -200px; left: 30%; opacity: 0.30; animation-delay: -11s; }
-    @keyframes floatOrb { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(28px, 22px) scale(1.06); } }
-    @media (prefers-reduced-motion: reduce) { .orb { animation: none; } }
+    /* Soft White Apple Liquid Glass Ambient Orbs */
+    .ambient-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: #FAFBFD; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(110px); opacity: 0.45; }
+    .orb-1 { width: 520px; height: 520px; background: radial-gradient(circle, #DDD6FE, transparent 70%); top: -150px; left: -120px; }
+    .orb-2 { width: 480px; height: 480px; background: radial-gradient(circle, #FED7AA, transparent 70%); top: -40px; right: -120px; }
+    .orb-3 { width: 500px; height: 500px; background: radial-gradient(circle, #E0F2FE, transparent 70%); bottom: -180px; left: 30%; }
 
     .glass {
       background: var(--glass);
-      backdrop-filter: blur(28px) saturate(180%);
-      -webkit-backdrop-filter: blur(28px) saturate(180%);
-      border: 1px solid var(--glass-border);
-      box-shadow: var(--glass-highlight), 0 16px 42px rgba(0, 0, 0, 0.38);
-      border-radius: 26px;
+      backdrop-filter: blur(26px) saturate(180%);
+      -webkit-backdrop-filter: blur(26px) saturate(180%);
+      border: 1px solid var(--border);
+      box-shadow: var(--highlight), var(--shadow);
+      border-radius: 24px;
     }
 
-    /* Sticky Top Pill Nav */
-    .topbar { position: sticky; top: 12px; z-index: 30; max-width: 1280px; margin: 12px auto 0; padding: 0 18px; }
-    .nav-pill {
-      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
-      padding: 10px 18px; border-radius: 999px;
-      background: linear-gradient(135deg, rgba(16, 18, 36, 0.78), rgba(16, 18, 36, 0.56));
-      backdrop-filter: blur(32px) saturate(190%);
-      -webkit-backdrop-filter: blur(32px) saturate(190%);
-      border: 1px solid rgba(255,255,255,0.18);
-      box-shadow: var(--glass-highlight), 0 12px 34px rgba(0,0,0,0.45);
+    /* Buttons & Inputs */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+      border: 1px solid var(--border-strong); background: rgba(255,255,255,0.85); color: var(--text);
+      cursor: pointer; transition: all 0.16s ease;
     }
-    .brand { display: flex; align-items: center; gap: 12px; }
+    .btn:hover { background: #FFFFFF; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,0.08); }
+    .btn-primary {
+      background: linear-gradient(135deg, #7C3AED 0%, #EA580C 100%);
+      color: #FFFFFF; border-color: transparent;
+      box-shadow: 0 6px 18px rgba(124, 58, 237, 0.24);
+    }
+    .btn-primary:hover { background: linear-gradient(135deg, #6D28D9 0%, #C2410C 100%); color: #FFFFFF; }
+    .btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
+
+    .seg {
+      display: inline-flex; padding: 3px; border-radius: 999px;
+      background: rgba(15, 23, 42, 0.05); border: 1px solid var(--border);
+    }
+    .seg-btn {
+      border: 0; background: transparent; color: var(--sub); padding: 6px 13px; border-radius: 999px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.18s;
+    }
+    .seg-btn.active {
+      background: #FFFFFF; color: var(--violet); box-shadow: 0 2px 8px rgba(15,23,42,0.08);
+    }
+
+    /* Brand Emblem */
     .brand-logo {
       width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center;
       background: linear-gradient(135deg, #7C3AED 0%, #EC4899 55%, #F97316 100%);
-      box-shadow: inset 0 1px 1px rgba(255,255,255,0.45), 0 6px 18px rgba(124, 58, 237, 0.42);
-    }
-    .brand-title { font-size: 16.5px; font-weight: 700; letter-spacing: -0.02em; }
-    .brand-sub { font-size: 11px; color: var(--muted); }
-
-    .nav-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-    .seg-glass {
-      display: inline-flex; padding: 3px; border-radius: 999px;
-      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14);
-    }
-    .seg-btn {
-      border: 0; background: transparent; color: var(--sub); padding: 6px 14px; border-radius: 999px;
-      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .seg-btn.active {
-      background: linear-gradient(135deg, rgba(139,92,246,0.92), rgba(249,115,22,0.88));
-      color: #fff; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.38);
+      box-shadow: 0 6px 16px rgba(124, 58, 237, 0.25); flex-shrink: 0;
     }
 
-    .btn-glass {
-      display: inline-flex; align-items: center; gap: 6px; padding: 8px 15px; border-radius: 999px;
-      font-size: 12.5px; font-weight: 600; border: 1px solid rgba(255,255,255,0.20);
-      background: rgba(255,255,255,0.09); color: #fff; cursor: pointer;
-      transition: transform 0.15s, background 0.2s;
+    /* AUTH GATE (Shown when NOT logged in) */
+    #authGate {
+      position: relative; z-index: 10; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 28px 18px;
     }
-    .btn-glass:hover { background: rgba(255,255,255,0.17); transform: translateY(-1px); }
-    .btn-accent {
-      background: linear-gradient(135deg, #8B5CF6 0%, #F97316 100%);
-      border-color: rgba(255,255,255,0.32);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 6px 20px rgba(249, 115, 22, 0.28);
+    .gate-grid {
+      max-width: 980px; width: 100%; display: grid; grid-template-columns: 1.15fr 0.95fr; gap: 28px; align-items: center;
     }
-    .btn-glass:disabled { opacity: 0.55; cursor: wait; }
-
-    .container { position: relative; z-index: 10; max-width: 1280px; margin: 0 auto; padding: 20px 18px 64px; }
-
-    .status-line {
-      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
-      padding: 0 6px; margin-bottom: 14px; font-size: 12px; color: var(--muted);
+    .gate-hero { padding: 12px; }
+    .gate-hero h1 { font-size: 34px; font-weight: 800; line-height: 1.18; letter-spacing: -0.02em; margin: 16px 0 12px; }
+    .gate-hero p { color: var(--sub); font-size: 14.5px; margin: 0 0 20px; }
+    .feature-list { display: flex; flex-direction: column; gap: 10px; }
+    .feature-item {
+      display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: 16px;
+      background: rgba(255,255,255,0.72); border: 1px solid var(--border); backdrop-filter: blur(18px);
     }
-    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); display: inline-block; margin-right: 7px; }
-    .pulse-dot.loading { background: var(--orange); box-shadow: 0 0 10px var(--orange); animation: pulse 0.9s infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .feat-icon {
+      width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+      background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(234,88,12,0.12)); color: var(--violet); font-weight: 700;
+    }
+    .gate-card { padding: 28px; background: var(--glass-strong); }
 
-    /* Graphical Analytics Row */
-    .charts-grid { display: grid; grid-template-columns: 1.45fr 1fr 1fr; gap: 16px; margin-bottom: 22px; }
-    .chart-card { padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; }
-    .card-kicker { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-    .big-num { font-size: 29px; font-weight: 700; letter-spacing: -0.02em; margin: 4px 0; }
+    .field { margin-bottom: 13px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--sub); margin-bottom: 5px; }
+    .field input, .field select {
+      width: 100%; padding: 10px 13px; border-radius: 12px; border: 1px solid var(--border-strong);
+      background: #FFFFFF; color: var(--text); font-size: 13.5px;
+    }
+    .field input:focus, .field select:focus { outline: 2px solid rgba(124, 58, 237, 0.35); border-color: var(--violet); }
 
-    .rings-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-items: center; margin-top: 8px; }
-    .ring-box { text-align: center; }
-    .ring-lbl { font-size: 11px; color: var(--sub); margin-top: 4px; font-weight: 500; }
+    /* APP SHELL (Shown ONLY after real login) */
+    #appShell { display: none; position: relative; z-index: 10; }
+    .topbar { position: sticky; top: 12px; z-index: 30; max-width: 1340px; margin: 12px auto 0; padding: 0 18px; }
+    .nav-pill {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 18px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.80);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid var(--border);
+      box-shadow: var(--highlight), 0 8px 28px rgba(15, 23, 42, 0.06);
+    }
+
+    .main-wrap {
+      max-width: 1340px; margin: 18px auto 60px; padding: 0 18px;
+      display: grid; grid-template-columns: minmax(0, 1fr) 355px; gap: 18px; align-items: start;
+    }
 
     /* Tabs */
-    .tabs-wrap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .tabs-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
     .tab-btn {
-      border: 1px solid transparent; background: rgba(255,255,255,0.05); color: var(--sub);
-      padding: 9px 16px; border-radius: 999px; font-weight: 600; font-size: 12.5px; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 8px; transition: all 0.18s;
+      border: 1px solid var(--border); background: rgba(255,255,255,0.60); color: var(--sub);
+      padding: 8px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 7px; transition: all 0.16s;
     }
-    .tab-btn:hover { background: rgba(255,255,255,0.11); color: #fff; }
-    .tab-btn.active {
-      background: var(--glass-strong); color: #fff; border-color: rgba(255,255,255,0.26);
-      box-shadow: var(--glass-highlight), 0 6px 20px rgba(0,0,0,0.3);
-    }
-    .pill-cnt { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: rgba(139, 92, 246, 0.32); color: #EDE9FE; }
+    .tab-btn.active { background: #FFFFFF; color: var(--violet); border-color: rgba(124,58,237,0.28); box-shadow: 0 4px 12px rgba(124,58,237,0.10); }
+    .pill-cnt { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(124,58,237,0.10); color: var(--violet); }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
-    /* League / Competition Container Cards */
-    .leagues-stack { display: flex; flex-direction: column; gap: 20px; }
-    .league-section { padding: 20px; }
+    /* League Cards */
+    .leagues-stack { display: flex; flex-direction: column; gap: 18px; }
+    .league-section { padding: 18px 20px; }
     .league-header {
-      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;
-      padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.12);
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border);
     }
-    .league-title-wrap { display: flex; align-items: center; gap: 12px; }
     .league-emblem {
-      width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center;
-      font-size: 12px; font-weight: 800; color: #fff;
-      background: linear-gradient(135deg, rgba(139,92,246,0.7), rgba(249,115,22,0.7));
-      border: 1px solid rgba(255,255,255,0.25);
+      width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+      font-size: 11px; font-weight: 800; color: #FFFFFF;
+      background: linear-gradient(135deg, #7C3AED, #EA580C);
     }
-    .league-name { font-size: 16.5px; font-weight: 700; margin: 0; }
-    .league-count { font-size: 12px; font-weight: 600; color: var(--sub); background: rgba(255,255,255,0.08); padding: 4px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); }
-
-    /* Match Sub-Cards inside League Container */
-    .matches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }
+    .matches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
     .match-card {
-      background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 12px;
-      transition: transform 0.18s, border-color 0.18s, background 0.18s;
+      background: rgba(255,255,255,0.82); border: 1px solid var(--border); border-radius: 18px;
+      padding: 15px; display: flex; flex-direction: column; gap: 11px; transition: transform 0.16s, box-shadow 0.16s;
     }
-    .match-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.28); background: rgba(255,255,255,0.07); }
-    .mc-top { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--sub); }
-    .mc-teams { font-size: 15.5px; font-weight: 700; text-align: center; letter-spacing: -0.01em; }
-
-    .prob-stack { height: 9px; border-radius: 999px; overflow: hidden; display: flex; gap: 2px; background: rgba(255,255,255,0.08); }
-    .ps-1 { background: linear-gradient(90deg, #7C3AED, #A78BFA); }
-    .ps-x { background: rgba(148, 163, 184, 0.65); }
-    .ps-2 { background: linear-gradient(90deg, #FB923C, #F97316); }
-    .prob-legend { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); margin-top: 5px; }
-
-    .split-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .mini-glass {
-      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10);
-      border-radius: 14px; padding: 10px 11px;
+    .match-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(15,23,42,0.07); }
+    .fav-btn {
+      border: 1px solid var(--border); background: #FFFFFF; border-radius: 999px;
+      width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer; color: #94A3B8; transition: all 0.15s;
     }
-    .mini-bar-row { margin-top: 6px; }
-    .mini-bar-lbl { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); }
-    .track { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.10); overflow: hidden; margin-top: 3px; }
-    .fill-v { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #8B5CF6, #C084FC); }
-    .fill-o { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #F97316, #FBBF24); }
-    .fill-g { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #22C55E, #4ADE80); }
+    .fav-btn.active { color: #F59E0B; border-color: #FDE68A; background: #FFFBEB; }
 
-    .dots { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+    .prob-stack { height: 8px; border-radius: 999px; overflow: hidden; display: flex; gap: 2px; background: #E2E8F0; }
+    .ps-1 { background: #7C3AED; }
+    .ps-x { background: #94A3B8; }
+    .ps-2 { background: #F97316; }
+
+    .split-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .mini-box { background: #F8FAFC; border: 1px solid var(--border); border-radius: 12px; padding: 9px 10px; }
+    .track { height: 6px; border-radius: 999px; background: #E2E8F0; overflow: hidden; margin-top: 3px; }
+    .fill-v { height: 100%; background: #7C3AED; border-radius: 999px; }
+    .fill-o { height: 100%; background: #F97316; border-radius: 999px; }
+    .fill-g { height: 100%; background: #16A34A; border-radius: 999px; }
+
+    .dots { display: flex; gap: 3px; margin-top: 7px; flex-wrap: wrap; }
     .dot-w, .dot-d, .dot-l {
-      width: 19px; height: 19px; border-radius: 6px; font-size: 10px; font-weight: 700;
-      display: grid; place-items: center; color: #fff;
+      width: 18px; height: 18px; border-radius: 5px; font-size: 10px; font-weight: 700;
+      display: grid; place-items: center; color: #FFFFFF;
     }
-    .dot-w { background: rgba(34, 197, 94, 0.85); }
-    .dot-d { background: rgba(148, 163, 184, 0.55); }
-    .dot-l { background: rgba(239, 68, 68, 0.82); }
+    .dot-w { background: #16A34A; }
+    .dot-d { background: #64748B; }
+    .dot-l { background: #DC2626; }
 
-    .mc-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.09); }
-    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-    .b-pos { background: rgba(34,197,94,0.2); color: var(--green); border: 1px solid rgba(74,222,128,0.35); }
-    .b-warn { background: rgba(251,191,36,0.16); color: var(--amber); border: 1px solid rgba(251,191,36,0.35); }
-    .b-lost { background: rgba(248,113,113,0.2); color: var(--red); border: 1px solid rgba(248,113,113,0.35); }
-    .b-pend { background: rgba(56,189,248,0.18); color: var(--blue); border: 1px solid rgba(56,189,248,0.35); }
+    .badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .b-pos { background: var(--green-bg); color: var(--green); }
+    .b-warn { background: var(--amber-bg); color: var(--amber); }
+    .b-lost { background: var(--red-bg); color: var(--red); }
+    .b-pend { background: var(--blue-bg); color: var(--blue); }
 
-    .table-glass { overflow-x: auto; padding: 8px; }
+    /* Sticky Slip Sidebar */
+    .slip-panel { position: sticky; top: 82px; padding: 18px; }
+    .slip-leg {
+      background: #FFFFFF; border: 1px solid var(--border); border-radius: 14px;
+      padding: 10px 12px; margin-bottom: 9px;
+    }
+    .slip-odd-input {
+      width: 74px; padding: 4px 7px; border-radius: 8px; border: 1px solid var(--border-strong);
+      font-weight: 700; font-size: 12.5px; text-align: center;
+    }
+
+    /* Charts & Tables */
+    .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 16px; }
+    .table-card { overflow-x: auto; padding: 8px; }
     table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.12); }
-    td { padding: 11px 10px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; padding: 10px; border-bottom: 1px solid var(--border); }
+    td { padding: 10px; border-bottom: 1px solid var(--border); }
     tr:last-child td { border-bottom: 0; }
 
-    .search-glass {
-      border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.07); color: #fff;
-      padding: 9px 15px; border-radius: 999px; font-size: 13px; min-width: 260px; backdrop-filter: blur(12px);
+    .search-input {
+      border: 1px solid var(--border-strong); background: #FFFFFF; color: var(--text);
+      padding: 8px 14px; border-radius: 999px; font-size: 13px; min-width: 230px;
     }
-    .search-glass::placeholder { color: var(--muted); }
 
     .overlay {
-      position: fixed; inset: 0; background: rgba(5, 6, 15, 0.70); backdrop-filter: blur(10px);
-      z-index: 60; display: none; justify-content: center; align-items: center; padding: 16px;
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(8px);
+      z-index: 60; display: none; justify-content: flex-end; padding: 12px;
     }
     .overlay.open { display: flex; }
-    .modal-card { width: min(440px, 100%); padding: 24px; }
-    .drawer-wrap { justify-content: flex-end; align-items: stretch; padding: 12px; }
-    .drawer-card { width: min(560px, 100%); padding: 22px; overflow-y: auto; }
+    .drawer { width: min(560px, 100%); background: rgba(255,255,255,0.92); padding: 22px; overflow-y: auto; }
 
-    .field { margin-bottom: 12px; }
-    .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 5px; font-weight: 600; }
-    .field input, .field select {
-      width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.22);
-      background: rgba(255,255,255,0.08); color: #fff; font-size: 13.5px;
+    @media (max-width: 1020px) {
+      .main-wrap, .gate-grid { grid-template-columns: 1fr; }
+      .slip-panel { position: static; }
     }
-
-    @media (max-width: 960px) { .charts-grid { grid-template-columns: 1fr; } }
-    @media (max-width: 640px) {
+    @media (max-width: 600px) {
       .matches-grid, .split-bars { grid-template-columns: 1fr; }
       .nav-pill { border-radius: 22px; }
     }
@@ -246,161 +249,223 @@
     <div class="orb orb-3"></div>
   </div>
 
-  <header class="topbar">
-    <div class="nav-pill">
-      <div class="brand">
-        <div class="brand-logo" aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
-            <path d="M5 10L9 5L13 9H19L23 5L27 10L25 22L16 27L7 22L5 10Z" fill="rgba(15,15,30,0.85)" stroke="white" stroke-width="1.6"/>
-            <path d="M8 14.5C8 13.2 9.1 12.2 10.4 12.2H14.5L16 14L17.5 12.2H21.6C22.9 12.2 24 13.2 24 14.5V16.2C24 17.6 22.8 18.6 21.4 18.4L17.2 17.8L16 16.5L14.8 17.8L10.6 18.4C9.2 18.6 8 17.6 8 16.2V14.5Z" fill="#F97316" stroke="#FDE047" stroke-width="1"/>
-            <circle cx="16" cy="21.5" r="1.4" fill="#F8FAFC"/>
-          </svg>
+  <!-- LOGIN / REGISTER GATE (Exclusive access only after authentication) -->
+  <section id="authGate">
+    <div class="gate-grid">
+      <div class="gate-hero">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="brand-logo" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+              <path d="M5 10L9 5L13 9H19L23 5L27 10L25 22L16 27L7 22L5 10Z" fill="rgba(15,15,30,0.85)" stroke="white" stroke-width="1.6"/>
+              <path d="M8 14.5C8 13.2 9.1 12.2 10.4 12.2H14.5L16 14L17.5 12.2H21.6C22.9 12.2 24 13.2 24 14.5V16.2C24 17.6 22.8 18.6 21.4 18.4L17.2 17.8L16 16.5L14.8 17.8L10.6 18.4C9.2 18.6 8 17.6 8 16.2V14.5Z" fill="#F97316" stroke="#FDE047" stroke-width="1"/>
+              <circle cx="16" cy="21.5" r="1.4" fill="#F8FAFC"/>
+            </svg>
+          </div>
+          <span style="font-size:20px;font-weight:800;letter-spacing:-0.02em;">Caza Cuotas</span>
         </div>
-        <div>
-          <div class="brand-title">Caza Cuotas</div>
-          <div class="brand-sub">Pronósticos &amp; Estadísticas Deportivas</div>
+        <h1>Analiza tus apuestas con datos reales antes de jugar.</h1>
+        <p>Inicia sesión para acceder al radar de ligas europeas y Liga BetPlay, guardar tus partidos favoritos, ingresar las cuotas de tu casa de apuestas y evaluar tus combinadas.</p>
+        <div class="feature-list">
+          <div class="feature-item">
+            <div class="feat-icon">★</div>
+            <div><strong>Partidos Favoritos</strong><div style="font-size:12px;color:var(--muted);">Guarda los partidos que quieres seguir en tu cuenta personal.</div></div>
+          </div>
+          <div class="feature-item">
+            <div class="feat-icon">%</div>
+            <div><strong>Analizador de Cuota Propia</strong><div style="font-size:12px;color:var(--muted);">Ingresa la cuota que te da tu casa y el bot calcula si tiene valor o margen en contra.</div></div>
+          </div>
+          <div class="feature-item">
+            <div class="feat-icon">+</div>
+            <div><strong>Armador de Combinadas &amp; Cupón</strong><div style="font-size:12px;color:var(--muted);">Arma tus propias jugadas, evalúa la probabilidad conjunta y simula tu bankroll.</div></div>
+          </div>
         </div>
       </div>
 
-      <div class="nav-actions">
-        <div class="seg-glass">
-          <button class="seg-btn active" id="scopeEu" onclick="setScope('eu')">Europa</button>
-          <button class="seg-btn" id="scopeAll" onclick="setScope('all')">Todas</button>
-          <button class="seg-btn" id="scopeCol" onclick="setScope('col.1')">Colombia</button>
+      <div class="glass gate-card">
+        <h2 style="margin:0 0 14px;font-size:20px;">Acceder a Caza Cuotas</h2>
+        <div id="staticAuthNotice" style="display:none;padding:10px 12px;border-radius:12px;background:var(--amber-bg);color:var(--amber);font-size:12px;margin-bottom:14px;">
+          Esta URL estática no tiene servidor activo. Ejecuta <strong>abrir_bot.bat</strong> en tu PC (o sube el servidor Python a un VPS/Railway) para iniciar sesión real.
         </div>
-        <button class="btn-glass btn-accent" id="btnScan" onclick="runScan()">Actualizar</button>
-        <button class="btn-glass" id="btnSettle" onclick="runSettle()">Liquidar</button>
-        <div id="authSlot"></div>
+        <div class="seg" style="width:100%;margin-bottom:16px;">
+          <button class="seg-btn active" style="flex:1;" id="tabLoginMode" onclick="setAuthMode('login')">Iniciar Sesión</button>
+          <button class="seg-btn" style="flex:1;" id="tabRegMode" onclick="setAuthMode('register')">Crear Cuenta</button>
+        </div>
+        <div class="field">
+          <label>Usuario</label>
+          <input type="text" id="authUser" placeholder="ej. juantovar" autocomplete="username" />
+        </div>
+        <div class="field" id="displayWrap" style="display:none;">
+          <label>Nombre completo</label>
+          <input type="text" id="authDisplay" placeholder="ej. Juan Tovar" />
+        </div>
+        <div class="field">
+          <label>Contraseña (mín. 6 caracteres)</label>
+          <input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitAuth()" />
+        </div>
+        <div id="authErr" style="color:var(--red);font-size:12px;min-height:18px;margin-bottom:10px;"></div>
+        <button class="btn btn-primary" style="width:100%;padding:11px;" onclick="submitAuth()">Entrar</button>
       </div>
     </div>
-  </header>
+  </section>
 
-  <main class="container">
-    <div class="status-line">
-      <div><span class="pulse-dot" id="statusDot"></span><span id="statusText">Cargando partidos...</span></div>
-      <div class="num" id="updateTimeTag">Hora Colombia</div>
-    </div>
-
-    <section class="charts-grid">
-      <div class="glass chart-card">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+  <!-- AUTHENTICATED WORKSPACE -->
+  <div id="appShell">
+    <header class="topbar">
+      <div class="nav-pill">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="brand-logo" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+              <path d="M5 10L9 5L13 9H19L23 5L27 10L25 22L16 27L7 22L5 10Z" fill="rgba(15,15,30,0.85)" stroke="white" stroke-width="1.6"/>
+              <path d="M8 14.5C8 13.2 9.1 12.2 10.4 12.2H14.5L16 14L17.5 12.2H21.6C22.9 12.2 24 13.2 24 14.5V16.2C24 17.6 22.8 18.6 21.4 18.4L17.2 17.8L16 16.5L14.8 17.8L10.6 18.4C9.2 18.6 8 17.6 8 16.2V14.5Z" fill="#F97316" stroke="#FDE047" stroke-width="1"/>
+              <circle cx="16" cy="21.5" r="1.4" fill="#F8FAFC"/>
+            </svg>
+          </div>
           <div>
-            <div class="card-kicker" id="curveTitle">Evolución del Bankroll</div>
-            <div class="big-num num" id="heroBank">100.00u</div>
+            <div style="font-size:16px;font-weight:700;line-height:1.1;">Caza Cuotas</div>
+            <div style="font-size:11.5px;color:var(--muted);" id="welcomeUser">Bienvenido</div>
           </div>
-          <div id="heroRoiBadge"><span class="badge b-pend">ROI 0.00%</span></div>
         </div>
-        <div id="equityChartWrap" style="margin-top:8px;"></div>
-      </div>
 
-      <div class="glass chart-card">
-        <div class="card-kicker">Resumen de Rendimiento</div>
-        <div class="rings-row" id="ringsWrap"></div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:10px;">
-          Resultados verificados con marcadores oficiales.
-        </div>
-      </div>
-
-      <div class="glass chart-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div class="card-kicker">Calculadora Fibonacci vs Fijo</div>
-          <span class="badge b-warn">Gestión de Riesgo</span>
-        </div>
-        <div style="margin-top:8px;">
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--sub);">
-            <span>Racha de pérdidas seguidas: <strong class="num" id="fibLossVal">5</strong></span>
-            <span>Base: <strong class="num">2u</strong></span>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+          <div class="seg">
+            <button class="seg-btn active" id="scopeEu" onclick="setScope('eu')">Europa</button>
+            <button class="seg-btn" id="scopeAll" onclick="setScope('all')">Todas</button>
+            <button class="seg-btn" id="scopeCol" onclick="setScope('col.1')">Colombia</button>
           </div>
-          <input type="range" min="1" max="8" value="5" id="fibSlider" oninput="renderFibSim()" style="width:100%;accent-color:#F97316;margin:6px 0;" />
+          <button class="btn" id="btnFavFilter" onclick="toggleFavOnly()">★ Favoritos</button>
+          <button class="btn btn-primary" id="btnScan" onclick="runScan()">Actualizar</button>
+          <button class="btn" id="btnSettle" onclick="runSettle()">Liquidar</button>
+          <button class="btn" onclick="doLogout()">Salir</button>
         </div>
-        <div id="fibChartWrap"></div>
       </div>
-    </section>
+    </header>
 
-    <div class="tabs-wrap">
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        <button class="tab-btn active" onclick="switchTab('tabRadar', this)">Partidos por Liga <span class="pill-cnt" id="cntRadar">0</span></button>
-        <button class="tab-btn" onclick="switchTab('tabOptA', this)">Combinadas de 2 <span class="pill-cnt" id="cntOptA">0</span></button>
-        <button class="tab-btn" onclick="switchTab('tabOptB', this)">Mismo Partido <span class="pill-cnt" id="cntOptB">0</span></button>
-        <button class="tab-btn" onclick="switchTab('tabMyBets', this)">Mi Cuenta <span class="pill-cnt" id="cntUserBets">0</span></button>
-        <button class="tab-btn" onclick="switchTab('tabBotHist', this)">Historial General <span class="pill-cnt" id="cntBotHist">0</span></button>
-      </div>
-      <input type="search" id="searchInput" class="search-glass" placeholder="Buscar equipo o liga..." oninput="renderMatches()" />
-    </div>
+    <div class="main-wrap">
+      <!-- Left Main Area -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px 10px;font-size:12px;color:var(--muted);">
+          <span id="statusText">Listo</span>
+          <span class="num" id="bankHeaderTag">Saldo: 100.00u</span>
+        </div>
 
-    <section id="tabRadar" class="tab-panel active">
-      <div class="leagues-stack" id="leaguesContainer"></div>
-    </section>
+        <div class="tabs-row">
+          <div style="display:flex;flex-wrap:wrap;gap:7px;">
+            <button class="tab-btn active" onclick="switchTab('tabRadar', this)">Partidos por Liga <span class="pill-cnt" id="cntRadar">0</span></button>
+            <button class="tab-btn" onclick="switchTab('tabAnalyzer', this)">Analizar Mi Cuota</button>
+            <button class="tab-btn" onclick="switchTab('tabCombos', this)">Combinadas del Bot <span class="pill-cnt" id="cntCombos">0</span></button>
+            <button class="tab-btn" onclick="switchTab('tabAccount', this)">Mi Rendimiento <span class="pill-cnt" id="cntMyBets">0</span></button>
+          </div>
+          <input type="search" id="searchInput" class="search-input" placeholder="Buscar equipo o liga..." oninput="renderMatches()" />
+        </div>
 
-    <section id="tabOptA" class="tab-panel">
-      <div class="matches-grid" id="optAGrid"></div>
-    </section>
+        <!-- TAB 1: Leagues & Matches -->
+        <section id="tabRadar" class="tab-panel active">
+          <div class="leagues-stack" id="leaguesContainer"></div>
+        </section>
 
-    <section id="tabOptB" class="tab-panel">
-      <div class="matches-grid" id="optBGrid"></div>
-    </section>
+        <!-- TAB 2: Custom Odds Analyzer -->
+        <section id="tabAnalyzer" class="tab-panel">
+          <div class="glass" style="padding:22px;">
+            <h2 style="margin:0 0 6px;font-size:18px;">Analizador de Cuota Propia</h2>
+            <p style="margin:0 0 18px;font-size:13px;color:var(--sub);">Elige un partido, selecciona el mercado e ingresa la cuota exacta que te ofrece tu casa de apuestas para que el bot la evalúe con todos los datos.</p>
+            <div style="display:grid;grid-template-columns:1.4fr 1fr 0.6fr auto;gap:10px;align-items:end;">
+              <div class="field" style="margin:0;">
+                <label>Partido</label>
+                <select id="azMatch"></select>
+              </div>
+              <div class="field" style="margin:0;">
+                <label>Mercado</label>
+                <select id="azMarket"></select>
+              </div>
+              <div class="field" style="margin:0;">
+                <label>Tu Cuota</label>
+                <input type="number" step="0.01" min="1.01" max="50" id="azOdds" value="1.50" />
+              </div>
+              <button class="btn btn-primary" style="height:41px;" onclick="analyzeCustomOdds()">Analizar</button>
+            </div>
+            <div id="azResult" style="margin-top:18px;"></div>
+          </div>
+        </section>
 
-    <section id="tabMyBets" class="tab-panel">
-      <div class="glass" style="padding:18px;margin-bottom:14px;" id="userConfigBox"></div>
-      <div class="glass table-glass">
-        <table>
-          <thead><tr><th>#</th><th>Fecha</th><th>Partido</th><th>Mercado</th><th>Cuota</th><th>Stake</th><th>Estado</th><th>Neto</th></tr></thead>
-          <tbody id="userBetsBody"></tbody>
-        </table>
-      </div>
-    </section>
+        <!-- TAB 3: Bot Suggested Combos -->
+        <section id="tabCombos" class="tab-panel">
+          <div class="matches-grid" id="combosGrid"></div>
+        </section>
 
-    <section id="tabBotHist" class="tab-panel">
-      <div class="glass table-glass">
-        <table>
-          <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Jugada</th><th>Mercado</th><th>Cuota</th><th>Estado</th><th>Neto</th></tr></thead>
-          <tbody id="botHistBody"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
+        <!-- TAB 4: Personal Account Performance, Charts & Fibonacci -->
+        <section id="tabAccount" class="tab-panel">
+          <div class="charts-row">
+            <div class="glass" style="padding:18px;">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Tu Bankroll</div>
+              <div class="num" style="font-size:28px;font-weight:800;margin:4px 0;" id="myBankVal">100.00u</div>
+              <div id="myRoiBadge"></div>
+              <div id="equityChartWrap" style="margin-top:8px;"></div>
+            </div>
+            <div class="glass" style="padding:18px;">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Resumen Personal</div>
+              <div id="myRingsWrap" style="display:flex;justify-content:space-around;margin-top:12px;"></div>
+            </div>
+            <div class="glass" style="padding:18px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Simulador Fibonacci</span>
+                <span class="badge b-warn">Base 2u</span>
+              </div>
+              <div style="font-size:12px;color:var(--sub);margin-top:6px;">Pérdidas seguidas: <strong class="num" id="fibLossVal">5</strong></div>
+              <input type="range" min="1" max="8" value="5" id="fibSlider" oninput="renderFibSim()" style="width:100%;accent-color:#EA580C;margin:6px 0;" />
+              <div id="fibChartWrap"></div>
+            </div>
+          </div>
 
-  <!-- Login / Register Modal -->
-  <div class="overlay" id="authModal" onclick="if(event.target===this) closeAuth()">
-    <div class="glass modal-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h2 style="margin:0;font-size:18px;">Acceso Caza Cuotas</h2>
-        <button class="btn-glass" style="padding:5px 11px;" onclick="closeAuth()">Cerrar</button>
+          <div class="glass" style="padding:16px 18px;margin-bottom:14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
+            <div>
+              <strong>Configuración de Stake Personal</strong>
+              <div style="font-size:12px;color:var(--sub);" id="stakeModeDesc">Modo actual: Stake Fijo (2.0u)</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="prefMode" style="padding:8px 12px;border-radius:10px;border:1px solid var(--border-strong);background:#FFFFFF;">
+                <option value="flat">Stake Fijo (2u)</option>
+                <option value="fibonacci">Progresión Fibonacci</option>
+              </select>
+              <button class="btn btn-primary" onclick="savePrefs()">Guardar</button>
+            </div>
+          </div>
+
+          <div class="glass table-card">
+            <table>
+              <thead><tr><th>#</th><th>Fecha</th><th>Jugada</th><th>Mercado</th><th>Cuota</th><th>Stake</th><th>Estado</th><th>Neto</th></tr></thead>
+              <tbody id="userBetsBody"></tbody>
+            </table>
+          </div>
+        </section>
       </div>
-      <div id="staticAuthNotice" style="display:none;padding:10px 12px;border-radius:12px;background:rgba(251,191,36,0.14);border:1px solid rgba(251,191,36,0.35);color:#FDE68A;font-size:12px;margin-bottom:12px;">
-        Esta vista web está en modo de solo consulta. Para iniciar sesión real multiusuario necesitas tener el servidor de <strong>Caza Cuotas</strong> encendido (local o en un VPS/Railway).
-      </div>
-      <div class="seg-glass" style="width:100%;margin-bottom:16px;">
-        <button class="seg-btn active" style="flex:1;" id="tabLoginMode" onclick="setAuthMode('login')">Iniciar Sesión</button>
-        <button class="seg-btn" style="flex:1;" id="tabRegMode" onclick="setAuthMode('register')">Crear Cuenta</button>
-      </div>
-      <div class="field">
-        <label>Usuario</label>
-        <input type="text" id="authUser" placeholder="ej. juantovar" autocomplete="username" />
-      </div>
-      <div class="field" id="displayWrap" style="display:none;">
-        <label>Nombre completo</label>
-        <input type="text" id="authDisplay" placeholder="ej. Juan Tovar" />
-      </div>
-      <div class="field">
-        <label>Contraseña (mín. 6 caracteres)</label>
-        <input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password" />
-      </div>
-      <div id="authErr" style="color:var(--red);font-size:12px;min-height:18px;margin-bottom:10px;"></div>
-      <button class="btn-glass btn-accent" style="width:100%;justify-content:center;padding:11px;" onclick="submitAuth()">Continuar</button>
+
+      <!-- Sticky Right Sidebar: Interactive Bet Slip & Live Parlay Analyzer -->
+      <aside class="glass slip-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div>
+            <h3 style="margin:0;font-size:16px;">Mi Cupón</h3>
+            <div style="font-size:11.5px;color:var(--muted);">Arma tu apuesta y edita cuotas</div>
+          </div>
+          <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="clearSlip()">Limpiar</button>
+        </div>
+
+        <div id="slipLegs"></div>
+
+        <div id="slipSummary" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;"></div>
+      </aside>
     </div>
   </div>
 
-  <!-- Match 17-Market Glass Drawer -->
-  <div class="overlay drawer-wrap" id="drawerOverlay" onclick="if(event.target===this) closeDrawer()">
-    <aside class="glass drawer-card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-bottom:1px solid rgba(255,255,255,0.14);padding-bottom:12px;margin-bottom:14px;">
+  <!-- Match 17-Market Light Liquid Glass Drawer -->
+  <div class="overlay" id="drawerOverlay" onclick="if(event.target===this) closeDrawer()">
+    <aside class="glass drawer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;">
         <div>
-          <span class="league-count" id="drLeague"></span>
-          <h2 id="drTitle" style="margin:8px 0 2px;font-size:18px;"></h2>
+          <span class="badge b-pend" id="drLeague"></span>
+          <h2 id="drTitle" style="margin:6px 0 2px;font-size:18px;"></h2>
           <div id="drSub" style="font-size:12px;color:var(--muted);"></div>
         </div>
-        <button class="btn-glass" onclick="closeDrawer()">Cerrar</button>
+        <button class="btn" onclick="closeDrawer()">Cerrar</button>
       </div>
       <div id="drBody"></div>
     </aside>
@@ -409,26 +474,80 @@
   <script>
     const STATIC_MODE = true;
     const LEAGUE_ORDER = ['uefa.champions', 'ger.1', 'ita.1', 'eng.1', 'esp.1', 'fra.1', 'col.1'];
-    const LEAGUE_SHORT = {
-      'col.1': 'COL', 'uefa.champions': 'UCL', 'eng.1': 'ENG',
-      'esp.1': 'ESP', 'ita.1': 'ITA', 'ger.1': 'GER', 'fra.1': 'FRA'
-    };
+    const LEAGUE_SHORT = { 'col.1': 'COL', 'uefa.champions': 'UCL', 'eng.1': 'ENG', 'esp.1': 'ESP', 'ita.1': 'ITA', 'ger.1': 'GER', 'fra.1': 'FRA' };
 
     let currentScope = 'eu';
-    let fullStaticData = null;
-    let lastScan = { matches: [], parlays_a: [], opt_b: [] };
-    let botReport = { bankroll_u: 100, roi_pct: 0, won: 0, lost: 0, pending: 0, total_trades: 0, equity_curve: [100], recent: [] };
+    let favOnly = false;
+    let authMode = 'login';
     let currentUser = null;
     let userSummary = null;
-    let authMode = 'login';
+    let favorites = new Set();
+    let lastScan = { matches: [], parlays_a: [], opt_b: [] };
+    let slip = []; // [{event_id, league, match_date, title, market, market_name, odds, prob}]
+
+    function setAuthMode(mode) {
+      authMode = mode;
+      document.getElementById('tabLoginMode').classList.toggle('active', mode === 'login');
+      document.getElementById('tabRegMode').classList.toggle('active', mode === 'register');
+      document.getElementById('displayWrap').style.display = mode === 'register' ? 'block' : 'none';
+    }
+
+    async function checkAuth() {
+      if (STATIC_MODE) {
+        document.getElementById('staticAuthNotice').style.display = 'block';
+        return;
+      }
+      const r = await fetch('/api/auth/me');
+      const d = await r.json();
+      if (d.logged_in && d.user) {
+        currentUser = d.user;
+        userSummary = d.summary;
+        favorites = new Set((d.summary && d.summary.favorites) || []);
+        document.getElementById('authGate').style.display = 'none';
+        document.getElementById('appShell').style.display = 'block';
+        renderUserUI();
+        if (!lastScan.matches.length) await runScan();
+      } else {
+        currentUser = null;
+        document.getElementById('authGate').style.display = 'flex';
+        document.getElementById('appShell').style.display = 'none';
+      }
+    }
+
+    async function submitAuth() {
+      if (STATIC_MODE) {
+        document.getElementById('authErr').textContent = 'Ejecuta abrir_bot.bat o monta el servidor Python para iniciar sesión.';
+        return;
+      }
+      const username = document.getElementById('authUser').value;
+      const display_name = document.getElementById('authDisplay').value;
+      const password = document.getElementById('authPass').value;
+      const ep = authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
+      const r = await fetch(ep, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username, display_name, password}) });
+      const d = await r.json();
+      if (!r.ok) { document.getElementById('authErr').textContent = d.error || 'Error de acceso'; return; }
+      await checkAuth();
+    }
+
+    async function doLogout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      lastScan = { matches: [], parlays_a: [], opt_b: [] };
+      slip = [];
+      await checkAuth();
+    }
 
     function setScope(scope) {
       currentScope = scope;
       document.getElementById('scopeEu').classList.toggle('active', scope === 'eu');
       document.getElementById('scopeAll').classList.toggle('active', scope === 'all');
       document.getElementById('scopeCol').classList.toggle('active', scope === 'col.1');
-      if (STATIC_MODE && fullStaticData) applyStaticScope();
-      else runScan();
+      runScan();
+    }
+
+    function toggleFavOnly() {
+      favOnly = !favOnly;
+      document.getElementById('btnFavFilter').classList.toggle('btn-primary', favOnly);
+      renderMatches();
     }
 
     function switchTab(id, btn) {
@@ -439,17 +558,13 @@
     }
 
     function setStatus(loading, msg) {
-      document.getElementById('statusDot').classList.toggle('loading', loading);
       document.getElementById('statusText').textContent = msg;
-      const b1 = document.getElementById('btnScan'), b2 = document.getElementById('btnSettle');
-      if (b1) b1.disabled = loading;
-      if (b2) b2.disabled = loading;
+      document.getElementById('btnScan').disabled = loading;
+      document.getElementById('btnSettle').disabled = loading;
     }
 
     function evBadge(ev) {
-      return ev > 0
-        ? `<span class="badge b-pos">Ventaja +${ev}%</span>`
-        : `<span class="badge b-warn">Margen ${ev}%</span>`;
+      return ev > 0 ? `<span class="badge b-pos">Ventaja +${ev}%</span>` : `<span class="badge b-warn">Margen ${ev}%</span>`;
     }
 
     function formDots(scores) {
@@ -457,161 +572,55 @@
       return scores.slice(-6).map(s => {
         const [gf, ga] = s.split('-').map(Number);
         const cls = gf > ga ? 'dot-w' : (gf === ga ? 'dot-d' : 'dot-l');
-        const txt = gf > ga ? 'G' : (gf === ga ? 'E' : 'P');
-        return `<span class="${cls}" title="${s}">${txt}</span>`;
+        return `<span class="${cls}" title="${s}">${gf > ga ? 'G' : (gf === ga ? 'E' : 'P')}</span>`;
       }).join('');
     }
 
-    function svgRing(pct, color, label, valueText) {
-      const r = 28, c = 2 * Math.PI * r;
-      const off = c * (1 - Math.max(0, Math.min(100, pct)) / 100);
-      return `<div class="ring-box">
-        <svg width="74" height="74" viewBox="0 0 74 74">
-          <circle cx="37" cy="37" r="${r}" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="7"/>
-          <circle cx="37" cy="37" r="${r}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round"
-            stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 37 37)"/>
-          <text x="37" y="41" text-anchor="middle" fill="#F8FAFC" font-size="13" font-weight="700" font-family="Poppins,sans-serif">${valueText}</text>
-        </svg>
-        <div class="ring-lbl">${label}</div>
-      </div>`;
+    async function runScan() {
+      setStatus(true, 'Consultando partidos y estadísticas...');
+      const res = await fetch(`/api/scan?scope=${currentScope}&days=5`);
+      if (res.status === 401) { await checkAuth(); return; }
+      lastScan = await res.json();
+      setStatus(false, `${lastScan.total_matches} partidos próximos analizados.`);
+      populateAnalyzerSelects();
+      renderMatches();
+      renderCombos();
+      renderSlip();
     }
 
-    function renderCharts() {
-      const activeRep = (currentUser && userSummary) ? userSummary : botReport;
-      document.getElementById('curveTitle').textContent = currentUser ? `Bankroll de ${currentUser.display_name}` : 'Evolución del Bankroll';
-      document.getElementById('heroBank').textContent = `${activeRep.bankroll_u.toFixed(2)}u`;
-      const roi = activeRep.roi_pct || 0;
-      document.getElementById('heroRoiBadge').innerHTML = `<span class="badge ${roi >= 0 ? 'b-pos' : 'b-lost'}">ROI ${roi >= 0 ? '+' : ''}${roi}%</span>`;
+    async function runSettle() {
+      setStatus(true, 'Liquidando resultados reales...');
+      const r = await fetch('/api/settle', { method: 'POST' });
+      if (r.status === 401) { await checkAuth(); return; }
+      const d = await r.json();
+      setStatus(false, `Liquidación lista: ${d.user_settled || 0} jugadas tuyas actualizadas.`);
+      await checkAuth();
+    }
 
-      const pts = activeRep.equity_curve && activeRep.equity_curve.length > 1 ? activeRep.equity_curve : [100, 100];
-      const W = 420, H = 96, pad = 10;
-      const minV = Math.min(...pts, 95), maxV = Math.max(...pts, 105);
-      const span = Math.max(1, maxV - minV);
-      const coords = pts.map((v, i) => {
-        const x = pad + (i / (pts.length - 1)) * (W - 2 * pad);
-        const y = H - pad - ((v - minV) / span) * (H - 2 * pad);
-        return [x, y];
+    async function toggleFavorite(eventId) {
+      const r = await fetch('/api/user/favorite', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({event_id: eventId})
       });
-      const poly = coords.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
-      const area = `${coords[0][0].toFixed(1)},${H - pad} ${poly} ${coords[coords.length - 1][0].toFixed(1)},${H - pad}`;
-      const baseY = H - pad - ((100 - minV) / span) * (H - 2 * pad);
-
-      document.getElementById('equityChartWrap').innerHTML = `
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:96px;display:block;">
-          <defs>
-            <linearGradient id="eqGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#F97316"/>
-            </linearGradient>
-            <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="rgba(139,92,246,0.45)"/><stop offset="100%" stop-color="rgba(139,92,246,0)"/>
-            </linearGradient>
-          </defs>
-          <line x1="${pad}" y1="${baseY.toFixed(1)}" x2="${W - pad}" y2="${baseY.toFixed(1)}" stroke="rgba(255,255,255,0.2)" stroke-dasharray="4 4"/>
-          <polygon points="${area}" fill="url(#eqFill)"/>
-          <polyline points="${poly}" fill="none" stroke="url(#eqGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>`;
-
-      const settled = activeRep.settled || 0;
-      const winPct = settled > 0 ? Math.round((activeRep.won / settled) * 100) : 0;
-      const allPicks = [...(lastScan.parlays_a || []), ...(lastScan.opt_b || [])];
-      const evPct = allPicks.length ? Math.round((allPicks.filter(x => x.ev_pct > 0).length / allPicks.length) * 100) : 0;
-      const euMatches = (lastScan.matches || []).filter(m => m.league !== 'col.1').length;
-      const euShare = lastScan.matches && lastScan.matches.length ? Math.round((euMatches / lastScan.matches.length) * 100) : 100;
-
-      document.getElementById('ringsWrap').innerHTML =
-        svgRing(winPct, '#4ADE80', 'Acierto', settled ? `${winPct}%` : '—') +
-        svgRing(evPct, '#8B5CF6', 'Con Ventaja', `${evPct}%`) +
-        svgRing(euShare, '#F97316', 'Europa', `${euMatches}`);
-      renderFibSim();
-    }
-
-    function renderFibSim() {
-      const k = parseInt(document.getElementById('fibSlider').value, 10);
-      document.getElementById('fibLossVal').textContent = k;
-      const seq = [1, 1, 2, 3, 5, 8, 13, 21];
-      let fibSum = 0, flatSum = 0;
-      const bars = [];
-      for (let i = 0; i < k; i++) {
-        fibSum += 2 * seq[i];
-        flatSum += 2;
-        bars.push({ step: i + 1, stake: 2 * seq[i] });
+      if (r.ok) {
+        const d = await r.json();
+        if (d.added) favorites.add(eventId); else favorites.delete(eventId);
+        renderMatches();
       }
-      const maxS = Math.max(...bars.map(b => b.stake), 4);
-      const barsHtml = bars.map(b => {
-        const h = Math.max(8, Math.round((b.stake / maxS) * 44));
-        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
-          <span class="num" style="font-size:10px;color:#FDBA74;">${b.stake}u</span>
-          <div style="width:100%;height:${h}px;border-radius:6px;background:linear-gradient(180deg,#F97316,#7C3AED);"></div>
-        </div>`;
-      }).join('');
-      document.getElementById('fibChartWrap').innerHTML = `
-        <div style="display:flex;align-items:flex-end;gap:5px;height:68px;margin-top:4px;">${barsHtml}</div>
-        <div style="font-size:11px;color:var(--sub);margin-top:8px;">
-          Riesgo acumulado: <strong class="num" style="color:#F87171;">${fibSum}u</strong> (Fibonacci) vs <strong class="num" style="color:#4ADE80;">${flatSum}u</strong> (Fijo).
-        </div>`;
-    }
-
-    function renderMatchCardHtml(m, origIdx) {
-      const sInv = 1 / m.o1 + 1 / m.ox + 1 / m.o2;
-      const p1 = ((1 / m.o1) / sInv * 100), px = ((1 / m.ox) / sInv * 100), p2 = ((1 / m.o2) / sInv * 100);
-      const hs = m.h_stat, as_ = m.a_stat;
-      const bestPick = m.opt_b_pick || m.opt_a_leg;
-      const badgeHtml = bestPick
-        ? `${evBadge(bestPick.ev_pct)} <span style="font-size:11.5px;font-weight:600;">${bestPick.market_name} @${bestPick.odds.toFixed(2)}</span>`
-        : '<span style="font-size:11.5px;color:var(--muted);">Sin pick en rango 1.20–1.90</span>';
-
-      return `<article class="match-card">
-        <div class="mc-top">
-          <span class="num">${m.kickoff_col} COL</span>
-          <span>${m.ou_line ? 'Goles O/U ' + m.ou_line : ''}</span>
-        </div>
-        <div class="mc-teams">${m.home} <span style="color:var(--orange);font-weight:500;">vs</span> ${m.away}</div>
-        <div>
-          <div class="prob-stack">
-            <div class="ps-1" style="width:${p1.toFixed(1)}%"></div>
-            <div class="ps-x" style="width:${px.toFixed(1)}%"></div>
-            <div class="ps-2" style="width:${p2.toFixed(1)}%"></div>
-          </div>
-          <div class="prob-legend num">
-            <span>1: ${p1.toFixed(0)}% (@${m.o1.toFixed(2)})</span>
-            <span>X: ${px.toFixed(0)}% (@${m.ox.toFixed(2)})</span>
-            <span>2: ${p2.toFixed(0)}% (@${m.o2.toFixed(2)})</span>
-          </div>
-        </div>
-        <div class="split-bars">
-          <div class="mini-glass">
-            <div style="font-size:11.5px;font-weight:600;">${m.home}</div>
-            <div class="mini-bar-row"><div class="mini-bar-lbl"><span>Gana</span><span class="num">${(hs.win_pct*100).toFixed(0)}%</span></div><div class="track"><div class="fill-v" style="width:${hs.win_pct*100}%"></div></div></div>
-            <div class="mini-bar-row"><div class="mini-bar-lbl"><span>No pierde</span><span class="num">${(hs.unbeaten_pct*100).toFixed(0)}%</span></div><div class="track"><div class="fill-g" style="width:${hs.unbeaten_pct*100}%"></div></div></div>
-            <div class="dots">${formDots(m.h_recent_scores)}</div>
-          </div>
-          <div class="mini-glass">
-            <div style="font-size:11.5px;font-weight:600;">${m.away}</div>
-            <div class="mini-bar-row"><div class="mini-bar-lbl"><span>Gana</span><span class="num">${(as_.win_pct*100).toFixed(0)}%</span></div><div class="track"><div class="fill-o" style="width:${as_.win_pct*100}%"></div></div></div>
-            <div class="mini-bar-row"><div class="mini-bar-lbl"><span>No pierde</span><span class="num">${(as_.unbeaten_pct*100).toFixed(0)}%</span></div><div class="track"><div class="fill-g" style="width:${as_.unbeaten_pct*100}%"></div></div></div>
-            <div class="dots">${formDots(m.a_recent_scores)}</div>
-          </div>
-        </div>
-        <div class="mc-foot">
-          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">${badgeHtml}</div>
-          <button class="btn-glass" style="padding:6px 12px;font-size:12px;" onclick="openDrawer(${origIdx})">Ver Mercados</button>
-        </div>
-      </article>`;
     }
 
     function renderMatches() {
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
-      const list = (lastScan.matches || []).filter(m =>
-        !q || m.home.toLowerCase().includes(q) || m.away.toLowerCase().includes(q) || m.league_label.toLowerCase().includes(q)
-      );
+      const list = (lastScan.matches || []).filter(m => {
+        if (favOnly && !favorites.has(m.event_id)) return false;
+        return !q || m.home.toLowerCase().includes(q) || m.away.toLowerCase().includes(q) || m.league_label.toLowerCase().includes(q);
+      });
       document.getElementById('cntRadar').textContent = list.length;
 
       if (!list.length) {
-        document.getElementById('leaguesContainer').innerHTML = '<div class="glass" style="padding:36px;text-align:center;color:var(--muted);">No hay partidos disponibles para este filtro.</div>';
+        document.getElementById('leaguesContainer').innerHTML = `<div class="glass" style="padding:36px;text-align:center;color:var(--muted);">${favOnly ? 'No tienes partidos favoritos en este filtro. Toca ★ en cualquier partido.' : 'No hay partidos disponibles.'}</div>`;
         return;
       }
 
-      // Group matches cleanly by competition/league
       const grouped = {};
       list.forEach(m => {
         if (!grouped[m.league]) grouped[m.league] = { label: m.league_label, items: [] };
@@ -626,55 +635,148 @@
       document.getElementById('leaguesContainer').innerHTML = orderedKeys.map(lg => {
         const g = grouped[lg];
         const code = LEAGUE_SHORT[lg] || lg.toUpperCase().slice(0, 3);
-        const cards = g.items.map(it => renderMatchCardHtml(it.m, it.origIdx)).join('');
+        const cards = g.items.map(({ m, origIdx }) => {
+          const sInv = 1 / m.o1 + 1 / m.ox + 1 / m.o2;
+          const p1 = ((1 / m.o1) / sInv * 100), px = ((1 / m.ox) / sInv * 100), p2 = ((1 / m.o2) / sInv * 100);
+          const hs = m.h_stat, as_ = m.a_stat;
+          const isFav = favorites.has(m.event_id);
+          const bestPick = m.opt_b_pick || m.opt_a_leg;
+          return `<article class="match-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="num" style="font-size:11.5px;color:var(--muted);">${m.kickoff_col} COL ${m.ou_line ? '• O/U ' + m.ou_line : ''}</span>
+              <button class="fav-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite('${m.event_id}')" title="Marcar favorito">★</button>
+            </div>
+            <div style="font-size:15px;font-weight:700;text-align:center;">${m.home} <span style="color:var(--orange);">vs</span> ${m.away}</div>
+            <div>
+              <div class="prob-stack"><div class="ps-1" style="width:${p1.toFixed(1)}%"></div><div class="ps-x" style="width:${px.toFixed(1)}%"></div><div class="ps-2" style="width:${p2.toFixed(1)}%"></div></div>
+              <div class="num" style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;">
+                <span>1: ${p1.toFixed(0)}% (@${m.o1.toFixed(2)})</span>
+                <span>X: ${px.toFixed(0)}% (@${m.ox.toFixed(2)})</span>
+                <span>2: ${p2.toFixed(0)}% (@${m.o2.toFixed(2)})</span>
+              </div>
+            </div>
+            <div class="split-bars">
+              <div class="mini-box">
+                <div style="font-size:11.5px;font-weight:600;">${m.home}</div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;"><span>Gana</span><span class="num">${(hs.win_pct*100).toFixed(0)}%</span></div>
+                <div class="track"><div class="fill-v" style="width:${hs.win_pct*100}%"></div></div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:5px;"><span>No pierde</span><span class="num">${(hs.unbeaten_pct*100).toFixed(0)}%</span></div>
+                <div class="track"><div class="fill-g" style="width:${hs.unbeaten_pct*100}%"></div></div>
+                <div class="dots">${formDots(m.h_recent_scores)}</div>
+              </div>
+              <div class="mini-box">
+                <div style="font-size:11.5px;font-weight:600;">${m.away}</div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;"><span>Gana</span><span class="num">${(as_.win_pct*100).toFixed(0)}%</span></div>
+                <div class="track"><div class="fill-o" style="width:${as_.win_pct*100}%"></div></div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:5px;"><span>No pierde</span><span class="num">${(as_.unbeaten_pct*100).toFixed(0)}%</span></div>
+                <div class="track"><div class="fill-g" style="width:${as_.unbeaten_pct*100}%"></div></div>
+                <div class="dots">${formDots(m.a_recent_scores)}</div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid var(--border);">
+              <div style="font-size:11.5px;font-weight:600;">${bestPick ? `${evBadge(bestPick.ev_pct)} @${bestPick.odds.toFixed(2)}` : '<span style="color:var(--muted);">Ver mercados</span>'}</div>
+              <div style="display:flex;gap:6px;">
+                <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="openInAnalyzer(${origIdx})">Analizar Cuota</button>
+                <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="openDrawer(${origIdx})">+ Cupón</button>
+              </div>
+            </div>
+          </article>`;
+        }).join('');
+
         return `<section class="glass league-section">
           <div class="league-header">
-            <div class="league-title-wrap">
+            <div style="display:flex;align-items:center;gap:10px;">
               <div class="league-emblem">${code}</div>
-              <h2 class="league-name">${g.label}</h2>
+              <h2 style="margin:0;font-size:16px;font-weight:700;">${g.label}</h2>
             </div>
-            <span class="league-count">${g.items.length} ${g.items.length === 1 ? 'partido' : 'partidos'}</span>
+            <span class="badge b-pend">${g.items.length} ${g.items.length===1?'partido':'partidos'}</span>
           </div>
           <div class="matches-grid">${cards}</div>
         </section>`;
       }).join('');
     }
 
-    function renderTickets() {
-      const pa = lastScan.parlays_a || [];
-      document.getElementById('cntOptA').textContent = pa.length;
-      document.getElementById('optAGrid').innerHTML = pa.map((p, idx) => `
-        <article class="glass match-card" style="padding:18px;">
-          <div class="mc-top">
-            <span class="league-count">Combinada de 2</span>
-            <span class="num">${p.kickoff_col} COL</span>
-          </div>
-          <div class="mini-glass"><div style="font-size:11px;color:var(--muted);">Selección 1</div><div style="font-weight:600;">${p.leg1}</div></div>
-          <div class="mini-glass"><div style="font-size:11px;color:var(--muted);">Selección 2</div><div style="font-weight:600;">${p.leg2}</div></div>
-          <div>
-            <div class="prob-legend"><span>Probabilidad est.: <strong>${p.prob_est}%</strong></span><span>Casa: ${p.prob_impl}%</span></div>
-            <div class="track" style="height:8px;margin-top:4px;"><div class="${p.ev_pct>0?'fill-g':'fill-o'}" style="width:${Math.min(100, p.prob_est)}%"></div></div>
-          </div>
-          <div class="mc-foot">
-            <div style="display:flex;gap:8px;align-items:center;"><span class="num" style="font-size:18px;font-weight:700;">@${p.combo_odds.toFixed(2)}</span>${evBadge(p.ev_pct)}</div>
-            ${STATIC_MODE ? '' : `<button class="btn-glass btn-accent" style="padding:6px 12px;font-size:12px;" onclick="betParlay(${idx})">Simular</button>`}
-          </div>
-        </article>`).join('') || '<div class="glass" style="padding:32px;text-align:center;color:var(--muted);">Sin combinadas de 2 para esta selección.</div>';
+    function populateAnalyzerSelects() {
+      const selM = document.getElementById('azMatch');
+      const ms = lastScan.matches || [];
+      selM.innerHTML = ms.map((m, i) => `<option value="${i}">(${m.league}) ${m.home} vs ${m.away} — ${m.kickoff_col}</option>`).join('');
+      const selK = document.getElementById('azMarket');
+      if (ms.length && ms[0].all_markets) {
+        selK.innerHTML = ms[0].all_markets.map(mk => `<option value="${mk.key}">${mk.name}</option>`).join('');
+      }
+    }
 
-      const pb = lastScan.opt_b || [];
-      document.getElementById('cntOptB').textContent = pb.length;
-      document.getElementById('optBGrid').innerHTML = pb.map(b => `
-        <article class="glass match-card" style="padding:18px;">
-          <div class="mc-top">
-            <span class="league-count">${b.league.toUpperCase()}</span>
-            <span class="num">${b.kickoff_col} COL</span>
+    function openInAnalyzer(matchIdx) {
+      document.getElementById('azMatch').value = String(matchIdx);
+      const m = lastScan.matches[matchIdx];
+      if (m && m.all_markets && m.all_markets.length) {
+        document.getElementById('azOdds').value = m.all_markets[0].odds.toFixed(2);
+      }
+      const btn = document.querySelectorAll('.tab-btn')[1];
+      switchTab('tabAnalyzer', btn);
+      analyzeCustomOdds();
+    }
+
+    async function analyzeCustomOdds() {
+      const idx = parseInt(document.getElementById('azMatch').value, 10);
+      const m = lastScan.matches[idx];
+      const market = document.getElementById('azMarket').value;
+      const customOdds = parseFloat(document.getElementById('azOdds').value);
+      if (!m || !market || !(customOdds > 1.01)) return;
+
+      const r = await fetch('/api/analyze', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ league: m.league, home: m.home, away: m.away, o1: m.o1, ox: m.ox, o2: m.o2, ou_line: m.ou_line, o_over: m.o_over, o_under: m.o_under, market, custom_odds: customOdds })
+      });
+      if (!r.ok) return;
+      const d = await r.json();
+      const good = d.ev_pct > 0;
+      document.getElementById('azResult').innerHTML = `
+        <div style="background:#FFFFFF;border:1px solid var(--border);border-radius:18px;padding:18px;">
+          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;">
+            <div>
+              <strong style="font-size:15.5px;">${m.home} vs ${m.away}</strong> • ${d.market_name} @<strong class="num">${customOdds.toFixed(2)}</strong>
+              <div style="font-size:12px;color:var(--muted);">Goles esperados Poisson: ${d.lam_h} vs ${d.lam_a}</div>
+            </div>
+            ${evBadge(d.ev_pct)}
           </div>
-          <div style="font-size:15.5px;font-weight:700;">${b.title}</div>
-          <div class="mini-glass" style="font-weight:600;color:#DDD6FE;">${b.market_name}</div>
-          <div class="mc-foot">
-            <div style="display:flex;gap:8px;align-items:center;"><span class="num" style="font-size:18px;font-weight:700;">@~${b.odds.toFixed(2)}</span>${evBadge(b.ev_pct)}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;">
+            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Prob. Modelo</div><div class="num" style="font-size:20px;font-weight:700;">${d.model_prob_pct}%</div></div>
+            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Exige tu Cuota</div><div class="num" style="font-size:20px;font-weight:700;">${d.implied_prob_pct}%</div></div>
+            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Prob. Mercado Justa</div><div class="num" style="font-size:20px;font-weight:700;">${d.market_prob_pct}%</div></div>
+            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Stake Kelly (1/4)</div><div class="num" style="font-size:20px;font-weight:700;color:var(--violet);">${d.kelly_quarter_u}u</div></div>
           </div>
-        </article>`).join('') || '<div class="glass" style="padding:32px;text-align:center;color:var(--muted);">Sin apuestas de mismo partido en rango 1.20–1.90.</div>';
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:12.5px;color:${good?'var(--green)':'var(--amber)'};font-weight:600;">${d.verdict}</span>
+            <button class="btn btn-primary" onclick="addLegToSlip('${m.event_id}','${m.league}','${m.kickoff_col.slice(0,10)}','${m.home} vs ${m.away}','${market}','${d.market_name}',${customOdds},${d.model_prob_pct/100})">Agregar esta cuota al Cupón</button>
+          </div>
+        </div>`;
+    }
+
+    function renderCombos() {
+      const pa = lastScan.parlays_a || [], pb = lastScan.opt_b || [];
+      document.getElementById('cntCombos').textContent = pa.length + pb.length;
+      const aHtml = pa.map(p => `
+        <article class="match-card">
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);"><span>Combinada de 2</span><span class="num">${p.kickoff_col} COL</span></div>
+          <div class="mini-box" style="font-weight:600;">1) ${p.leg1}</div>
+          <div class="mini-box" style="font-weight:600;">2) ${p.leg2}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div><strong class="num" style="font-size:17px;">@${p.combo_odds.toFixed(2)}</strong> ${evBadge(p.ev_pct)}</div>
+            <span style="font-size:12px;color:var(--sub);">Prob: ${p.prob_est}%</span>
+          </div>
+        </article>`).join('');
+      const bHtml = pb.map(b => `
+        <article class="match-card">
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);"><span>Mismo Partido</span><span class="num">${b.kickoff_col} COL</span></div>
+          <div style="font-weight:700;">${b.title}</div>
+          <div class="mini-box" style="font-weight:600;color:var(--violet);">${b.market_name}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div><strong class="num" style="font-size:17px;">@~${b.odds.toFixed(2)}</strong> ${evBadge(b.ev_pct)}</div>
+            <span style="font-size:12px;color:var(--sub);">Prob: ${b.prob_est}%</span>
+          </div>
+        </article>`).join('');
+      document.getElementById('combosGrid').innerHTML = (aHtml + bHtml) || '<div class="glass" style="padding:32px;text-align:center;color:var(--muted);">No hay combinadas en este rango.</div>';
     }
 
     function openDrawer(idx) {
@@ -683,229 +785,158 @@
       document.getElementById('drLeague').textContent = m.league_label;
       document.getElementById('drTitle').textContent = `${m.home} vs ${m.away}`;
       document.getElementById('drSub').textContent = `${m.kickoff_col} COL • Goles esperados: ${m.lam_h} vs ${m.lam_a}`;
-      const rows = (m.all_markets || []).map((mk, mIdx) => `<tr>
+      const rows = (m.all_markets || []).map(mk => `<tr>
         <td>${mk.name}</td>
         <td class="num"><strong>${mk.odds.toFixed(2)}</strong></td>
         <td class="num">${mk.prob}% / ${mk.impl}%</td>
         <td>${evBadge(mk.ev_pct)}</td>
-        <td>${STATIC_MODE ? '' : `<button class="btn-glass" style="padding:4px 10px;font-size:11px;" onclick="betSingle(${idx},${mIdx})">Simular</button>`}</td>
+        <td><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;" onclick="addLegToSlip('${m.event_id}','${m.league}','${m.kickoff_col.slice(0,10)}','${m.home} vs ${m.away}','${mk.key}','${mk.name}',${mk.odds},${mk.prob/100});closeDrawer();">+ Cupón</button></td>
       </tr>`).join('');
-      document.getElementById('drBody').innerHTML = `<div class="table-glass"><table><thead><tr><th>Mercado</th><th>Cuota</th><th>Est/Casa</th><th>Balance</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      document.getElementById('drBody').innerHTML = `<div class="table-card"><table><thead><tr><th>Mercado</th><th>Cuota</th><th>Est/Casa</th><th>Balance</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
       document.getElementById('drawerOverlay').classList.add('open');
     }
 
     function closeDrawer() { document.getElementById('drawerOverlay').classList.remove('open'); }
-    function openAuth() {
-      document.getElementById('authErr').textContent = '';
-      document.getElementById('staticAuthNotice').style.display = STATIC_MODE ? 'block' : 'none';
-      document.getElementById('authModal').classList.add('open');
-    }
-    function closeAuth() { document.getElementById('authModal').classList.remove('open'); }
 
-    function setAuthMode(mode) {
-      authMode = mode;
-      document.getElementById('tabLoginMode').classList.toggle('active', mode === 'login');
-      document.getElementById('tabRegMode').classList.toggle('active', mode === 'register');
-      document.getElementById('displayWrap').style.display = mode === 'register' ? 'block' : 'none';
+    function addLegToSlip(event_id, league, match_date, title, market, market_name, odds, prob) {
+      const existing = slip.findIndex(x => x.event_id === event_id && x.market === market);
+      if (existing >= 0) slip[existing].odds = odds;
+      else slip.push({ event_id, league, match_date, title, market, market_name, odds, prob });
+      renderSlip();
     }
 
-    function renderAuthSlot() {
-      const slot = document.getElementById('authSlot');
-      if (STATIC_MODE) {
-        slot.innerHTML = `<button class="btn-glass" onclick="openAuth()">Iniciar Sesión</button>`;
-        document.getElementById('userConfigBox').innerHTML = `<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;">
-          <span>Inicia sesión desde el servidor de <strong>Caza Cuotas</strong> para llevar tu propia cuenta, saldo y modo Fibonacci.</span>
-          <button class="btn-glass btn-accent" onclick="openAuth()">Iniciar Sesión</button>
-        </div>`;
+    function removeLeg(i) { slip.splice(i, 1); renderSlip(); }
+    function clearSlip() { slip = []; renderSlip(); }
+    function updateSlipOdds(i, val) {
+      const v = parseFloat(val);
+      if (v > 1.01) { slip[i].odds = v; renderSlip(); }
+    }
+
+    function renderSlip() {
+      const box = document.getElementById('slipLegs');
+      const sum = document.getElementById('slipSummary');
+      if (!slip.length) {
+        box.innerHTML = '<div style="padding:20px 10px;text-align:center;font-size:12.5px;color:var(--muted);border:1px dashed var(--border-strong);border-radius:16px;">Tu cupón está vacío. Toca <strong>+ Cupón</strong> en cualquier partido para armar tu apuesta.</div>';
+        sum.innerHTML = '';
         return;
       }
-      if (currentUser) {
-        slot.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">
-          <span class="badge b-pos">${currentUser.display_name} • ${userSummary ? userSummary.bankroll_u.toFixed(1) : '100.0'}u</span>
-          <button class="btn-glass" onclick="doLogout()">Salir</button>
-        </div>`;
-        const u = currentUser;
-        document.getElementById('userConfigBox').innerHTML = `
-          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;">
+      box.innerHTML = slip.map((s, i) => `
+        <div class="slip-leg">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
             <div>
-              <strong>Cuenta activa: ${u.display_name}</strong> (@${u.username})
-              <div style="font-size:12px;color:var(--sub);">Modo actual: <strong>${u.stake_mode === 'fibonacci' ? 'Fibonacci (Próx. ' + (userSummary ? userSummary.next_fib_stake : 2) + 'u)' : 'Stake Fijo (2.0u)'}</strong></div>
+              <div style="font-size:12px;font-weight:700;">${s.title}</div>
+              <div style="font-size:11.5px;color:var(--violet);font-weight:600;">${s.market_name}</div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <select id="prefMode" style="padding:7px 10px;border-radius:10px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);">
-                <option value="flat" ${u.stake_mode==='flat'?'selected':''}>Stake Fijo (2u)</option>
-                <option value="fibonacci" ${u.stake_mode==='fibonacci'?'selected':''}>Progresión Fibonacci</option>
-              </select>
-              <button class="btn-glass btn-accent" onclick="savePrefs()">Guardar Modo</button>
-            </div>
-          </div>`;
-      } else {
-        slot.innerHTML = `<button class="btn-glass" onclick="openAuth()">Iniciar Sesión</button>`;
-        document.getElementById('userConfigBox').innerHTML = `<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;">
-          <span>Inicia sesión o crea una cuenta para registrar tus propias jugadas y probar Fibonacci o Stake Fijo.</span>
-          <button class="btn-glass btn-accent" onclick="openAuth()">Entrar / Registrarme</button>
-        </div>`;
+            <button onclick="removeLeg(${i})" style="border:0;background:none;color:var(--muted);cursor:pointer;font-weight:700;">✕</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            <span style="font-size:11px;color:var(--muted);">Prob. Est: <strong>${(s.prob*100).toFixed(1)}%</strong></span>
+            <label style="font-size:11px;color:var(--sub);">Cuota: <input type="number" step="0.01" min="1.01" class="slip-odd-input num" value="${s.odds.toFixed(2)}" onchange="updateSlipOdds(${i}, this.value)"/></label>
+          </div>
+        </div>`).join('');
+
+      const totalOdds = slip.reduce((acc, x) => acc * x.odds, 1.0);
+      const totalProb = slip.reduce((acc, x) => acc * x.prob, 1.0);
+      const impl = 1.0 / totalOdds;
+      const ev = (totalProb * totalOdds - 1.0) * 100.0;
+      const defStake = (userSummary && currentUser && currentUser.stake_mode === 'fibonacci') ? userSummary.next_fib_stake : 2.0;
+
+      sum.innerHTML = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span>Cuota Total (${slip.length})</span><strong class="num" style="font-size:18px;">@${totalOdds.toFixed(2)}</strong></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-bottom:6px;"><span>Probabilidad Real vs Exigida</span><span class="num"><strong>${(totalProb*100).toFixed(1)}%</strong> / ${(impl*100).toFixed(1)}%</span></div>
+        <div style="margin-bottom:10px;">${evBadge(parseFloat(ev.toFixed(1)))} <span style="font-size:11.5px;color:var(--muted);">${ev>0?'Tiene valor frente a la cuota':'La cuota no cubre el riesgo estadístico'}</span></div>
+        <div class="field" style="margin-bottom:10px;"><label>Monto a simular (unidades)</label><input type="number" step="0.5" min="0.5" id="slipStake" value="${defStake}"/></div>
+        <button class="btn btn-primary" style="width:100%;padding:10px;" onclick="saveSlip()">Guardar en Mi Cuenta</button>`;
+    }
+
+    async function saveSlip() {
+      if (!slip.length) return;
+      const stake = parseFloat(document.getElementById('slipStake').value) || 2.0;
+      const totalOdds = slip.reduce((a, x) => a * x.odds, 1.0);
+      const isCombo = slip.length > 1;
+      const title = slip.map(s => s.title).join(' + ');
+      const mktKey = isCombo ? ('COMBINADA:' + slip.map(s => s.market).join('+')) : slip[0].market;
+      const mktName = isCombo ? (`Combinada (${slip.length}): ` + slip.map(s => s.market_name).join(' + ')) : slip[0].market_name;
+      const r = await fetch('/api/user/bet', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          match_date: slip[0].match_date, league: isCombo ? 'combo' : slip[0].league,
+          event_id: slip.map(s => s.event_id).join('+'), title, market: mktKey, market_name: mktName,
+          odds: totalOdds, custom_stake: stake,
+          legs: slip.map(s => ({ event_id: s.event_id, league: s.league, match_date: s.match_date, market: s.market }))
+        })
+      });
+      if (r.ok) {
+        clearSlip();
+        setStatus(false, 'Jugada guardada en tu cuenta.');
+        await checkAuth();
       }
     }
 
-    function renderTables() {
-      document.getElementById('cntBotHist').textContent = botReport.total_trades || 0;
-      document.getElementById('botHistBody').innerHTML = (botReport.recent || []).slice().reverse().map(t => {
-        const cls = t.status === 'WON' ? 'b-pos' : (t.status === 'LOST' ? 'b-lost' : 'b-pend');
-        const label = t.strategy === 'FORMULA_OPT_A' ? 'Combinada 2' : (t.strategy === 'FORMULA_OPT_B' ? 'Mismo Partido' : t.strategy);
-        return `<tr><td class="num">#${t.id}</td><td class="num">${t.match_date}</td><td>${label}</td><td>${t.title}</td><td class="num">${t.market}</td><td class="num">${t.odds.toFixed(2)}</td><td><span class="badge ${cls}">${t.status}</span></td><td class="num">${t.profit_u>=0?'+':''}${t.profit_u.toFixed(2)}u</td></tr>`;
-      }).join('') || '<tr><td colspan="8" style="color:var(--muted);text-align:center;">Sin registros aún.</td></tr>';
+    function svgRing(pct, color, label, valueText) {
+      const r = 26, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(100, pct)) / 100);
+      return `<div style="text-align:center;">
+        <svg width="68" height="68" viewBox="0 0 68 68">
+          <circle cx="34" cy="34" r="${r}" fill="none" stroke="#E2E8F0" stroke-width="6"/>
+          <circle cx="34" cy="34" r="${r}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 34 34)"/>
+          <text x="34" y="38" text-anchor="middle" fill="#0F172A" font-size="12" font-weight="700">${valueText}</text>
+        </svg>
+        <div style="font-size:11px;color:var(--sub);font-weight:600;">${label}</div>
+      </div>`;
+    }
 
-      const uRows = (userSummary && userSummary.recent) ? userSummary.recent.slice().reverse() : [];
-      document.getElementById('cntUserBets').textContent = uRows.length;
-      document.getElementById('userBetsBody').innerHTML = uRows.map(t => {
+    function renderUserUI() {
+      const u = currentUser, d = userSummary;
+      document.getElementById('welcomeUser').textContent = `${u.display_name} (@${u.username})`;
+      document.getElementById('bankHeaderTag').textContent = `Saldo: ${d.bankroll_u.toFixed(2)}u`;
+      document.getElementById('myBankVal').textContent = `${d.bankroll_u.toFixed(2)}u`;
+      document.getElementById('myRoiBadge').innerHTML = `<span class="badge ${d.roi_pct>=0?'b-pos':'b-lost'}">ROI ${d.roi_pct>=0?'+':''}${d.roi_pct}%</span>`;
+      document.getElementById('prefMode').value = u.stake_mode;
+      document.getElementById('stakeModeDesc').textContent = u.stake_mode === 'fibonacci' ? `Modo actual: Fibonacci (Próximo stake: ${d.next_fib_stake}u)` : 'Modo actual: Stake Fijo (2.0u)';
+
+      const pts = d.equity_curve && d.equity_curve.length > 1 ? d.equity_curve : [100, 100];
+      const W = 320, H = 74, pad = 6, minV = Math.min(...pts, 95), maxV = Math.max(...pts, 105), span = Math.max(1, maxV - minV);
+      const coords = pts.map((v, i) => [pad + (i / (pts.length - 1)) * (W - 2 * pad), H - pad - ((v - minV) / span) * (H - 2 * pad)]);
+      const poly = coords.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+      document.getElementById('equityChartWrap').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:74px;"><polyline points="${poly}" fill="none" stroke="#7C3AED" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+
+      const winPct = d.settled > 0 ? Math.round((d.won / d.settled) * 100) : 0;
+      document.getElementById('myRingsWrap').innerHTML =
+        svgRing(winPct, '#16A34A', 'Acierto', d.settled ? `${winPct}%` : '—') +
+        svgRing(Math.min(100, d.pending * 10), '#7C3AED', 'Pendientes', `${d.pending}`) +
+        svgRing(Math.min(100, favorites.size * 15), '#EA580C', 'Favoritos', `${favorites.size}`);
+
+      const rows = (d.recent || []).slice().reverse();
+      document.getElementById('cntMyBets').textContent = rows.length;
+      document.getElementById('userBetsBody').innerHTML = rows.map(t => {
         const cls = t.status === 'WON' ? 'b-pos' : (t.status === 'LOST' ? 'b-lost' : 'b-pend');
         return `<tr><td class="num">#${t.id}</td><td class="num">${t.match_date}</td><td>${t.title}</td><td>${t.market_name}</td><td class="num">${t.odds.toFixed(2)}</td><td class="num">${t.stake_u}u</td><td><span class="badge ${cls}">${t.status}</span></td><td class="num">${t.profit_u>=0?'+':''}${t.profit_u.toFixed(2)}u</td></tr>`;
-      }).join('') || '<tr><td colspan="8" style="color:var(--muted);text-align:center;">Aún no has guardado jugadas con tu cuenta.</td></tr>';
+      }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);">Aún no has guardado jugadas.</td></tr>';
+      renderFibSim();
     }
 
-    async function refreshSession() {
-      if (STATIC_MODE) { renderAuthSlot(); return; }
-      const r = await fetch('/api/auth/me');
-      const d = await r.json();
-      currentUser = d.user;
-      userSummary = d.summary;
-      renderAuthSlot();
-      renderTables();
-      renderCharts();
-    }
-
-    async function submitAuth() {
-      if (STATIC_MODE) {
-        document.getElementById('authErr').textContent = 'Vista estática sin servidor activo. Ejecuta abrir_bot.bat o monta el servidor Python.';
-        return;
-      }
-      const username = document.getElementById('authUser').value;
-      const display_name = document.getElementById('authDisplay').value;
-      const password = document.getElementById('authPass').value;
-      const ep = authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
-      const r = await fetch(ep, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username, display_name, password}) });
-      const d = await r.json();
-      if (!r.ok) { document.getElementById('authErr').textContent = d.error || 'Error'; return; }
-      closeAuth();
-      await refreshSession();
-    }
-
-    async function doLogout() {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      currentUser = null; userSummary = null;
-      await refreshSession();
+    function renderFibSim() {
+      const k = parseInt(document.getElementById('fibSlider').value, 10);
+      document.getElementById('fibLossVal').textContent = k;
+      const seq = [1, 1, 2, 3, 5, 8, 13, 21];
+      let fibSum = 0, flatSum = 0;
+      const bars = [];
+      for (let i = 0; i < k; i++) { fibSum += 2 * seq[i]; flatSum += 2; bars.push(2 * seq[i]); }
+      const maxS = Math.max(...bars, 4);
+      document.getElementById('fibChartWrap').innerHTML = `
+        <div style="display:flex;align-items:flex-end;gap:4px;height:52px;margin-top:4px;">
+          ${bars.map(s => `<div style="flex:1;height:${Math.max(6, Math.round((s/maxS)*44))}px;border-radius:5px;background:linear-gradient(180deg,#F97316,#7C3AED);" title="${s}u"></div>`).join('')}
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin-top:6px;">Riesgo: <strong style="color:var(--red);">${fibSum}u</strong> (Fib) vs <strong style="color:var(--green);">${flatSum}u</strong> (Fijo)</div>`;
     }
 
     async function savePrefs() {
       const stake_mode = document.getElementById('prefMode').value;
       await fetch('/api/user/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({stake_mode, bankroll_base: 100}) });
-      await refreshSession();
+      await checkAuth();
     }
 
-    async function betSingle(matchIdx, mIdx) {
-      if (!currentUser) { closeDrawer(); openAuth(); return; }
-      const m = lastScan.matches[matchIdx], mk = m.all_markets[mIdx];
-      const r = await fetch('/api/user/bet', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          match_date: m.kickoff_col.slice(0,10), league: m.league, event_id: m.event_id,
-          title: `${m.home} vs ${m.away}`, market: mk.key, market_name: mk.name, odds: mk.odds,
-          legs: [{event_id: m.event_id, league: m.league, match_date: m.kickoff_col.slice(0,10), market: mk.key}]
-        })
-      });
-      if (r.ok) {
-        const res = await r.json();
-        setStatus(false, `Jugada guardada (${res.stake_u}u en modo ${res.stake_mode}).`);
-        closeDrawer();
-        await refreshSession();
-      }
-    }
-
-    async function betParlay(idx) {
-      if (!currentUser) { openAuth(); return; }
-      const p = lastScan.parlays_a[idx];
-      if (!p) return;
-      const r = await fetch('/api/user/bet', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          match_date: p.kickoff_col.slice(0,10), league: 'combo', event_id: p.market_key + '_' + p.kickoff_col,
-          title: p.title || (p.leg1.split(':')[0] + ' + ' + p.leg2.split(':')[0]),
-          market: 'COMBINADA:' + (p.market_key || ''),
-          market_name: 'Combinada de 2 (' + (p.market_key || '') + ')',
-          odds: p.combo_odds,
-          legs: p.legs || []
-        })
-      });
-      if (r.ok) {
-        const res = await r.json();
-        setStatus(false, `Combinada guardada (${res.stake_u}u en modo ${res.stake_mode}).`);
-        await refreshSession();
-      }
-    }
-
-    async function loadBotReport() {
-      if (STATIC_MODE) return;
-      const r = await fetch('/api/report');
-      botReport = await r.json();
-      renderTables();
-      renderCharts();
-    }
-
-    async function runScan() {
-      setStatus(true, 'Consultando partidos y estadísticas...');
-      try {
-        const res = await fetch(`/api/scan?scope=${currentScope}&days=5&save=0`);
-        lastScan = await res.json();
-        setStatus(false, `${lastScan.total_matches} partidos próximos analizados.`);
-        renderMatches(); renderTickets(); renderCharts();
-      } catch (e) { setStatus(false, 'Error de conexión al escanear.'); }
-    }
-
-    async function runSettle() {
-      setStatus(true, 'Comprobando marcadores finales...');
-      const r = await fetch('/api/settle', { method: 'POST' });
-      const d = await r.json();
-      setStatus(false, `Liquidación completada: ${d.settled_now} actualizadas, ${d.user_settled || 0} de usuarios.`);
-      await loadBotReport();
-      await refreshSession();
-    }
-
-    function applyStaticScope() {
-      const s = fullStaticData.scan;
-      if (currentScope === 'col.1') {
-        lastScan = {
-          ...s,
-          matches: (s.matches || []).filter(m => m.league === 'col.1'),
-          opt_b: (s.opt_b || []).filter(b => b.league === 'col.1'),
-          parlays_a: (s.parlays_a || []).filter(p => p.leg1.includes('(col.1)') || p.leg2.includes('(col.1)')),
-        };
-      } else if (currentScope === 'eu') {
-        lastScan = {
-          ...s,
-          matches: (s.matches || []).filter(m => m.league !== 'col.1'),
-          opt_b: (s.opt_b || []).filter(b => b.league !== 'col.1'),
-          parlays_a: (s.parlays_a || []).filter(p => !p.leg1.includes('(col.1)') && !p.leg2.includes('(col.1)')),
-        };
-      } else {
-        lastScan = s;
-      }
-      renderMatches(); renderTickets(); renderCharts();
-    }
-
-    async function initStatic() {
-      document.getElementById('btnScan').style.display = 'none';
-      document.getElementById('btnSettle').style.display = 'none';
-      renderAuthSlot();
-      const res = await fetch('./data.json?t=' + Date.now());
-      fullStaticData = await res.json();
-      botReport = fullStaticData.report;
-      setStatus(false, `Actualizado: ${fullStaticData.generated_col} hora Colombia`);
-      document.getElementById('updateTimeTag').textContent = `Actualizado ${fullStaticData.generated_col} COL`;
-      applyStaticScope(); renderTables();
-    }
-
-    if (STATIC_MODE) { initStatic(); } else { refreshSession(); loadBotReport(); runScan(); }
+    checkAuth();
   </script>
 </body>
 </html>

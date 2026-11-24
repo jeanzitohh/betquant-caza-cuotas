@@ -134,6 +134,17 @@ class PaperTradingDB:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_favorites (
+                    user_id INTEGER NOT NULL,
+                    event_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY(user_id, event_id),
+                    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """
+            )
 
     def was_alert_sent(self, alert_key: str) -> bool:
         with self._connect() as conn:
@@ -411,6 +422,27 @@ class PaperTradingDB:
                 next_step = max(0, u["fib_step"] - 2) if status == "WON" else min(9, u["fib_step"] + 1)
                 conn.execute("UPDATE users SET fib_step = ? WHERE id = ?", (next_step, user_id))
 
+    def get_favorites(self, user_id: int) -> list[str]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT event_id FROM user_favorites WHERE user_id = ?", (user_id,)).fetchall()
+        return [r["event_id"] for r in rows]
+
+    def toggle_favorite(self, user_id: int, event_id: str) -> bool:
+        """Toggle favorite match for user; returns True if added, False if removed."""
+        with self._connect() as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM user_favorites WHERE user_id = ? AND event_id = ?", (user_id, event_id)
+            ).fetchone()
+            if exists:
+                conn.execute("DELETE FROM user_favorites WHERE user_id = ? AND event_id = ?", (user_id, event_id))
+                return False
+            now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+            conn.execute(
+                "INSERT INTO user_favorites (user_id, event_id, created_at) VALUES (?, ?, ?)",
+                (user_id, event_id, now),
+            )
+            return True
+
     def get_user_summary(self, user_id: int) -> dict:
         with self._connect() as conn:
             u = conn.execute("SELECT id, username, display_name, stake_mode, fib_step, bankroll_base FROM users WHERE id = ?", (user_id,)).fetchone()
@@ -438,5 +470,6 @@ class PaperTradingDB:
             "bankroll_u": round(base + total_profit, 2),
             "next_fib_stake": self.fib_stake(u["fib_step"]) if u else 2.0,
             "equity_curve": curve,
+            "favorites": self.get_favorites(user_id),
             "recent": rows[-100:],
         }
