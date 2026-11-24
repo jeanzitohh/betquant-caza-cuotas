@@ -341,6 +341,10 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
     for e in evals:
         m = e["match"]
         hs, as_ = e["h_stat"], e["a_stat"]
+        qp = e["qprobs"]
+        p_btts = max(0.0, qp["H_O05"] + qp["A_O05"] - (1.0 - (1.0 - qp["H_O05"]) * (1.0 - qp["A_O05"])))
+        # Exact independent Poisson BTTS = P(H>=1)*P(A>=1)
+        p_btts_exact = qp["H_O05"] * qp["A_O05"]
         matches_detail.append(
             {
                 "event_id": m.event_id,
@@ -362,6 +366,20 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 "a_recent_scores": [f"{gf}-{ga}" for gf, ga in e["a_recent"]],
                 "lam_h": round(e["lam_h"], 2),
                 "lam_a": round(e["lam_a"], 2),
+                "probs_summary": {
+                    "p1": round(qp["1"] * 100.0, 1),
+                    "px": round(qp["X"] * 100.0, 1),
+                    "p2": round(qp["2"] * 100.0, 1),
+                    "p1x": round(qp["1X"] * 100.0, 1),
+                    "px2": round(qp["X2"] * 100.0, 1),
+                    "h_o05": round(qp["H_O05"] * 100.0, 1),
+                    "h_o15": round(qp["H_O15"] * 100.0, 1),
+                    "a_o05": round(qp["A_O05"] * 100.0, 1),
+                    "a_o15": round(qp["A_O15"] * 100.0, 1),
+                    "o15": round(qp["O15"] * 100.0, 1),
+                    "o25": round(qp["O25"] * 100.0, 1),
+                    "btts": round(p_btts_exact * 100.0, 1),
+                },
                 "all_markets": [
                     {
                         "key": k,

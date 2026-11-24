@@ -11,11 +11,14 @@ from paper_db import PaperTradingDB
 from providers import load_env
 
 try:
-    from card_renderer import render_match_card, render_parlay_card
+    from card_renderer import literal_market_text, render_match_card, render_parlay_card
 
     HAS_CARDS = True
 except ImportError:
     HAS_CARDS = False
+
+    def literal_market_text(market_name: str, home: str, away: str) -> str:
+        return market_name
 
 
 MAIN_MENU_MARKUP = {
@@ -155,50 +158,88 @@ def format_history_block(rep: dict) -> str:
     )
 
 
+def _build_detailed_match_caption(m: dict) -> str:
+    """Build explicit Spanish breakdown caption for Telegram photo/text posts."""
+    hs, as_ = m["h_stat"], m["a_stat"]
+    ps = m.get("probs_summary") or {}
+    s_inv = 1.0 / m["o1"] + 1.0 / m["ox"] + 1.0 / m["o2"]
+    p1 = (1.0 / m["o1"]) / s_inv * 100.0
+    px = (1.0 / m["ox"]) / s_inv * 100.0
+    p2 = (1.0 / m["o2"]) / s_inv * 100.0
+
+    if p1 >= 52:
+        fav_txt = f"Favorito: <b>{html.escape(m['home'])}</b> ({p1:.0f}% ganar | {p1+px:.0f}% 1X)"
+    elif p2 >= 52:
+        fav_txt = f"Favorito: <b>{html.escape(m['away'])}</b> ({p2:.0f}% ganar | {p2+px:.0f}% X2)"
+    else:
+        fav_txt = f"Partido parejo (ligero fav. {html.escape(m['home'] if p1 >= p2 else m['away'])} {max(p1, p2):.0f}%)"
+
+    pick_line = "<i>Sin combinada 1.20–1.90 en filtros actuales.</i>"
+    if m.get("opt_b_pick"):
+        pb = m["opt_b_pick"]
+        lit = literal_market_text(pb["market_name"], m["home"], m["away"])
+        pick_line = f"👉 <b>{html.escape(lit)}</b> @~<code>{pb['odds']:.2f}</code> (Prob {pb['prob']}% | EV {pb['ev_pct']:+.1f}%)"
+    elif m.get("opt_a_leg"):
+        pa = m["opt_a_leg"]
+        lit = literal_market_text(pa["market_name"], m["home"], m["away"])
+        pick_line = f"👉 <b>{html.escape(lit)}</b> @<code>{pa['odds']:.2f}</code> (Prob {pa['prob']}% | EV {pa['ev_pct']:+.1f}%)"
+
+    return (
+        f"⚽ <b>{html.escape(m['home'])} vs {html.escape(m['away'])}</b>\n"
+        f"🏆 {html.escape(m.get('league_label', m['league']))} • 🕒 <code>{m['kickoff_col']} COL</code>\n\n"
+        f"📌 <b>GANADOR:</b> {fav_txt}\n"
+        f"• {html.escape(m['home'])}: <b>{p1:.0f}%</b> (<code>@{m['o1']:.2f}</code>) | Empate: <b>{px:.0f}%</b> (<code>@{m['ox']:.2f}</code>) | {html.escape(m['away'])}: <b>{p2:.0f}%</b> (<code>@{m['o2']:.2f}</code>)\n\n"
+        f"⚽ <b>GOLES ESPERADOS Y PORCENTAJES:</b>\n"
+        f"• Promedio esperado: {html.escape(m['home'])} <b>~{m.get('lam_h', 1.3):.2f}</b> vs {html.escape(m['away'])} <b>~{m.get('lam_a', 1.1):.2f}</b>\n"
+        f"• {html.escape(m['home'])} anota +0.5: <b>{ps.get('h_o05', hs['o05_pct']*100):.0f}%</b> (+1.5: <b>{ps.get('h_o15', hs['o15_pct']*100):.0f}%</b>)\n"
+        f"• {html.escape(m['away'])} anota +0.5: <b>{ps.get('a_o05', as_['o05_pct']*100):.0f}%</b> (+1.5: <b>{ps.get('a_o15', as_['o15_pct']*100):.0f}%</b>)\n"
+        f"• Partido +1.5 goles: <b>{ps.get('o15', 70):.0f}%</b> | +2.5: <b>{ps.get('o25', 45):.0f}%</b> | Ambos marcan: <b>{ps.get('btts', 45):.0f}%</b>\n\n"
+        f"🎯 <b>APUESTA LITERAL:</b>\n{pick_line}"
+    )
+
+
 def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_id: str) -> int:
     """Publish graphical forecast PNG cards and settled results to the Caza Cuotas Channel."""
     if not token or not channel_id:
         return 0
     sent_count = 0
 
-    # 1. Graphical Match Cards for upcoming matches with clear picks (prioritizing Europe, plus Colombia)
+    # 1. Graphical Match Cards: ALWAYS include today's Colombia matches + top European picks (cap 6 total per run)
     new_cards = []
     for m in scan.get("matches", []):
         if m["league"] != "col.1" and not (m.get("opt_a_leg") or m.get("opt_b_pick")):
             continue
-        key = f"match_card_poppins_v1:{m['event_id']}"
+        key = f"match_card_detailed_v1:{m['event_id']}"
         if not db.was_alert_sent(key):
             new_cards.append((key, m))
 
-    # Send Europe first, cap at 4 new cards per cron run to keep channel clean
-    new_cards.sort(key=lambda item: (item[1]["league"] == "col.1", item[1]["kickoff_col"]))
-    for key, m in new_cards[:4]:
+    # Prioritize Colombia matches first (so both Millonarios and América always go out) then Europe
+    new_cards.sort(key=lambda item: (item[1]["league"] != "col.1", item[1]["kickoff_col"]))
+    for key, m in new_cards[:6]:
+        cap = _build_detailed_match_caption(m)
         if HAS_CARDS:
             png = render_match_card(m)
-            cap = (
-                f"⚽ <b>{html.escape(m['home'])} vs {html.escape(m['away'])}</b> ({html.escape(m.get('league_label', m['league']))})\n"
-                f"🕒 {m['kickoff_col']} COL • Cuotas: <code>{m['o1']:.2f} | {m['ox']:.2f} | {m['o2']:.2f}</code>\n"
-                "📊 <i>Caza Cuotas • Estadísticas y simulación</i>"
-            )
             if send_photo_bytes(token, channel_id, png, cap):
                 db.mark_alert_sent(key)
                 sent_count += 1
         else:
-            if send_html(token, channel_id, format_match_stats_block([m], f"⚽ {m.get('league_label', m['league'])}")):
+            if send_html(token, channel_id, cap):
                 db.mark_alert_sent(key)
                 sent_count += 1
 
-    # 2. Graphical Parlay Cards for new Option A picks
+    # 2. Graphical Parlay Cards for new Option A picks (deduped by event_ids, not fluctuating odds)
     for p in scan.get("parlays_a", [])[:4]:
-        key = f"pick_a_v2:{p['leg1']}+{p['leg2']}"
+        leg_ids = "+".join(leg["event_id"] + ":" + leg["market"] for leg in (p.get("legs") or [])) or (p["leg1"] + "+" + p["leg2"])
+        key = f"pick_a_v3:{leg_ids}"
         if db.was_alert_sent(key):
             continue
         if HAS_CARDS:
             png = render_parlay_card(p)
             cap = (
-                f"🎯 <b>CAZA CUOTAS • COMBINADA @{p['combo_odds']:.2f}</b>\n"
-                f"Probabilidad est.: <b>{p['prob_est']}%</b> (EV {p['ev_pct']:+.1f}%)\n"
-                "<i>Pronóstico educativo / simulación sin dinero real</i>"
+                f"🎯 <b>CAZA CUOTAS • COMBINADA DE 2 (@{p['combo_odds']:.2f})</b>\n"
+                f"1️⃣ {html.escape(p['leg1'])}\n"
+                f"2️⃣ {html.escape(p['leg2'])}\n"
+                f"📊 Probabilidad real conjunta: <b>{p['prob_est']}%</b> (EV {p['ev_pct']:+.1f}%)"
             )
             if send_photo_bytes(token, channel_id, png, cap):
                 db.mark_alert_sent(key)

@@ -1,6 +1,6 @@
 import io
 import os
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FONTS_DIR = os.path.join(BASE_DIR, "fonts")
@@ -11,6 +11,11 @@ FONT_CANDIDATES_BOLD = [
     r"C:\Windows\Fonts\arialbd.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
 ]
+FONT_CANDIDATES_SEMI = [
+    os.path.join(FONTS_DIR, "Poppins-SemiBold.ttf"),
+    os.path.join(FONTS_DIR, "Poppins-Bold.ttf"),
+    r"C:\Windows\Fonts\seguisb.ttf",
+]
 FONT_CANDIDATES_REG = [
     os.path.join(FONTS_DIR, "Poppins-Regular.ttf"),
     r"C:\Windows\Fonts\segoeui.ttf",
@@ -19,40 +24,54 @@ FONT_CANDIDATES_REG = [
 ]
 
 
-def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    paths = FONT_CANDIDATES_BOLD if bold else FONT_CANDIDATES_REG
+def _load_font(size: int, weight: str = "reg") -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    paths = FONT_CANDIDATES_BOLD if weight == "bold" else (FONT_CANDIDATES_SEMI if weight == "semi" else FONT_CANDIDATES_REG)
     for p in paths:
         if os.path.exists(p):
             return ImageFont.truetype(p, size)
     return ImageFont.load_default()
 
 
-def _create_backdrop(w: int = 1200, h: int = 675) -> Image.Image:
-    """Create Caza Cuotas dark violet-orange ambient gradient backdrop."""
+def literal_market_text(market_name: str, home: str, away: str) -> str:
+    """Turn generic Local/Visita labels into explicit team names in Spanish."""
+    return (
+        market_name.replace("BetBuilder: ", "")
+        .replace("Local o Empate (1X)", f"{home} Gana o Empata (1X)")
+        .replace("Visitante o Empate (X2)", f"{away} Gana o Empata (X2)")
+        .replace("Gana Local (1)", f"{home} Gana directo (1)")
+        .replace("Gana Visitante (2)", f"{away} Gana directo (2)")
+        .replace("Local 1X", f"{home} Gana o Empata (1X)")
+        .replace("Visita X2", f"{away} Gana o Empata (X2)")
+        .replace("Local Gana", f"{home} Gana")
+        .replace("Visita Gana", f"{away} Gana")
+        .replace("Local +0.5 goles", f"{home} anota +0.5 goles (mín. 1)")
+        .replace("Local +1.5 goles", f"{home} anota +1.5 goles (mín. 2)")
+        .replace("Visitante +0.5 goles", f"{away} anota +0.5 goles (mín. 1)")
+        .replace("Visitante +1.5 goles", f"{away} anota +1.5 goles (mín. 2)")
+        .replace("Visita +0.5 goles", f"{away} anota +0.5 goles (mín. 1)")
+        .replace("Visita +1.5 goles", f"{away} anota +1.5 goles (mín. 2)")
+    )
+
+
+def _create_backdrop(w: int = 1200, h: int = 780) -> Image.Image:
     img = Image.new("RGBA", (w, h), (10, 11, 24, 255))
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
-    # Soft ambient violet & orange orbs
     for r, col in [
-        ((-120, -140, 620, 520), (124, 58, 237, 95)),
-        ((680, -100, 1340, 540), (249, 115, 22, 80)),
-        ((320, 260, 1020, 860), (59, 130, 246, 55)),
+        ((-120, -140, 640, 560), (124, 58, 237, 95)),
+        ((660, -100, 1340, 560), (249, 115, 22, 80)),
+        ((300, 320, 1020, 920), (59, 130, 246, 55)),
     ]:
         od.ellipse(r, fill=col)
-    from PIL import ImageFilter
-
     overlay = overlay.filter(ImageFilter.GaussianBlur(radius=95))
-    img = Image.alpha_composite(img, overlay)
-    return img
+    return Image.alpha_composite(img, overlay)
 
 
 def _composite_rect(img: Image.Image, box: tuple[int, int, int, int], radius: int, fill: tuple, outline: tuple | None = None, width: int = 1) -> None:
-    """Draw an alpha-blended rounded rectangle cleanly onto an RGBA image."""
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     ld = ImageDraw.Draw(layer)
     ld.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
-    composited = Image.alpha_composite(img, layer)
-    img.paste(composited)
+    img.paste(Image.alpha_composite(img, layer))
 
 
 def _glass_panel(img: Image.Image, box: tuple[int, int, int, int], radius: int = 24, fill=(255, 255, 255, 22), border=(255, 255, 255, 64)) -> None:
@@ -66,25 +85,26 @@ def _draw_progress_bar(img: Image.Image, x: int, y: int, w: int, h: int, pct: fl
 
 
 def _draw_brand_header(img: Image.Image, tag_text: str, right_text: str) -> None:
-    f_brand = _load_font(26, bold=True)
-    f_tag = _load_font(18, bold=True)
-    f_right = _load_font(20, bold=False)
+    f_brand = _load_font(25, "bold")
+    f_tag = _load_font(17, "semi")
+    f_right = _load_font(19, "semi")
 
-    # Caza Cuotas purple-orange badge
-    _composite_rect(img, (48, 34, 96, 82), radius=14, fill=(124, 58, 237, 255), outline=(249, 115, 22, 240), width=2)
+    _composite_rect(img, (48, 30, 100, 82), radius=15, fill=(124, 58, 237, 255), outline=(249, 115, 22, 240), width=2)
     d = ImageDraw.Draw(img)
-    d.text((61, 43), "CC", font=_load_font(24, bold=True), fill=(255, 255, 255, 255))
-    d.text((112, 34), "CAZA CUOTAS", font=f_brand, fill=(255, 255, 255, 255))
-    d.text((112, 64), tag_text, font=f_tag, fill=(251, 146, 60, 255))
+    cc_font = _load_font(22, "bold")
+    cc_w = d.textlength("CC", font=cc_font)
+    d.text((74 - cc_w / 2, 42), "CC", font=cc_font, fill=(255, 255, 255, 255))
+    d.text((116, 30), "CAZA CUOTAS", font=f_brand, fill=(255, 255, 255, 255))
+    d.text((116, 61), tag_text, font=f_tag, fill=(251, 146, 60, 255))
 
     rw = d.textlength(right_text, font=f_right)
-    _composite_rect(img, (int(1152 - rw - 32), 38, 1152, 78), radius=20, fill=(255, 255, 255, 28), outline=(255, 255, 255, 65), width=1)
+    _composite_rect(img, (int(1152 - rw - 34), 34, 1152, 76), radius=21, fill=(255, 255, 255, 28), outline=(255, 255, 255, 70), width=1)
     d = ImageDraw.Draw(img)
-    d.text((1152 - rw - 16, 46), right_text, font=f_right, fill=(241, 245, 249, 255))
+    d.text((1152 - rw - 17, 42), right_text, font=f_right, fill=(248, 250, 252, 255))
 
 
 def _form_dots(d: ImageDraw.ImageDraw, x: int, y: int, scores: list[str]) -> None:
-    f_dot = _load_font(15, bold=True)
+    f_dot = _load_font(14, "bold")
     for idx, s in enumerate(scores[-5:]):
         try:
             gf, ga = map(int, s.split("-"))
@@ -93,98 +113,140 @@ def _form_dots(d: ImageDraw.ImageDraw, x: int, y: int, scores: list[str]) -> Non
         col = (34, 197, 94, 240) if gf > ga else ((100, 116, 139, 230) if gf == ga else (239, 68, 68, 240))
         lbl = "G" if gf > ga else ("E" if gf == ga else "P")
         bx = x + idx * 34
-        d.rounded_rectangle((bx, y, bx + 28, y + 28), radius=8, fill=col)
-        d.text((bx + 8, y + 4), lbl, font=f_dot, fill=(255, 255, 255, 255))
+        d.rounded_rectangle((bx, y, bx + 28, y + 26), radius=7, fill=col)
+        lw = d.textlength(lbl, font=f_dot)
+        d.text((bx + 14 - lw / 2, y + 4), lbl, font=f_dot, fill=(255, 255, 255, 255))
 
 
 def render_match_card(m: dict) -> bytes:
-    """Render a graphical 1200x675 PNG card for a match with probabilities, form, and odds."""
-    img = _create_backdrop()
-    _draw_brand_header(img, f"RADAR • {m.get('league_label', m['league']).upper()}", f"{m['kickoff_col']} COL")
-    _glass_panel(img, (48, 108, 1152, 632), radius=28)
+    """Render an explicit, detailed 1200x780 PNG card with winner forecast, goal percentages, and literal bet."""
+    img = _create_backdrop(1200, 780)
+    _draw_brand_header(img, m.get("league_label", m["league"]).upper(), f"{m['kickoff_col']} COL")
+    _glass_panel(img, (48, 102, 1152, 742), radius=28)
 
     d = ImageDraw.Draw(img)
-    f_team = _load_font(34, bold=True)
-    f_sub = _load_font(19, bold=False)
-    f_lbl = _load_font(18, bold=True)
-    f_big = _load_font(28, bold=True)
+    f_team = _load_font(32, "bold")
+    f_sub = _load_font(17, "reg")
+    f_lbl = _load_font(17, "semi")
 
-    # Match header
     title = f"{m['home']}   vs   {m['away']}"
     tw = d.textlength(title, font=f_team)
     if tw > 1040:
-        f_team = _load_font(27, bold=True)
+        f_team = _load_font(25, "bold")
         tw = d.textlength(title, font=f_team)
-    d.text(((1200 - tw) / 2, 134), title, font=f_team, fill=(255, 255, 255, 255))
+    d.text(((1200 - tw) / 2, 120), title, font=f_team, fill=(255, 255, 255, 255))
 
-    # Stacked market-implied 1 / X / 2 probability bar
+    # Winner probabilities (market implied + model)
     s_inv = 1.0 / m["o1"] + 1.0 / m["ox"] + 1.0 / m["o2"]
     p1 = (1.0 / m["o1"]) / s_inv
     px = (1.0 / m["ox"]) / s_inv
     p2 = (1.0 / m["o2"]) / s_inv
 
-    bar_x, bar_y, bar_w, bar_h = 96, 198, 1008, 26
+    bar_x, bar_y, bar_w, bar_h = 84, 174, 1032, 24
     w1 = int(bar_w * p1)
     wx = int(bar_w * px)
-    w2 = bar_w - w1 - wx
     d.rounded_rectangle((bar_x, bar_y, bar_x + w1, bar_y + bar_h), radius=10, fill=(139, 92, 246, 255))
     d.rectangle((bar_x + w1 + 2, bar_y, bar_x + w1 + wx - 2, bar_y + bar_h), fill=(148, 163, 184, 220))
     d.rounded_rectangle((bar_x + w1 + wx, bar_y, bar_x + bar_w, bar_y + bar_h), radius=10, fill=(249, 115, 22, 255))
 
-    d.text((bar_x, 232), f"Local {p1*100:.0f}% (@{m['o1']:.2f})", font=f_lbl, fill=(196, 181, 253, 255))
-    mid_txt = f"Empate {px*100:.0f}% (@{m['ox']:.2f})"
+    d.text((bar_x, 204), f"{m['home'][:18]} Gana: {p1*100:.0f}% (@{m['o1']:.2f})", font=f_lbl, fill=(196, 181, 253, 255))
+    mid_txt = f"Empate: {px*100:.0f}% (@{m['ox']:.2f})"
     mw = d.textlength(mid_txt, font=f_lbl)
-    d.text((600 - mw / 2, 232), mid_txt, font=f_lbl, fill=(203, 213, 225, 255))
-    r_txt = f"Visita {p2*100:.0f}% (@{m['o2']:.2f})"
+    d.text((600 - mw / 2, 204), mid_txt, font=f_lbl, fill=(203, 213, 225, 255))
+    r_txt = f"{m['away'][:18]} Gana: {p2*100:.0f}% (@{m['o2']:.2f})"
     rw = d.textlength(r_txt, font=f_lbl)
-    d.text((bar_x + bar_w - rw, 232), r_txt, font=f_lbl, fill=(253, 186, 116, 255))
+    d.text((bar_x + bar_w - rw, 204), r_txt, font=f_lbl, fill=(253, 186, 116, 255))
 
-    # Left & Right team glass boxes
-    _glass_panel(img, (84, 276, 584, 520), radius=20, fill=(255, 255, 255, 16))
-    _glass_panel(img, (616, 276, 1116, 520), radius=20, fill=(255, 255, 255, 16))
+    # Left & Right team stats
+    _glass_panel(img, (84, 242, 584, 466), radius=20, fill=(255, 255, 255, 16))
+    _glass_panel(img, (616, 242, 1116, 466), radius=20, fill=(255, 255, 255, 16))
     d = ImageDraw.Draw(img)
 
     hs, as_ = m["h_stat"], m["a_stat"]
     for bx, name, st, scores, col in [
-        (110, f"LOCAL: {m['home'][:22]}", hs, m.get("h_recent_scores", []), (139, 92, 246, 255)),
-        (642, f"VISITA: {m['away'][:22]}", as_, m.get("a_recent_scores", []), (249, 115, 22, 255)),
+        (108, f"LOCAL: {m['home'][:22]}", hs, m.get("h_recent_scores", []), (139, 92, 246, 255)),
+        (640, f"VISITA: {m['away'][:22]}", as_, m.get("a_recent_scores", []), (249, 115, 22, 255)),
     ]:
-        d.text((bx, 294), name, font=f_lbl, fill=(255, 255, 255, 255))
-        d.text((bx, 330), f"Victorias: {st['win_pct']*100:.0f}%", font=f_sub, fill=(226, 232, 240, 255))
-        _draw_progress_bar(img, bx + 175, 336, 270, 12, st["win_pct"], col)
+        d.text((bx, 256), name, font=f_lbl, fill=(255, 255, 255, 255))
+        d.text((bx, 288), f"Victorias: {st['win_pct']*100:.0f}%", font=f_sub, fill=(226, 232, 240, 255))
+        _draw_progress_bar(img, bx + 175, 294, 270, 11, st["win_pct"], col)
 
         d = ImageDraw.Draw(img)
-        d.text((bx, 366), f"No pierde: {st['unbeaten_pct']*100:.0f}%", font=f_sub, fill=(226, 232, 240, 255))
-        _draw_progress_bar(img, bx + 175, 372, 270, 12, st["unbeaten_pct"], (34, 197, 94, 235))
+        d.text((bx, 320), f"No pierde: {st['unbeaten_pct']*100:.0f}%", font=f_sub, fill=(226, 232, 240, 255))
+        _draw_progress_bar(img, bx + 175, 326, 270, 11, st["unbeaten_pct"], (34, 197, 94, 235))
 
         d = ImageDraw.Draw(img)
-        d.text((bx, 402), f"+0.5 goles: {st['o05_pct']*100:.0f}%", font=f_sub, fill=(226, 232, 240, 255))
-        _draw_progress_bar(img, bx + 175, 408, 270, 12, st["o05_pct"], (56, 189, 248, 235))
+        d.text((bx, 352), f"Anota +0.5: {st['o05_pct']*100:.0f}%", font=f_sub, fill=(226, 232, 240, 255))
+        _draw_progress_bar(img, bx + 175, 358, 270, 11, st["o05_pct"], (56, 189, 248, 235))
 
         d = ImageDraw.Draw(img)
-        d.text((bx, 440), f"Prom. Goles: {st['gf_avg']:.2f} GF / {st['ga_avg']:.2f} GA", font=f_sub, fill=(203, 213, 225, 255))
-        _form_dots(d, bx, 474, scores)
+        d.text((bx, 386), f"Prom. último 10: {st['gf_avg']:.2f} GF / {st['ga_avg']:.2f} GA", font=f_sub, fill=(203, 213, 225, 255))
+        _form_dots(d, bx, 420, scores)
 
-    # Bottom pick highlight bar
-    pick_txt = "Sin señal 1.20–1.90 en filtros actuales"
-    ev_txt = "Solo radar estadístico"
-    ev_col = (148, 163, 184, 255)
+    # Dedicated Goal Forecast Breakdown Panel
+    _glass_panel(img, (84, 482, 1116, 616), radius=20, fill=(255, 255, 255, 18), border=(255, 255, 255, 55))
+    d = ImageDraw.Draw(img)
+    ps = m.get("probs_summary") or {}
+    lam_h = m.get("lam_h", 1.3)
+    lam_a = m.get("lam_a", 1.1)
+    h_o05 = ps.get("h_o05", round(hs["o05_pct"] * 100, 0))
+    h_o15 = ps.get("h_o15", round(hs["o15_pct"] * 100, 0))
+    a_o05 = ps.get("a_o05", round(as_["o05_pct"] * 100, 0))
+    a_o15 = ps.get("a_o15", round(as_["o15_pct"] * 100, 0))
+    tot_o15 = ps.get("o15", 72)
+    tot_o25 = ps.get("o25", 48)
+    btts = ps.get("btts", 45)
+
+    if p1 >= 0.52:
+        fav_line = f"PRONÓSTICO: Favorito {m['home']} ({p1*100:.0f}% de ganar | {(p1+px)*100:.0f}% Gana o Empata)"
+    elif p2 >= 0.52:
+        fav_line = f"PRONÓSTICO: Favorito {m['away']} ({p2*100:.0f}% de ganar | {(p2+px)*100:.0f}% Gana o Empata)"
+    else:
+        fav_line = f"PRONÓSTICO: Partido parejo — Ligero favorito {m['home'] if p1>=p2 else m['away']} ({max(p1,p2)*100:.0f}%)"
+
+    d.text((108, 496), fav_line, font=_load_font(19, "bold"), fill=(253, 224, 71, 255))
+    d.text(
+        (108, 530),
+        f"Goles esperados: {m['home'][:16]} ~{lam_h:.2f}  |  {m['away'][:16]} ~{lam_a:.2f}  |  Partido +1.5: {tot_o15:.0f}%  •  +2.5: {tot_o25:.0f}%  •  Ambos marcan: {btts:.0f}%",
+        font=f_sub,
+        fill=(241, 245, 249, 255),
+    )
+    d.text(
+        (108, 564),
+        f"{m['home'][:18]} anota +0.5: {h_o05:.0f}%  (+1.5: {h_o15:.0f}%)    |    {m['away'][:18]} anota +0.5: {a_o05:.0f}%  (+1.5: {a_o15:.0f}%)",
+        font=f_lbl,
+        fill=(186, 230, 253, 255),
+    )
+
+    # Bottom Literal Bet Box
     if m.get("opt_b_pick"):
         pb = m["opt_b_pick"]
-        pick_txt = f"Opción B: {pb['market_name']}  @~{pb['odds']:.2f}  (Prob {pb['prob']}%)"
-        ev_txt = f"EV {pb['ev_pct']:+.1f}%"
+        lit = literal_market_text(pb["market_name"], m["home"], m["away"])
+        pick_txt = f"APUESTA SUGERIDA: {lit}  @~{pb['odds']:.2f}"
+        ev_txt = f"Prob {pb['prob']}% | EV {pb['ev_pct']:+.1f}%"
         ev_col = (74, 222, 128, 255) if pb["ev_pct"] > 0 else (251, 191, 36, 255)
     elif m.get("opt_a_leg"):
         pa = m["opt_a_leg"]
-        pick_txt = f"Pata Opción A: {pa['market_name']}  @{pa['odds']:.2f}  (Prob {pa['prob']}%)"
-        ev_txt = f"EV {pa['ev_pct']:+.1f}%"
+        lit = literal_market_text(pa["market_name"], m["home"], m["away"])
+        pick_txt = f"SELECCIÓN SUGERIDA: {lit}  @{pa['odds']:.2f}"
+        ev_txt = f"Prob {pa['prob']}% | EV {pa['ev_pct']:+.1f}%"
         ev_col = (74, 222, 128, 255) if pa["ev_pct"] > 0 else (251, 191, 36, 255)
+    else:
+        win_side = f"{m['home']} Gana o Empata (1X)" if p1 >= p2 else f"{m['away']} Gana o Empata (X2)"
+        pick_txt = f"LECTURA GENERAL: {win_side} • Partido +1.5 goles ({tot_o15:.0f}%)"
+        ev_txt = "Fuera de rango 1.20–1.90"
+        ev_col = (203, 213, 225, 255)
 
-    _glass_panel(img, (84, 540, 1116, 610), radius=18, fill=(124, 58, 237, 55), border=(167, 139, 250, 110))
+    _glass_panel(img, (84, 632, 1116, 718), radius=18, fill=(124, 58, 237, 65), border=(167, 139, 250, 130))
     d = ImageDraw.Draw(img)
-    d.text((108, 560), pick_txt, font=_load_font(22, bold=True), fill=(255, 255, 255, 255))
-    ew = d.textlength(ev_txt, font=f_big)
-    d.text((1092 - ew, 556), ev_txt, font=f_big, fill=ev_col)
+    f_pk = _load_font(20, "bold")
+    if d.textlength(pick_txt, font=f_pk) > 740:
+        f_pk = _load_font(17, "bold")
+    d.text((108, 650), pick_txt, font=f_pk, fill=(255, 255, 255, 255))
+    f_ev = _load_font(19, "bold")
+    ew = d.textlength(ev_txt, font=f_ev)
+    d.text((1092 - ew, 652), ev_txt, font=f_ev, fill=ev_col)
+    d.text((108, 684), "Análisis estadístico Caza Cuotas (simulación educativa)", font=_load_font(14, "reg"), fill=(226, 232, 240, 255))
 
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)
@@ -192,40 +254,42 @@ def render_match_card(m: dict) -> bytes:
 
 
 def render_parlay_card(parlay: dict) -> bytes:
-    """Render a graphical 1200x675 PNG ticket card for a 2-match parlay (Option A)."""
-    img = _create_backdrop()
-    _draw_brand_header(img, "POSIBLE COMBINADA • OPCIÓN A (1.20–1.90)", f"{parlay['kickoff_col']} COL")
-    _glass_panel(img, (48, 108, 1152, 632), radius=28)
+    """Render an explicit 1200x675 PNG ticket card for a 2-match parlay."""
+    img = _create_backdrop(1200, 675)
+    _draw_brand_header(img, "COMBINADA DE 2 SELECCIONES • CUOTA 1.20–1.90", f"{parlay['kickoff_col']} COL")
+    _glass_panel(img, (48, 102, 1152, 636), radius=28)
 
     d = ImageDraw.Draw(img)
-    f_leg = _load_font(25, bold=True)
-    f_sub = _load_font(20, bold=False)
+    f_leg = _load_font(23, "bold")
+    f_sub = _load_font(18, "reg")
 
-    # Leg 1 & Leg 2 glass cards
     for idx, leg_txt in enumerate([parlay["leg1"], parlay["leg2"]]):
-        y0 = 148 + idx * 146
+        y0 = 138 + idx * 144
         _glass_panel(img, (88, y0, 1112, y0 + 118), radius=20, fill=(255, 255, 255, 18))
         d = ImageDraw.Draw(img)
         parts = leg_txt.split(":", 1)
         match_part = parts[0].strip()
         pick_part = parts[1].strip() if len(parts) > 1 else ""
-        d.text((118, y0 + 20), f"SELECCIÓN {idx + 1} • {match_part}", font=f_sub, fill=(196, 181, 253, 255))
-        d.text((118, y0 + 54), pick_part, font=f_leg, fill=(255, 255, 255, 255))
+        # Extract home vs away to make pick literal
+        clean_match = match_part.split(")", 1)[-1].strip() if ")" in match_part else match_part
+        if " vs " in clean_match:
+            hm, aw = [x.strip() for x in clean_match.split(" vs ", 1)]
+            pick_part = literal_market_text(pick_part, hm, aw)
+        d.text((118, y0 + 18), f"APUESTA {idx + 1} • {match_part}", font=f_sub, fill=(196, 181, 253, 255))
+        d.text((118, y0 + 52), pick_part, font=f_leg, fill=(255, 255, 255, 255))
 
-    # Bottom odds & probability gauge
-    _glass_panel(img, (88, 456, 1112, 598), radius=22, fill=(249, 115, 22, 38), border=(251, 146, 60, 130))
+    _glass_panel(img, (88, 448, 1112, 598), radius=22, fill=(249, 115, 22, 42), border=(251, 146, 60, 130))
     d = ImageDraw.Draw(img)
-    d.text((120, 478), "CUOTA FINAL", font=_load_font(18, bold=True), fill=(253, 186, 116, 255))
-    d.text((120, 506), f"@{parlay['combo_odds']:.2f}", font=_load_font(48, bold=True), fill=(255, 255, 255, 255))
+    d.text((120, 470), "CUOTA FINAL", font=_load_font(17, "bold"), fill=(253, 186, 116, 255))
+    d.text((120, 498), f"@{parlay['combo_odds']:.2f}", font=_load_font(46, "bold"), fill=(255, 255, 255, 255))
 
-    d.text((380, 480), f"Probabilidad Estimada: {parlay['prob_est']}%   |   Implícita Casa: {parlay['prob_impl']}%", font=f_sub, fill=(241, 245, 249, 255))
-    _draw_progress_bar(img, 380, 520, 460, 18, parlay["prob_est"] / 100.0, (74, 222, 128, 255) if parlay["ev_pct"] > 0 else (251, 191, 36, 255))
+    d.text((370, 474), f"Probabilidad Real: {parlay['prob_est']}%   |   Exigida por cuota: {parlay['prob_impl']}%", font=f_sub, fill=(241, 245, 249, 255))
+    _draw_progress_bar(img, 370, 514, 460, 18, parlay["prob_est"] / 100.0, (74, 222, 128, 255) if parlay["ev_pct"] > 0 else (251, 191, 36, 255))
     d = ImageDraw.Draw(img)
 
     ev_col = (74, 222, 128, 255) if parlay["ev_pct"] > 0 else (251, 191, 36, 255)
-    ev_lbl = f"EV {parlay['ev_pct']:+.1f}%"
-    d.text((880, 496), ev_lbl, font=_load_font(34, bold=True), fill=ev_col)
-    d.text((880, 542), "Ventaja +EV" if parlay["ev_pct"] > 0 else "Ojo: margen casa", font=_load_font(17, bold=False), fill=ev_col)
+    d.text((870, 488), f"EV {parlay['ev_pct']:+.1f}%", font=_load_font(32, "bold"), fill=ev_col)
+    d.text((870, 536), "Con ventaja" if parlay["ev_pct"] > 0 else "Margen de la casa", font=_load_font(16, "reg"), fill=ev_col)
 
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)
