@@ -262,12 +262,18 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 parlays_a.append(
                     {
                         "kickoff_col": m1.kickoff_col,
+                        "title": f"{m1.home} vs {m1.away} + {m2.home} vs {m2.away}",
                         "leg1": f"({m1.league}) {m1.home} vs {m1.away}: {MARKET_NAMES[k1]} @{o1:.2f}",
                         "leg2": f"({m2.league}) {m2.home} vs {m2.away}: {MARKET_NAMES[k2]} @{o2:.2f}",
+                        "market_key": f"{k1}+{k2}",
                         "combo_odds": combo,
                         "prob_est": round(p_combo * 100.0, 1),
                         "prob_impl": round(imp * 100.0, 1),
                         "ev_pct": round(ev_est, 1),
+                        "legs": [
+                            {"event_id": m1.event_id, "league": m1.league, "match_date": m1.match_date, "market": k1},
+                            {"event_id": m2.event_id, "league": m2.league, "match_date": m2.match_date, "market": k2},
+                        ],
                     }
                 )
                 if db:
@@ -402,40 +408,51 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
 def run_settle_pipeline() -> dict:
     db = PaperTradingDB()
     pending = db.get_pending()
-    if not pending:
-        return {"pending_before": 0, "settled_now": 0, "still_pending": 0}
+    pending_user = db.get_pending_user_bets()
 
-    settled_now = 0
-    for tr in pending:
-        leg_outcomes = []
-        notes = []
+    def _evaluate_legs(legs: list[dict]) -> tuple[bool, bool, list[str]]:
         any_lost = False
         all_done = True
-
-        for leg in tr["legs"]:
+        notes = []
+        for leg in legs:
             res = fetch_espn_match_result(leg["league"], leg["match_date"], leg["event_id"])
             if res is None or not res[0]:
                 all_done = False
                 continue
             _, hg, ag = res
             won = grade_market(leg["market"], hg, ag)
-            leg_outcomes.append(won)
             notes.append(f"{leg['market']}:{hg}-{ag}({'W' if won else 'L'})")
             if not won:
                 any_lost = True
+        return any_lost, all_done, notes
 
+    settled_now = 0
+    for tr in pending:
+        any_lost, all_done, notes = _evaluate_legs(tr["legs"])
         if any_lost:
             db.settle_trade(tr["id"], "LOST", -tr["stake_u"], " | ".join(notes))
             settled_now += 1
-        elif all_done and len(leg_outcomes) == len(tr["legs"]):
+        elif all_done and notes:
             profit = tr["stake_u"] * (tr["odds"] - 1.0)
             db.settle_trade(tr["id"], "WON", profit, " | ".join(notes))
             settled_now += 1
+
+    user_settled = 0
+    for ub in pending_user:
+        any_lost, all_done, notes = _evaluate_legs(ub["legs"])
+        if any_lost:
+            db.settle_user_bet(ub["id"], ub["user_id"], "LOST", -ub["stake_u"], " | ".join(notes))
+            user_settled += 1
+        elif all_done and notes:
+            profit = ub["stake_u"] * (ub["odds"] - 1.0)
+            db.settle_user_bet(ub["id"], ub["user_id"], "WON", profit, " | ".join(notes))
+            user_settled += 1
 
     return {
         "pending_before": len(pending),
         "settled_now": settled_now,
         "still_pending": len(pending) - settled_now,
+        "user_settled": user_settled,
     }
 
 
