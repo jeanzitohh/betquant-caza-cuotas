@@ -2,17 +2,20 @@ import io
 import os
 from PIL import Image, ImageDraw, ImageFont
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONTS_DIR = os.path.join(BASE_DIR, "fonts")
+
 FONT_CANDIDATES_BOLD = [
+    os.path.join(FONTS_DIR, "Poppins-Bold.ttf"),
     r"C:\Windows\Fonts\segoeuib.ttf",
     r"C:\Windows\Fonts\arialbd.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
 ]
 FONT_CANDIDATES_REG = [
+    os.path.join(FONTS_DIR, "Poppins-Regular.ttf"),
     r"C:\Windows\Fonts\segoeui.ttf",
     r"C:\Windows\Fonts\arial.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
 ]
 
 

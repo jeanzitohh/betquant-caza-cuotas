@@ -12,13 +12,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 LEAGUE_LABELS = {
-    "col.1": "Colombia Primera A (Liga BetPlay)",
-    "eng.1": "Premier League",
-    "esp.1": "LaLiga",
-    "ita.1": "Serie A",
-    "ger.1": "Bundesliga",
-    "fra.1": "Ligue 1",
     "uefa.champions": "UEFA Champions League",
+    "ger.1": "Bundesliga — Alemania",
+    "ita.1": "Serie A — Italia",
+    "eng.1": "Premier League — Inglaterra",
+    "esp.1": "LaLiga — España",
+    "fra.1": "Ligue 1 — Francia",
+    "col.1": "Liga BetPlay — Colombia",
 }
 
 APIFOOTBALL_LEAGUE_IDS = {

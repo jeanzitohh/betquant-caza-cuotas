@@ -161,31 +161,31 @@ def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_
         return 0
     sent_count = 0
 
-    # 1. Graphical Match Cards for new Colombia matches
-    new_col = []
+    # 1. Graphical Match Cards for upcoming matches with clear picks (prioritizing Europe, plus Colombia)
+    new_cards = []
     for m in scan.get("matches", []):
-        if m["league"] != "col.1":
+        if m["league"] != "col.1" and not (m.get("opt_a_leg") or m.get("opt_b_pick")):
             continue
-        key = f"col_match_v2:{m['event_id']}"
+        key = f"match_card_poppins_v1:{m['event_id']}"
         if not db.was_alert_sent(key):
-            new_col.append((key, m))
+            new_cards.append((key, m))
 
-    if new_col:
+    # Send Europe first, cap at 4 new cards per cron run to keep channel clean
+    new_cards.sort(key=lambda item: (item[1]["league"] == "col.1", item[1]["kickoff_col"]))
+    for key, m in new_cards[:4]:
         if HAS_CARDS:
-            for key, m in new_col:
-                png = render_match_card(m)
-                cap = (
-                    f"🇨🇴 <b>{html.escape(m['home'])} vs {html.escape(m['away'])}</b>\n"
-                    f"🕒 {m['kickoff_col']} COL • Cuotas: <code>{m['o1']:.2f} | {m['ox']:.2f} | {m['o2']:.2f}</code>\n"
-                    "📊 <i>Simulación estadística — Caza Cuotas</i>"
-                )
-                if send_photo_bytes(token, channel_id, png, cap):
-                    db.mark_alert_sent(key)
-                    sent_count += 1
+            png = render_match_card(m)
+            cap = (
+                f"⚽ <b>{html.escape(m['home'])} vs {html.escape(m['away'])}</b> ({html.escape(m.get('league_label', m['league']))})\n"
+                f"🕒 {m['kickoff_col']} COL • Cuotas: <code>{m['o1']:.2f} | {m['ox']:.2f} | {m['o2']:.2f}</code>\n"
+                "📊 <i>Caza Cuotas • Estadísticas y simulación</i>"
+            )
+            if send_photo_bytes(token, channel_id, png, cap):
+                db.mark_alert_sent(key)
+                sent_count += 1
         else:
-            if send_html(token, channel_id, format_match_stats_block([m for _, m in new_col], "🇨🇴 CAZA CUOTAS • LIGA BETPLAY")):
-                for key, _ in new_col:
-                    db.mark_alert_sent(key)
+            if send_html(token, channel_id, format_match_stats_block([m], f"⚽ {m.get('league_label', m['league'])}")):
+                db.mark_alert_sent(key)
                 sent_count += 1
 
     # 2. Graphical Parlay Cards for new Option A picks
