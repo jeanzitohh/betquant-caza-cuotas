@@ -3,6 +3,7 @@ import json
 import os
 
 from dashboard import HTML_PAGE
+from providers import load_env
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOCS_DIR = os.path.join(BASE_DIR, "docs")
@@ -11,17 +12,35 @@ DOCS_DIR = os.path.join(BASE_DIR, "docs")
 def export_static_site(scan_res: dict, report_res: dict) -> str:
     """Export static GitHub Pages bundle (docs/index.html + docs/data.json)."""
     os.makedirs(DOCS_DIR, exist_ok=True)
+    env = load_env()
+    sb_url = env.get("SUPABASE_URL", "").strip()
+    sb_anon = env.get("SUPABASE_ANON_KEY", "").strip()
+    sb_ready = bool(sb_url and sb_anon)
     now_col = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M")
 
-    payload = {
-        "generated_col": now_col,
-        "scan": scan_res,
-        "report": report_res,
-    }
+    if sb_ready:
+        # Strict auth-only gate: never expose unauthenticated radar data in public static JSON
+        payload = {"auth_required": True, "generated_col": now_col}
+    else:
+        payload = {
+            "generated_col": now_col,
+            "scan": scan_res,
+            "report": report_res,
+        }
     with open(os.path.join(DOCS_DIR, "data.json"), "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False)
 
     static_html = HTML_PAGE.replace("const STATIC_MODE = false;", "const STATIC_MODE = true;")
+    static_html = static_html.replace(
+        "const SUPABASE_URL = '';", f"const SUPABASE_URL = {json.dumps(sb_url)};"
+    ).replace(
+        "const SUPABASE_ANON_KEY = '';", f"const SUPABASE_ANON_KEY = {json.dumps(sb_anon)};"
+    )
+    if sb_ready:
+        static_html = static_html.replace(
+            "</head>",
+            '  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n</head>',
+        )
     with open(os.path.join(DOCS_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(static_html)
 

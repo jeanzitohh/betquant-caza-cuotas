@@ -296,14 +296,14 @@ HTML_PAGE = """<!DOCTYPE html>
       <div class="glass gate-card">
         <h2 style="margin:0 0 14px;font-size:20px;">Acceder a Caza Cuotas</h2>
         <div id="staticAuthNotice" style="display:none;padding:10px 12px;border-radius:12px;background:var(--amber-bg);color:var(--amber);font-size:12px;margin-bottom:14px;">
-          Esta URL estática no tiene servidor activo. Ejecuta <strong>abrir_bot.bat</strong> en tu PC (o sube el servidor Python a un VPS/Railway) para iniciar sesión real.
+          Esta URL estática no tiene servidor activo. Ejecuta <strong>abrir_bot.bat</strong> en tu PC para iniciar sesión local.
         </div>
         <div class="seg" style="width:100%;margin-bottom:16px;">
           <button class="seg-btn active" style="flex:1;" id="tabLoginMode" onclick="setAuthMode('login')">Iniciar Sesión</button>
           <button class="seg-btn" style="flex:1;" id="tabRegMode" onclick="setAuthMode('register')">Crear Cuenta</button>
         </div>
         <div class="field">
-          <label>Usuario</label>
+          <label id="authUserLabel">Usuario</label>
           <input type="text" id="authUser" placeholder="ej. juantovar" autocomplete="username" />
         </div>
         <div class="field" id="displayWrap" style="display:none;">
@@ -314,8 +314,9 @@ HTML_PAGE = """<!DOCTYPE html>
           <label>Contraseña (mín. 6 caracteres)</label>
           <input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitAuth()" />
         </div>
-        <div id="authErr" style="color:var(--red);font-size:12px;min-height:18px;margin-bottom:10px;"></div>
-        <button class="btn btn-primary" style="width:100%;padding:11px;" onclick="submitAuth()">Entrar</button>
+        <div id="authErr" style="color:var(--red);font-size:12px;min-height:18px;margin-bottom:6px;"></div>
+        <div id="authInfo" style="display:none;padding:9px 12px;border-radius:10px;background:var(--green-bg);color:var(--green);font-size:12px;margin-bottom:10px;"></div>
+        <button class="btn btn-primary" style="width:100%;padding:11px;" id="authSubmitBtn" onclick="submitAuth()">Entrar</button>
       </div>
     </div>
   </section>
@@ -485,6 +486,12 @@ HTML_PAGE = """<!DOCTYPE html>
 
   <script>
     const STATIC_MODE = false;
+    const SUPABASE_URL = '';
+    const SUPABASE_ANON_KEY = '';
+    const SUPABASE_ENABLED = STATIC_MODE && Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
+    const sbClient = SUPABASE_ENABLED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+    const FIB_SEQ = [1, 1, 2, 3, 5, 8, 13, 21];
+
     const LEAGUE_ORDER = ['uefa.champions', 'ger.1', 'ita.1', 'eng.1', 'esp.1', 'fra.1', 'col.1'];
     const LEAGUE_SHORT = { 'col.1': 'COL', 'uefa.champions': 'UCL', 'eng.1': 'ENG', 'esp.1': 'ESP', 'ita.1': 'ITA', 'ger.1': 'GER', 'fra.1': 'FRA' };
 
@@ -494,17 +501,106 @@ HTML_PAGE = """<!DOCTYPE html>
     let currentUser = null;
     let userSummary = null;
     let favorites = new Set();
+    let rawCloudScan = null;
+    let rawCloudGen = '';
     let lastScan = { matches: [], parlays_a: [], opt_b: [] };
     let slip = []; // [{event_id, league, match_date, title, market, market_name, odds, prob}]
+
+    if (SUPABASE_ENABLED) {
+      document.getElementById('authUserLabel').textContent = 'Correo electrónico';
+      const uIn = document.getElementById('authUser');
+      uIn.type = 'email';
+      uIn.placeholder = 'tu@correo.com';
+      uIn.autocomplete = 'email';
+    }
 
     function setAuthMode(mode) {
       authMode = mode;
       document.getElementById('tabLoginMode').classList.toggle('active', mode === 'login');
       document.getElementById('tabRegMode').classList.toggle('active', mode === 'register');
       document.getElementById('displayWrap').style.display = mode === 'register' ? 'block' : 'none';
+      document.getElementById('authErr').textContent = '';
+      document.getElementById('authInfo').style.display = 'none';
+    }
+
+    function buildUserSummaryFromRows(profile, rows, favSet) {
+      const base = Number((profile && profile.bankroll_base) || 100.0);
+      const settled = (rows || []).filter(r => r.status === 'WON' || r.status === 'LOST');
+      const won = settled.filter(r => r.status === 'WON').length;
+      const lost = settled.filter(r => r.status === 'LOST').length;
+      const pending = (rows || []).filter(r => r.status === 'PENDING').length;
+      const netU = settled.reduce((s, r) => s + Number(r.profit_u || 0), 0);
+      const stakedU = settled.reduce((s, r) => s + Number(r.stake_u || 0), 0);
+      const bankrollU = Number((base + netU).toFixed(2));
+      const roiPct = stakedU > 0 ? Number(((netU / stakedU) * 100.0).toFixed(1)) : 0.0;
+      const equityCurve = [base];
+      let cur = base;
+      for (const r of settled) {
+        cur += Number(r.profit_u || 0);
+        equityCurve.push(Number(cur.toFixed(2)));
+      }
+      const fibStep = Math.min(Number((profile && profile.fib_step) || 0), FIB_SEQ.length - 1);
+      const nextFib = Number((2.0 * FIB_SEQ[fibStep]).toFixed(2));
+      return {
+        bankroll_u: bankrollU,
+        settled: settled.length,
+        won,
+        lost,
+        pending,
+        roi_pct: roiPct,
+        equity_curve: equityCurve,
+        next_fib_stake: nextFib,
+        favorites: Array.from(favSet || []),
+        recent: (rows || []).slice(-50).map(r => ({
+          id: r.id,
+          match_date: r.match_date,
+          title: r.title,
+          market_name: r.market_name,
+          odds: Number(r.odds),
+          stake_u: Number(r.stake_u),
+          status: r.status,
+          profit_u: Number(r.profit_u || 0)
+        }))
+      };
     }
 
     async function checkAuth() {
+      if (SUPABASE_ENABLED) {
+        const { data: { user } } = await sbClient.auth.getUser();
+        if (!user) {
+          currentUser = null;
+          document.getElementById('authGate').style.display = 'flex';
+          document.getElementById('appShell').style.display = 'none';
+          return;
+        }
+        let { data: prof } = await sbClient.from('user_profiles').select('*').eq('user_id', user.id).maybeSingle();
+        if (!prof) {
+          const defName = (user.user_metadata && user.user_metadata.display_name) || (user.email ? user.email.split('@')[0] : 'Usuario');
+          const ins = await sbClient.from('user_profiles').upsert({
+            user_id: user.id, display_name: defName, stake_mode: 'flat', fib_step: 0, bankroll_base: 100.0
+          }).select().single();
+          prof = ins.data || { user_id: user.id, display_name: defName, stake_mode: 'flat', fib_step: 0, bankroll_base: 100.0 };
+        }
+        const [favRes, betRes] = await Promise.all([
+          sbClient.from('user_favorites').select('event_id').eq('user_id', user.id),
+          sbClient.from('user_bets').select('*').eq('user_id', user.id).order('id', { ascending: true })
+        ]);
+        favorites = new Set((favRes.data || []).map(x => String(x.event_id)));
+        currentUser = {
+          id: user.id,
+          username: (user.email || '').split('@')[0],
+          display_name: prof.display_name,
+          stake_mode: prof.stake_mode || 'flat',
+          fib_step: Number(prof.fib_step || 0),
+          bankroll_base: Number(prof.bankroll_base || 100)
+        };
+        userSummary = buildUserSummaryFromRows(prof, betRes.data || [], favorites);
+        document.getElementById('authGate').style.display = 'none';
+        document.getElementById('appShell').style.display = 'block';
+        renderUserUI();
+        if (!lastScan.matches.length) await runScan(false);
+        return;
+      }
       if (STATIC_MODE) {
         document.getElementById('staticAuthNotice').style.display = 'block';
         return;
@@ -527,8 +623,50 @@ HTML_PAGE = """<!DOCTYPE html>
     }
 
     async function submitAuth() {
+      const errBox = document.getElementById('authErr');
+      const infoBox = document.getElementById('authInfo');
+      errBox.textContent = '';
+      infoBox.style.display = 'none';
+      if (SUPABASE_ENABLED) {
+        const email = document.getElementById('authUser').value.trim();
+        const display_name = document.getElementById('authDisplay').value.trim();
+        const password = document.getElementById('authPass').value;
+        if (!email || !email.includes('@')) { errBox.textContent = 'Ingresa un correo electrónico válido.'; return; }
+        if (password.length < 6) { errBox.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+        const btn = document.getElementById('authSubmitBtn');
+        btn.disabled = true;
+        try {
+          if (authMode === 'register') {
+            const { data, error } = await sbClient.auth.signUp({
+              email,
+              password,
+              options: { data: { display_name: display_name || email.split('@')[0] } }
+            });
+            if (error) {
+              errBox.textContent = error.message.includes('already registered') ? 'Este correo ya está registrado. Inicia sesión.' : error.message;
+              return;
+            }
+            if (!data.session) {
+              infoBox.textContent = 'Cuenta creada. Revisa tu correo para confirmar e inicia sesión.';
+              infoBox.style.display = 'block';
+              setAuthMode('login');
+              return;
+            }
+          } else {
+            const { error } = await sbClient.auth.signInWithPassword({ email, password });
+            if (error) {
+              errBox.textContent = error.message.includes('Invalid login') ? 'Correo o contraseña incorrectos.' : error.message;
+              return;
+            }
+          }
+          await checkAuth();
+        } finally {
+          btn.disabled = false;
+        }
+        return;
+      }
       if (STATIC_MODE) {
-        document.getElementById('authErr').textContent = 'Ejecuta abrir_bot.bat o monta el servidor Python para iniciar sesión.';
+        errBox.textContent = 'Ejecuta abrir_bot.bat en tu PC para iniciar sesión local.';
         return;
       }
       const username = document.getElementById('authUser').value;
@@ -537,12 +675,17 @@ HTML_PAGE = """<!DOCTYPE html>
       const ep = authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
       const r = await fetch(ep, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username, display_name, password}) });
       const d = await r.json();
-      if (!r.ok) { document.getElementById('authErr').textContent = d.error || 'Error de acceso'; return; }
+      if (!r.ok) { errBox.textContent = d.error || 'Error de acceso'; return; }
       await checkAuth();
     }
 
     async function doLogout() {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      if (SUPABASE_ENABLED) {
+        await sbClient.auth.signOut();
+        rawCloudScan = null;
+      } else {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      }
       lastScan = { matches: [], parlays_a: [], opt_b: [] };
       slip = [];
       await checkAuth();
@@ -553,7 +696,7 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('scopeEu').classList.toggle('active', scope === 'eu');
       document.getElementById('scopeAll').classList.toggle('active', scope === 'all');
       document.getElementById('scopeCol').classList.toggle('active', scope === 'col.1');
-      runScan();
+      runScan(false);
     }
 
     function toggleFavOnly() {
@@ -588,7 +731,36 @@ HTML_PAGE = """<!DOCTYPE html>
       }).join('');
     }
 
-    async function runScan() {
+    function filterScanByScope(raw, scope) {
+      const keepLeague = lg => scope === 'all' ? true : (scope === 'col.1' ? lg === 'col.1' : lg !== 'col.1');
+      return {
+        matches: (raw.matches || []).filter(m => keepLeague(m.league)),
+        parlays_a: (raw.parlays_a || []).filter(p => (p.legs || []).every(l => keepLeague(l.league))),
+        opt_b: (raw.opt_b || []).filter(b => keepLeague(b.league))
+      };
+    }
+
+    async function runScan(forceRefresh = true) {
+      if (SUPABASE_ENABLED) {
+        setStatus(true, 'Consultando radar en la nube...');
+        if (!rawCloudScan || forceRefresh) {
+          const { data, error } = await sbClient.from('radar_snapshots').select('generated_col,scan_json').eq('id', 1).maybeSingle();
+          if (error || !data || !data.scan_json) {
+            setStatus(false, 'Radar pendiente de primera sincronización en servidor.');
+            return;
+          }
+          rawCloudScan = data.scan_json;
+          rawCloudGen = data.generated_col || '';
+        }
+        const filtered = filterScanByScope(rawCloudScan, currentScope);
+        lastScan = { ...rawCloudScan, ...filtered, total_matches: filtered.matches.length };
+        setStatus(false, `${lastScan.total_matches} partidos próximos • Act: ${rawCloudGen} COL`);
+        populateAnalyzerSelects();
+        renderMatches();
+        renderCombos();
+        renderSlip();
+        return;
+      }
       setStatus(true, 'Consultando partidos y estadísticas...');
       const res = await fetch(`/api/scan?scope=${currentScope}&days=5`);
       if (res.status === 401) { await checkAuth(); return; }
@@ -601,6 +773,13 @@ HTML_PAGE = """<!DOCTYPE html>
     }
 
     async function runSettle() {
+      if (SUPABASE_ENABLED) {
+        setStatus(true, 'Sincronizando jugadas con el servidor...');
+        await runScan(true);
+        await checkAuth();
+        setStatus(false, 'Jugadas sincronizadas (el bot liquida resultados reales cada hora).');
+        return;
+      }
       setStatus(true, 'Liquidando resultados reales...');
       const r = await fetch('/api/settle', { method: 'POST' });
       if (r.status === 401) { await checkAuth(); return; }
@@ -610,12 +789,25 @@ HTML_PAGE = """<!DOCTYPE html>
     }
 
     async function toggleFavorite(eventId) {
+      const eid = String(eventId);
+      if (SUPABASE_ENABLED && currentUser) {
+        if (favorites.has(eid)) {
+          const { error } = await sbClient.from('user_favorites').delete().eq('user_id', currentUser.id).eq('event_id', eid);
+          if (!error) favorites.delete(eid);
+        } else {
+          const { error } = await sbClient.from('user_favorites').insert({ user_id: currentUser.id, event_id: eid });
+          if (!error) favorites.add(eid);
+        }
+        renderMatches();
+        renderUserUI();
+        return;
+      }
       const r = await fetch('/api/user/favorite', {
-        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({event_id: eventId})
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({event_id: eid})
       });
       if (r.ok) {
         const d = await r.json();
-        if (d.added) favorites.add(eventId); else favorites.delete(eventId);
+        if (d.added) favorites.add(eid); else favorites.delete(eid);
         renderMatches();
       }
     }
@@ -736,12 +928,36 @@ HTML_PAGE = """<!DOCTYPE html>
       const customOdds = parseFloat(document.getElementById('azOdds').value);
       if (!m || !market || !(customOdds > 1.01)) return;
 
-      const r = await fetch('/api/analyze', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ league: m.league, home: m.home, away: m.away, o1: m.o1, ox: m.ox, o2: m.o2, ou_line: m.ou_line, o_over: m.o_over, o_under: m.o_under, market, custom_odds: customOdds })
-      });
-      if (!r.ok) return;
-      const d = await r.json();
+      let d;
+      if (SUPABASE_ENABLED) {
+        const mk = (m.all_markets || []).find(x => x.key === market) || {};
+        const pModel = (mk.prob || 50.0) / 100.0;
+        const impl = 1.0 / Math.max(customOdds, 1.01);
+        const evPct = (pModel * customOdds - 1.0) * 100.0;
+        const kellyFull = Math.max(0.0, (pModel * customOdds - 1.0) / Math.max(customOdds - 1.0, 0.01));
+        const kellyQU = Number((100.0 * kellyFull * 0.25).toFixed(2));
+        const verdict = evPct > 2.0
+          ? 'Tu cuota supera la probabilidad estimada (apuesta con valor).'
+          : (evPct >= -2.0 ? 'Cuota muy justa respecto a la probabilidad estimada.' : 'La cuota que te ofrecen es baja para el riesgo estadístico.');
+        d = {
+          market_name: mk.name || market,
+          lam_h: m.lam_h,
+          lam_a: m.lam_a,
+          model_prob_pct: Number((pModel * 100.0).toFixed(1)),
+          market_prob_pct: Number((mk.impl || 50.0).toFixed(1)),
+          implied_prob_pct: Number((impl * 100.0).toFixed(1)),
+          ev_pct: Number(evPct.toFixed(1)),
+          kelly_quarter_u: kellyQU,
+          verdict
+        };
+      } else {
+        const r = await fetch('/api/analyze', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ league: m.league, home: m.home, away: m.away, o1: m.o1, ox: m.ox, o2: m.o2, ou_line: m.ou_line, o_over: m.o_over, o_under: m.o_under, market, custom_odds: customOdds })
+        });
+        if (!r.ok) return;
+        d = await r.json();
+      }
       const good = d.ev_pct > 0;
       document.getElementById('azResult').innerHTML = `
         <div style="background:#FFFFFF;border:1px solid var(--border);border-radius:18px;padding:18px;">
@@ -869,13 +1085,39 @@ HTML_PAGE = """<!DOCTYPE html>
       const title = slip.map(s => s.title).join(' + ');
       const mktKey = isCombo ? ('COMBINADA:' + slip.map(s => s.market).join('+')) : slip[0].market;
       const mktName = isCombo ? (`Combinada (${slip.length}): ` + slip.map(s => s.market_name).join(' + ')) : slip[0].market_name;
+      const legs = slip.map(s => ({ event_id: s.event_id, league: s.league, match_date: s.match_date, market: s.market }));
+
+      if (SUPABASE_ENABLED && currentUser) {
+        const { error } = await sbClient.from('user_bets').insert({
+          user_id: currentUser.id,
+          match_date: slip[0].match_date,
+          league: isCombo ? 'combo' : slip[0].league,
+          event_id: slip.map(s => s.event_id).join('+'),
+          title,
+          market: mktKey,
+          market_name: mktName,
+          odds: Number(totalOdds.toFixed(3)),
+          stake_u: stake,
+          legs_json: legs,
+          status: 'PENDING',
+          profit_u: 0.0
+        });
+        if (!error) {
+          clearSlip();
+          setStatus(false, 'Jugada guardada en tu cuenta.');
+          await checkAuth();
+        } else {
+          setStatus(false, 'Error guardando jugada: ' + error.message);
+        }
+        return;
+      }
+
       const r = await fetch('/api/user/bet', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
           match_date: slip[0].match_date, league: isCombo ? 'combo' : slip[0].league,
           event_id: slip.map(s => s.event_id).join('+'), title, market: mktKey, market_name: mktName,
-          odds: totalOdds, custom_stake: stake,
-          legs: slip.map(s => ({ event_id: s.event_id, league: s.league, match_date: s.match_date, market: s.market }))
+          odds: totalOdds, custom_stake: stake, legs
         })
       });
       if (r.ok) {
@@ -944,6 +1186,11 @@ HTML_PAGE = """<!DOCTYPE html>
 
     async function savePrefs() {
       const stake_mode = document.getElementById('prefMode').value;
+      if (SUPABASE_ENABLED && currentUser) {
+        await sbClient.from('user_profiles').update({ stake_mode }).eq('user_id', currentUser.id);
+        await checkAuth();
+        return;
+      }
       await fetch('/api/user/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({stake_mode, bankroll_base: 100}) });
       await checkAuth();
     }

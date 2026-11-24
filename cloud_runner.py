@@ -1,9 +1,10 @@
 import datetime as dt
 
-from bot_scanner import DEFAULT_LEAGUES, run_scan_pipeline, run_settle_pipeline
+from bot_scanner import DEFAULT_LEAGUES, grade_market, run_scan_pipeline, run_settle_pipeline
 from build_static_site import export_static_site
 from paper_db import PaperTradingDB
-from providers import load_env
+from providers import fetch_espn_match_result, load_env
+from supabase_sync import settle_supabase_bets, upsert_radar_snapshot
 from telegram_bot import poll_updates, publish_channel_updates
 
 
@@ -20,8 +21,25 @@ def main() -> None:
     print(f"Escaneo: {scan_res['total_matches']} partidos próximos, {scan_res['saved_count']} nuevas jugadas.")
 
     db = PaperTradingDB()
+    summary = db.get_summary()
 
-    # 3. Publicar novedades al Canal de Telegram y responder comandos en cola si hay token
+    # 3. Sincronizar Supabase si hay credenciales configuradas
+    sb_url = env.get("SUPABASE_URL", "").strip()
+    sb_service = env.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if sb_url and sb_service:
+        try:
+            sb_settled, sb_pending = settle_supabase_bets(
+                sb_url, sb_service, fetch_espn_match_result, grade_market
+            )
+            now_col = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M")
+            upsert_radar_snapshot(sb_url, sb_service, now_col, scan_res, summary)
+            print(f"Supabase Sync OK: radar actualizado; apuestas usuarios {sb_settled} liquidadas, {sb_pending} pendientes.")
+        except Exception as exc:
+            print(f"Supabase Sync Error: {exc}")
+    else:
+        print("Supabase Sync omitido (faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).")
+
+    # 4. Publicar novedades al Canal de Telegram y responder comandos en cola si hay token
     token = env.get("TELEGRAM_BOT_TOKEN", "").strip()
     channel_id = env.get("TELEGRAM_CHANNEL_ID", "").strip()
     if token:
@@ -35,8 +53,8 @@ def main() -> None:
     else:
         print("Telegram omitido (falta TELEGRAM_BOT_TOKEN).")
 
-    # 4. Generar sitio estático en docs/ para GitHub Pages
-    out_dir = export_static_site(scan_res, db.get_summary())
+    # 5. Generar sitio estático en docs/ para GitHub Pages
+    out_dir = export_static_site(scan_res, summary)
     print(f"Sitio estático actualizado en {out_dir}")
 
 
