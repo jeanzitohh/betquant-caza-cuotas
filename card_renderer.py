@@ -43,32 +43,41 @@ def _create_backdrop(w: int = 1200, h: int = 675) -> Image.Image:
     return img
 
 
-def _glass_panel(img: Image.Image, box: tuple[int, int, int, int], radius: int = 24, fill=(255, 255, 255, 22), border=(255, 255, 255, 58)) -> None:
-    d = ImageDraw.Draw(img)
-    d.rounded_rectangle(box, radius=radius, fill=fill, outline=border, width=2)
+def _composite_rect(img: Image.Image, box: tuple[int, int, int, int], radius: int, fill: tuple, outline: tuple | None = None, width: int = 1) -> None:
+    """Draw an alpha-blended rounded rectangle cleanly onto an RGBA image."""
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ld = ImageDraw.Draw(layer)
+    ld.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
+    composited = Image.alpha_composite(img, layer)
+    img.paste(composited)
 
 
-def _draw_progress_bar(d: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, pct: float, fill_col: tuple) -> None:
-    d.rounded_rectangle((x, y, x + w, y + h), radius=h // 2, fill=(255, 255, 255, 28))
+def _glass_panel(img: Image.Image, box: tuple[int, int, int, int], radius: int = 24, fill=(255, 255, 255, 22), border=(255, 255, 255, 64)) -> None:
+    _composite_rect(img, box, radius=radius, fill=fill, outline=border, width=2)
+
+
+def _draw_progress_bar(img: Image.Image, x: int, y: int, w: int, h: int, pct: float, fill_col: tuple) -> None:
+    _composite_rect(img, (x, y, x + w, y + h), radius=h // 2, fill=(255, 255, 255, 32))
     fw = max(h, int(w * max(0.0, min(1.0, pct))))
-    d.rounded_rectangle((x, y, x + fw, y + h), radius=h // 2, fill=fill_col)
+    _composite_rect(img, (x, y, x + fw, y + h), radius=h // 2, fill=fill_col)
 
 
 def _draw_brand_header(img: Image.Image, tag_text: str, right_text: str) -> None:
-    d = ImageDraw.Draw(img)
     f_brand = _load_font(26, bold=True)
     f_tag = _load_font(18, bold=True)
     f_right = _load_font(20, bold=False)
 
     # Caza Cuotas purple-orange badge
-    d.rounded_rectangle((48, 34, 96, 82), radius=14, fill=(124, 58, 237, 255), outline=(249, 115, 22, 230), width=2)
+    _composite_rect(img, (48, 34, 96, 82), radius=14, fill=(124, 58, 237, 255), outline=(249, 115, 22, 240), width=2)
+    d = ImageDraw.Draw(img)
     d.text((61, 43), "CC", font=_load_font(24, bold=True), fill=(255, 255, 255, 255))
     d.text((112, 34), "CAZA CUOTAS", font=f_brand, fill=(255, 255, 255, 255))
     d.text((112, 64), tag_text, font=f_tag, fill=(251, 146, 60, 255))
 
     rw = d.textlength(right_text, font=f_right)
-    d.rounded_rectangle((1152 - rw - 32, 38, 1152, 78), radius=20, fill=(255, 255, 255, 26), outline=(255, 255, 255, 55), width=1)
-    d.text((1152 - rw - 16, 46), right_text, font=f_right, fill=(226, 232, 240, 255))
+    _composite_rect(img, (int(1152 - rw - 32), 38, 1152, 78), radius=20, fill=(255, 255, 255, 28), outline=(255, 255, 255, 65), width=1)
+    d = ImageDraw.Draw(img)
+    d.text((1152 - rw - 16, 46), right_text, font=f_right, fill=(241, 245, 249, 255))
 
 
 def _form_dots(d: ImageDraw.ImageDraw, x: int, y: int, scores: list[str]) -> None:
@@ -139,14 +148,17 @@ def render_match_card(m: dict) -> bytes:
     ]:
         d.text((bx, 294), name, font=f_lbl, fill=(255, 255, 255, 255))
         d.text((bx, 330), f"Victorias: {st['win_pct']*100:.0f}%", font=f_sub, fill=(226, 232, 240, 255))
-        _draw_progress_bar(d, bx + 175, 336, 270, 12, st["win_pct"], col)
+        _draw_progress_bar(img, bx + 175, 336, 270, 12, st["win_pct"], col)
 
+        d = ImageDraw.Draw(img)
         d.text((bx, 366), f"No pierde: {st['unbeaten_pct']*100:.0f}%", font=f_sub, fill=(226, 232, 240, 255))
-        _draw_progress_bar(d, bx + 175, 372, 270, 12, st["unbeaten_pct"], (34, 197, 94, 235))
+        _draw_progress_bar(img, bx + 175, 372, 270, 12, st["unbeaten_pct"], (34, 197, 94, 235))
 
+        d = ImageDraw.Draw(img)
         d.text((bx, 402), f"+0.5 goles: {st['o05_pct']*100:.0f}%", font=f_sub, fill=(226, 232, 240, 255))
-        _draw_progress_bar(d, bx + 175, 408, 270, 12, st["o05_pct"], (56, 189, 248, 235))
+        _draw_progress_bar(img, bx + 175, 408, 270, 12, st["o05_pct"], (56, 189, 248, 235))
 
+        d = ImageDraw.Draw(img)
         d.text((bx, 440), f"Prom. Goles: {st['gf_avg']:.2f} GF / {st['ga_avg']:.2f} GA", font=f_sub, fill=(203, 213, 225, 255))
         _form_dots(d, bx, 474, scores)
 
@@ -204,7 +216,8 @@ def render_parlay_card(parlay: dict) -> bytes:
     d.text((120, 506), f"@{parlay['combo_odds']:.2f}", font=_load_font(48, bold=True), fill=(255, 255, 255, 255))
 
     d.text((380, 480), f"Probabilidad Estimada: {parlay['prob_est']}%   |   Implícita Casa: {parlay['prob_impl']}%", font=f_sub, fill=(241, 245, 249, 255))
-    _draw_progress_bar(d, 380, 520, 460, 18, parlay["prob_est"] / 100.0, (74, 222, 128, 255) if parlay["ev_pct"] > 0 else (251, 191, 36, 255))
+    _draw_progress_bar(img, 380, 520, 460, 18, parlay["prob_est"] / 100.0, (74, 222, 128, 255) if parlay["ev_pct"] > 0 else (251, 191, 36, 255))
+    d = ImageDraw.Draw(img)
 
     ev_col = (74, 222, 128, 255) if parlay["ev_pct"] > 0 else (251, 191, 36, 255)
     ev_lbl = f"EV {parlay['ev_pct']:+.1f}%"
