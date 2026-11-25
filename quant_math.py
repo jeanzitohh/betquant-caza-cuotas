@@ -206,3 +206,79 @@ def rolling_team_summary(hist: list[tuple[int, int]], window: int = 10) -> dict[
         "gf_avg": sum(gf for gf, _ in sub) / n,
         "ga_avg": sum(ga for _, ga in sub) / n,
     }
+
+
+def half_time_breakdown(
+    lam_h: float,
+    lam_a: float,
+    h_1h_ratio: float = 0.44,
+    a_1h_ratio: float = 0.44,
+) -> dict:
+    """
+    Model 1st Half (1T) and 2nd Half (2T) scoring intensities and market probabilities.
+    Soccer empirical benchmark: ~44% of match goals occur in 1H, ~56% in 2H.
+    """
+    r_h1 = max(0.30, min(0.60, float(h_1h_ratio)))
+    r_a1 = max(0.30, min(0.60, float(a_1h_ratio)))
+    r_h2 = 1.0 - r_h1
+    r_a2 = 1.0 - r_a1
+
+    lam_h1 = max(0.05, lam_h * r_h1)
+    lam_a1 = max(0.05, lam_a * r_a1)
+    lam_tot1 = lam_h1 + lam_a1
+
+    lam_h2 = max(0.05, lam_h * r_h2)
+    lam_a2 = max(0.05, lam_a * r_a2)
+    lam_tot2 = lam_h2 + lam_a2
+
+    # 1H Poisson probabilities
+    p_1h_o05 = 1.0 - math.exp(-lam_tot1)
+    p_1h_o15 = max(0.0, 1.0 - math.exp(-lam_tot1) * (1.0 + lam_tot1))
+    p_1h_h_o05 = 1.0 - math.exp(-lam_h1)
+    p_1h_a_o05 = 1.0 - math.exp(-lam_a1)
+
+    # 2H Poisson probabilities
+    p_2h_o05 = 1.0 - math.exp(-lam_tot2)
+    p_2h_o15 = max(0.0, 1.0 - math.exp(-lam_tot2) * (1.0 + lam_tot2))
+    p_2h_h_o05 = 1.0 - math.exp(-lam_h2)
+    p_2h_a_o05 = 1.0 - math.exp(-lam_a2)
+
+    # Most goals half: Convolve P(Goals 2H > Goals 1H)
+    ph1 = [poisson_pmf(k, lam_tot1) for k in range(7)]
+    ph2 = [poisson_pmf(k, lam_tot2) for k in range(7)]
+    p_most_2h = 0.0
+    p_equal_halves = 0.0
+    p_most_1h = 0.0
+    for g1 in range(7):
+        for g2 in range(7):
+            p = ph1[g1] * ph2[g2]
+            if g2 > g1:
+                p_most_2h += p
+            elif g2 == g1:
+                p_equal_halves += p
+            else:
+                p_most_1h += p
+
+    return {
+        "lam_h_1h": round(lam_h1, 2),
+        "lam_a_1h": round(lam_a1, 2),
+        "lam_tot_1h": round(lam_tot1, 2),
+        "lam_h_2h": round(lam_h2, 2),
+        "lam_a_2h": round(lam_a2, 2),
+        "lam_tot_2h": round(lam_tot2, 2),
+        "ratio_1h": round((lam_tot1 / max(0.01, lam_tot1 + lam_tot2)) * 100, 1),
+        "ratio_2h": round((lam_tot2 / max(0.01, lam_tot1 + lam_tot2)) * 100, 1),
+        "probs": {
+            "1H_O05": round(p_1h_o05, 4),
+            "1H_O15": round(p_1h_o15, 4),
+            "1H_H_O05": round(p_1h_h_o05, 4),
+            "1H_A_O05": round(p_1h_a_o05, 4),
+            "2H_O05": round(p_2h_o05, 4),
+            "2H_O15": round(p_2h_o15, 4),
+            "2H_H_O05": round(p_2h_h_o05, 4),
+            "2H_A_O05": round(p_2h_a_o05, 4),
+            "MOST_GOALS_2H": round(p_most_2h, 4),
+            "MOST_GOALS_1H": round(p_most_1h, 4),
+            "EQUAL_HALVES": round(p_equal_halves, 4),
+        },
+    }

@@ -116,6 +116,15 @@ def literal_market_text(market_name: str, home: str, away: str) -> str:
         .replace("Visita +0.5 goles", f"{away} anota +0.5 goles (mín. 1)")
         .replace("Visita +1.5 goles", f"{away} anota +1.5 goles (mín. 2)")
         .replace("+1.5 goles en el partido", "+1.5 goles totales en el partido")
+        .replace("1er Tiempo: Local anota gol", f"{home} anota en el 1er tiempo")
+        .replace("2do Tiempo: Local anota gol", f"{home} anota en el 2do tiempo")
+        .replace("1er Tiempo: Visitante anota gol", f"{away} anota en el 1er tiempo")
+        .replace("2do Tiempo: Visitante anota gol", f"{away} anota en el 2do tiempo")
+        .replace("1er Tiempo: Más de 0.5 goles (1T +0.5)", "+0.5 goles en el 1er tiempo")
+        .replace("2do Tiempo: Más de 0.5 goles (2T +0.5)", "+0.5 goles en el 2do tiempo")
+        .replace("1er Tiempo: Más de 1.5 goles (1T +1.5)", "+1.5 goles en el 1er tiempo")
+        .replace("2do Tiempo: Más de 1.5 goles (2T +1.5)", "+1.5 goles en el 2do tiempo")
+        .replace("Mitad con más goles: 2do Tiempo", "2da mitad con más goles que la 1ra")
     )
 
 

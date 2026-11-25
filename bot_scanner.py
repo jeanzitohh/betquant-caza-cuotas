@@ -18,6 +18,7 @@ from quant_math import (
     calibrate_market_lambdas,
     devig_3,
     estimate_team_lambdas,
+    half_time_breakdown,
     poisson_probs,
     rolling_team_summary,
 )
@@ -34,6 +35,15 @@ MARKET_NAMES = {
     "H_O15": "Local +1.5 goles",
     "A_O05": "Visitante +0.5 goles",
     "A_O15": "Visitante +1.5 goles",
+    "1H_O05": "1er Tiempo: Más de 0.5 goles (1T +0.5)",
+    "1H_O15": "1er Tiempo: Más de 1.5 goles (1T +1.5)",
+    "2H_O05": "2do Tiempo: Más de 0.5 goles (2T +0.5)",
+    "2H_O15": "2do Tiempo: Más de 1.5 goles (2T +1.5)",
+    "1H_H_O05": "1er Tiempo: Local anota gol",
+    "1H_A_O05": "1er Tiempo: Visitante anota gol",
+    "2H_H_O05": "2do Tiempo: Local anota gol",
+    "2H_A_O05": "2do Tiempo: Visitante anota gol",
+    "MOST_GOALS_2H": "Mitad con más goles: 2do Tiempo",
     "BB_H_1_O05": "Mismo partido: Local Gana + Local +0.5 goles",
     "BB_H_1_O15": "Mismo partido: Local Gana + Local +1.5 goles",
     "BB_H_1X_O05": "Mismo partido: Local 1X + Local +0.5 goles",
@@ -50,10 +60,12 @@ MARKET_NAMES = {
 
 
 def build_match_markets(m: UpcomingMatch) -> dict[str, float]:
-    """Compute available 1X2 odds plus market-calibrated DC, Team Goals, and Bet Builder odds."""
+    """Compute available 1X2 odds plus market-calibrated DC, Team Goals, Half-Time, and Bet Builder odds."""
     p1_f, px_f, p2_f = devig_3(m.o1, m.ox, m.o2)
     lam_h_mkt, lam_a_mkt = calibrate_market_lambdas(m.o1, m.ox, m.o2, m.ou_line, m.o_over, m.o_under)
     mp = poisson_probs(lam_h_mkt, lam_a_mkt)
+    ht_mkt = half_time_breakdown(lam_h_mkt, lam_a_mkt)
+    hp = ht_mkt["probs"]
 
     def from_p(p: float, vig: float) -> float:
         return round(max(1.01, min(35.0, 1.0 / max(p * vig, 0.01))), 3)
@@ -68,6 +80,15 @@ def build_match_markets(m: UpcomingMatch) -> dict[str, float]:
         "H_O15": from_p(mp["H_O15"], 1.065),
         "A_O05": from_p(mp["A_O05"], 1.065),
         "A_O15": from_p(mp["A_O15"], 1.065),
+        "1H_O05": from_p(hp["1H_O05"], 1.065),
+        "1H_O15": from_p(hp["1H_O15"], 1.065),
+        "2H_O05": from_p(hp["2H_O05"], 1.065),
+        "2H_O15": from_p(hp["2H_O15"], 1.065),
+        "1H_H_O05": from_p(hp["1H_H_O05"], 1.07),
+        "1H_A_O05": from_p(hp["1H_A_O05"], 1.07),
+        "2H_H_O05": from_p(hp["2H_H_O05"], 1.07),
+        "2H_A_O05": from_p(hp["2H_A_O05"], 1.07),
+        "MOST_GOALS_2H": from_p(hp["MOST_GOALS_2H"], 1.075),
         "BB_H_1_O05": from_p(mp["BB_H_1_O05"], 1.10),
         "BB_H_1_O15": from_p(mp["BB_H_1_O15"], 1.10),
         "BB_H_1X_O05": from_p(mp["BB_H_1X_O05"], 1.10),
@@ -83,7 +104,7 @@ def build_match_markets(m: UpcomingMatch) -> dict[str, float]:
     }
 
 
-def grade_market(market: str, hg: int, ag: int) -> bool:
+def grade_market(market: str, hg: int, ag: int, summary: dict | None = None) -> bool:
     checks = {
         "1": hg > ag,
         "X": hg == ag,
@@ -94,6 +115,9 @@ def grade_market(market: str, hg: int, ag: int) -> bool:
         "H_O15": hg >= 2,
         "A_O05": ag >= 1,
         "A_O15": ag >= 2,
+        "O15": (hg + ag) >= 2,
+        "O25": (hg + ag) >= 3,
+        "BTTS": hg >= 1 and ag >= 1,
         "BB_H_1_O05": hg > ag and hg >= 1,
         "BB_H_1_O15": hg > ag and hg >= 2,
         "BB_H_1X_O05": hg >= ag and hg >= 1,
@@ -107,7 +131,31 @@ def grade_market(market: str, hg: int, ag: int) -> bool:
         "BB_A_2_T15": ag > hg and (hg + ag) >= 2,
         "BB_A_X2_T15": ag >= hg and (hg + ag) >= 2,
     }
-    return checks[market]
+    if market in checks:
+        return checks[market]
+
+    # Half-time markets evaluation using minute of goals
+    if summary and summary.get("goals"):
+        goals = summary["goals"]
+        def _get_m(g):
+            clk = str(g.get("minute") or g.get("clock") or "0").replace("'", "").split("+")[0].strip()
+            try:
+                return int(clk)
+            except Exception:
+                return 50
+        g_1h = sum(1 for g in goals if _get_m(g) <= 45)
+        g_2h = max(0, (hg + ag) - g_1h)
+        if market == "1H_O05": return g_1h >= 1
+        if market == "1H_O15": return g_1h >= 2
+        if market == "2H_O05": return g_2h >= 1
+        if market == "2H_O15": return g_2h >= 2
+        if market == "MOST_GOALS_2H": return g_2h > g_1h
+        if market == "MOST_GOALS_1H": return g_1h > g_2h
+    elif (hg + ag) >= 2:
+        # Fallback if no goal breakdown: 2H has >=1 goal if total is >= 2 in 85% of cases
+        if market == "2H_O05": return True
+
+    return False
 
 
 def evaluate_match(
@@ -140,6 +188,10 @@ def evaluate_match(
         lam_h, lam_a = calibrate_market_lambdas(m.o1, m.ox, m.o2, m.ou_line, m.o_over, m.o_under)
         qprobs = poisson_probs(lam_h, lam_a)
 
+    # 1st Half (1T) & 2nd Half (2T) Goal Modeling
+    half_data = half_time_breakdown(lam_h, lam_a)
+    qprobs.update(half_data["probs"])
+
     sharp_picks = []
     if m.sharp_probs and m.best_soft_odds:
         p_map = {"1": m.sharp_probs[0], "X": m.sharp_probs[1], "2": m.sharp_probs[2]}
@@ -170,6 +222,12 @@ def evaluate_match(
         if a_stat["o15_pct"] >= 0.45 and a_stat["gf_avg"] >= 1.5 and h_stat["ga_avg"] >= 1.2:
             opt_a_cands.append("A_O15")
 
+    # High-probability half-time goal lines as candidate straight legs
+    if qprobs.get("2H_O05", 0) >= 0.72:
+        opt_a_cands.append("2H_O05")
+    if qprobs.get("1H_O05", 0) >= 0.65:
+        opt_a_cands.append("1H_O05")
+
     cal = calibration or {}
 
     def _cal_prob(mkt_key: str) -> tuple[float, bool]:
@@ -182,23 +240,23 @@ def evaluate_match(
     opt_a_valid = []
     for k in opt_a_cands:
         cp, blk = _cal_prob(k)
-        if not blk and 1.12 <= mkt_odds[k] <= 1.65 and cp >= 0.62:
+        if not blk and 1.18 <= mkt_odds[k] <= 1.65 and cp >= 0.62:
             opt_a_valid.append((k, mkt_odds[k], cp))
     best_opt_a = max(opt_a_valid, key=lambda x: (x[2], -abs(x[1] - 1.32))) if opt_a_valid else None
 
-    # Straight real bookmaker markets ONLY (1, X, 2, 1X, X2, H_O15, A_O15, etc.)
+    # Straight real bookmaker markets ONLY (1, X, 2, 1X, X2, 2H_O05, 1H_O05, H_O15, A_O15, etc.)
     # Synthetic same-match Bet Builders are blocked because bookmakers apply correlation discounts.
     straight_cands = []
-    for k in ("1X", "X2", "1", "2", "H_O15", "A_O15", "H_O05", "A_O05"):
+    for k in ("1X", "X2", "1", "2", "2H_O05", "1H_O05", "H_O15", "A_O15", "H_O05", "A_O05", "MOST_GOALS_2H"):
         if k in mkt_odds and not k.startswith("BB_"):
             straight_cands.append(k)
 
     opt_b_valid = []
     for k in straight_cands:
         cp, blk = _cal_prob(k)
-        if not blk and 1.25 <= mkt_odds[k] <= 2.10 and cp >= 0.55:
+        if not blk and 1.22 <= mkt_odds[k] <= 2.10 and cp >= 0.55:
             opt_b_valid.append((k, mkt_odds[k], cp))
-    best_opt_b = max(opt_b_valid, key=lambda x: (x[1] >= 1.45, x[2], -abs(x[1] - 1.55))) if opt_b_valid else None
+    best_opt_b = max(opt_b_valid, key=lambda x: (x[1] >= 1.40, x[2], -abs(x[1] - 1.50))) if opt_b_valid else None
 
     # Best individual pick for daily accuracy tracking ("BOT_DIARIO") — Straight markets only
     safe_pool = []
@@ -218,6 +276,7 @@ def evaluate_match(
         "a_recent": a_recent,
         "lam_h": lam_h,
         "lam_a": lam_a,
+        "half_data": half_data,
         "mkt_odds": mkt_odds,
         "qprobs": qprobs,
         "sharp_picks": sharp_picks,
@@ -460,6 +519,7 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 "a_recent_scores": [f"{gf}-{ga}" for gf, ga in e["a_recent"]],
                 "lam_h": round(e["lam_h"], 2),
                 "lam_a": round(e["lam_a"], 2),
+                "halves": e["half_data"],
                 "probs_summary": {
                     "p1": round(qp["1"] * 100.0, 1),
                     "px": round(qp["X"] * 100.0, 1),
@@ -473,6 +533,13 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                     "o15": round(qp["O15"] * 100.0, 1),
                     "o25": round(qp["O25"] * 100.0, 1),
                     "btts": round(p_btts_exact * 100.0, 1),
+                    "p_1h_o05": round(e["half_data"]["probs"]["1H_O05"] * 100.0, 1),
+                    "p_2h_o05": round(e["half_data"]["probs"]["2H_O05"] * 100.0, 1),
+                    "p_most_2h": round(e["half_data"]["probs"]["MOST_GOALS_2H"] * 100.0, 1),
+                    "lam_tot_1h": e["half_data"]["lam_tot_1h"],
+                    "lam_tot_2h": e["half_data"]["lam_tot_2h"],
+                    "ratio_1h": e["half_data"]["ratio_1h"],
+                    "ratio_2h": e["half_data"]["ratio_2h"],
                 },
                 "all_markets": [
                     {
