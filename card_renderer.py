@@ -221,22 +221,22 @@ def render_match_card(m: dict) -> bytes:
         fill=(186, 230, 253, 255),
     )
 
-    # Bottom Literal Bet Box
+    # Bottom Literal Bet Box (Always uses verified real bookmaker markets)
     pick_odds = None
-    if m.get("opt_b_pick"):
-        pb = m["opt_b_pick"]
-        pick_odds = float(pb["odds"])
-        lit = literal_market_text(pb["market_name"], m["home"], m["away"])
-        pick_txt = f"PRONÓSTICO SUGERIDO: {lit}  @~{pb['odds']:.2f}"
-        ev_txt = f"Prob. {pb['prob']}% • {'Cuota con valor' if pb['ev_pct'] > 0 else 'Cuota estándar'}"
-        ev_col = (74, 222, 128, 255) if pb["ev_pct"] > 0 else (251, 191, 36, 255)
-    elif m.get("opt_a_leg"):
+    if m.get("opt_a_leg"):
         pa = m["opt_a_leg"]
         pick_odds = float(pa["odds"])
         lit = literal_market_text(pa["market_name"], m["home"], m["away"])
-        pick_txt = f"SELECCIÓN SUGERIDA: {lit}  @{pa['odds']:.2f}"
+        pick_txt = f"APUESTA SUGERIDA: {lit}  @{pa['odds']:.2f}"
         ev_txt = f"Prob. {pa['prob']}% • {'Cuota con valor' if pa['ev_pct'] > 0 else 'Cuota estándar'}"
         ev_col = (74, 222, 128, 255) if pa["ev_pct"] > 0 else (251, 191, 36, 255)
+    elif m.get("opt_b_pick"):
+        pb = m["opt_b_pick"]
+        pick_odds = float(pb["odds"])
+        lit = literal_market_text(pb["market_name"], m["home"], m["away"])
+        pick_txt = f"APUESTA SUGERIDA: {lit}  @{pb['odds']:.2f}"
+        ev_txt = f"Prob. {pb['prob']}% • {'Cuota con valor' if pb['ev_pct'] > 0 else 'Cuota estándar'}"
+        ev_col = (74, 222, 128, 255) if pb["ev_pct"] > 0 else (251, 191, 36, 255)
     else:
         win_side = f"{m['home']} Gana o Empata (1X)" if p1 >= p2 else f"{m['away']} Gana o Empata (X2)"
         pick_txt = f"LECTURA DEL PARTIDO: {win_side} • Partido +1.5 goles ({tot_o15:.0f}%)"

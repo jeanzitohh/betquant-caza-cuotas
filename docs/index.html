@@ -1412,7 +1412,7 @@
         const p1 = ((1 / m.o1) / sInv * 100), px = ((1 / m.ox) / sInv * 100), p2 = ((1 / m.o2) / sInv * 100);
         const hs = m.h_stat, as_ = m.a_stat;
         const isFav = favorites.has(m.event_id);
-        const bestPick = m.opt_b_pick || m.opt_a_leg;
+        const bestPick = m.opt_a_leg || m.opt_b_pick;
         const code = LEAGUE_SHORT[m.league] || m.league.toUpperCase().slice(0, 3);
         const lgPill = showLeagueTag ? `<span class="badge b-pend" style="font-size:10px;padding:2px 7px;">${code}</span> ` : '';
         const pairHintHtml = (bestPick && Number(bestPick.odds) < 1.50 && m.pair_hint)

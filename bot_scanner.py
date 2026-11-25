@@ -325,6 +325,7 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 )
 
     # Build 2-match same-day combinadas strictly targeting >= 1.50 (1.50–1.95) sorted by highest probability
+    # ONLY uses pure real straight markets (no same-match Bet Builders) so bookmakers never slash correlated odds
     leg_pool: list[tuple[int, str, float, float]] = []
     for idx, e in enumerate(evals):
         seen_k: set[str] = set()
@@ -332,10 +333,6 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
             if k not in seen_k and 1.12 <= o <= 1.65 and p >= 0.62:
                 leg_pool.append((idx, k, o, p))
                 seen_k.add(k)
-        if e.get("best_opt_b"):
-            kb, ob, pb = e["best_opt_b"]
-            if kb not in seen_k and 1.25 <= ob < 1.55 and pb >= 0.62:
-                leg_pool.append((idx, kb, ob, pb))
 
     cand_pairs = []
     for a_i in range(len(leg_pool)):
@@ -508,14 +505,7 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 }
                 if e["best_opt_a"]
                 else None,
-                "opt_b_pick": {
-                    "market_name": MARKET_NAMES[e["best_opt_b"][0]],
-                    "odds": e["best_opt_b"][1],
-                    "prob": round(e["best_opt_b"][2] * 100.0, 1),
-                    "ev_pct": round((e["best_opt_b"][2] * e["best_opt_b"][1] - 1.0) * 100.0, 1),
-                }
-                if e["best_opt_b"]
-                else None,
+                "opt_b_pick": None,
             }
         )
 
@@ -524,7 +514,7 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
 
     # Attach same-day partner pairing hint for any match whose primary pick is < 1.50
     for md in matches_detail:
-        pk = md.get("opt_b_pick") or md.get("opt_a_leg")
+        pk = md.get("opt_a_leg")
         if not pk or float(pk["odds"]) >= 1.50:
             continue
         o1 = float(pk["odds"])
@@ -534,7 +524,7 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
         for other in matches_detail:
             if other["event_id"] == md["event_id"] or other["kickoff_col"][:10] != d1:
                 continue
-            opk = other.get("opt_a_leg") or other.get("opt_b_pick")
+            opk = other.get("opt_a_leg")
             if not opk:
                 continue
             o2 = float(opk["odds"])
@@ -598,17 +588,7 @@ def build_dual_serial_ladders(
     """Build one unified chronological queue ordered by kickoff time (no split groups)."""
     del next_global  # Unvetted global matches never enter official Series
     pool: dict[str, dict] = {}
-    # Every match in Serie 1 & Serie 2 uses bookmaker-valid 2-leg combos (excluding blocked +0.5 team goals)
-    same_match_combo_keys = {
-        "BB_H_1X_O15",
-        "BB_H_1_O15",
-        "BB_H_1X_T15",
-        "BB_H_1_T15",
-        "BB_A_X2_O15",
-        "BB_A_2_O15",
-        "BB_A_X2_T15",
-        "BB_A_2_T15",
-    }
+    # Every match in Serie uses pure, verified real straight bookmaker markets (no synthetic Bet Builders)
 
     for m in matches_detail:
         hs = m.get("h_stat") or {}
@@ -616,51 +596,40 @@ def build_dual_serial_ladders(
         if int(hs.get("n", 0)) < 5 or int(as_.get("n", 0)) < 5:
             continue
 
-        def _side_ok(mkt_key: str) -> bool:
-            if mkt_key.startswith("BB_H_"):
-                return float(hs.get("unbeaten_pct", 0.0)) >= 0.60
-            if mkt_key.startswith("BB_A_"):
-                return float(as_.get("unbeaten_pct", 0.0)) >= 0.60
-            return False
-
-        pick = m.get("opt_b_pick")
-        if pick and (float(pick.get("prob", 0.0)) < 60.0 or float(pick.get("odds", 0.0)) < 1.25):
-            pick = None
+        # Priority 1: Real verified market from opt_a_leg (1, 1X, 2, X2, H_O15, A_O15, etc.)
+        pick = None
+        if m.get("opt_a_leg") and float(m["opt_a_leg"].get("prob", 0.0)) >= 58.0 and float(m["opt_a_leg"].get("odds", 0.0)) >= 1.15:
+            k_found = next((k for k, v in MARKET_NAMES.items() if v == m["opt_a_leg"]["market_name"]), "1")
+            pick = {
+                "key": k_found,
+                "name": m["opt_a_leg"]["market_name"],
+                "market_name": m["opt_a_leg"]["market_name"],
+                "odds": float(m["opt_a_leg"]["odds"]),
+                "prob": float(m["opt_a_leg"]["prob"]),
+                "ev_pct": float(m["opt_a_leg"].get("ev_pct", 0.0)),
+            }
 
         if not pick:
-            combo_cands = [
+            real_cands = [
                 mk
                 for mk in (m.get("all_markets") or [])
-                if mk["key"] in same_match_combo_keys
-                and _side_ok(mk["key"])
-                and 1.30 <= mk["odds"] <= 1.95
-                and mk["prob"] >= 60.0
+                if not mk["key"].startswith("BB_")
+                and 1.15 <= mk["odds"] <= 2.20
+                and mk["prob"] >= 58.0
             ]
-            if not combo_cands:
+            if not real_cands:
                 continue
-            pick = max(combo_cands, key=lambda x: (x["odds"] >= 1.50 and x["prob"] >= 62.0, x["prob"], x["ev_pct"] > 0))
+            pick = max(real_cands, key=lambda x: (x["prob"], x["ev_pct"] > 0))
 
-        pk_key = pick.get("key") or next((k for k, v in MARKET_NAMES.items() if v == pick.get("market_name")), "BB_H_1X_T15")
+        pk_key = pick.get("key") or next((k for k, v in MARKET_NAMES.items() if v == pick.get("market_name")), "1")
         alt_mk = max(
             (
                 mk
                 for mk in (m.get("all_markets") or [])
-                if mk["key"] in same_match_combo_keys
+                if not mk["key"].startswith("BB_")
                 and mk["key"] != pk_key
-                and _side_ok(mk["key"])
-                and 1.30 <= mk["odds"] <= 1.95
-                and mk["prob"] >= 60.0
-            ),
-            key=lambda x: (x["odds"] >= 1.50, x["prob"]),
-            default=None,
-        ) or max(
-            (
-                mk
-                for mk in (m.get("all_markets") or [])
-                if mk["key"] != pk_key
-                and mk["key"] not in {"BB_H_1_O05", "BB_H_1X_O05", "BB_A_2_O05", "BB_A_X2_O05"}
-                and 1.25 <= mk["odds"] <= 1.95
-                and mk["prob"] >= 66.0
+                and 1.15 <= mk["odds"] <= 2.20
+                and mk["prob"] >= 55.0
             ),
             key=lambda x: x["prob"],
             default=None,

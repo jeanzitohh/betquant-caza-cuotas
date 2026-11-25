@@ -294,16 +294,16 @@ def _build_detailed_match_caption(m: dict) -> str:
 
     pick_line = "<i>Ver cartelera y mercados completos en Caza Cuotas.</i>"
     pick_odds = None
-    if m.get("opt_b_pick"):
-        pb = m["opt_b_pick"]
-        pick_odds = float(pb["odds"])
-        lit = literal_market_text(pb["market_name"], m["home"], m["away"])
-        pick_line = f"👉 <b>{html.escape(lit)}</b> @~<code>{pb['odds']:.2f}</code> (Probabilidad: <b>{pb['prob']}%</b>)"
-    elif m.get("opt_a_leg"):
+    if m.get("opt_a_leg"):
         pa = m["opt_a_leg"]
         pick_odds = float(pa["odds"])
         lit = literal_market_text(pa["market_name"], m["home"], m["away"])
         pick_line = f"👉 <b>{html.escape(lit)}</b> @<code>{pa['odds']:.2f}</code> (Probabilidad: <b>{pa['prob']}%</b>)"
+    elif m.get("opt_b_pick"):
+        pb = m["opt_b_pick"]
+        pick_odds = float(pb["odds"])
+        lit = literal_market_text(pb["market_name"], m["home"], m["away"])
+        pick_line = f"👉 <b>{html.escape(lit)}</b> @<code>{pb['odds']:.2f}</code> (Probabilidad: <b>{pb['prob']}%</b>)"
 
     pair_line = ""
     ph = m.get("pair_hint")
