@@ -48,6 +48,7 @@ def poisson_probs(lam_h: float, lam_a: float, max_g: int = 9) -> dict[str, float
     p_over15 = p_over25 = 0.0
     p_h_o05_1 = p_h_o15_1 = p_h_o05_1x = p_h_o15_1x = 0.0
     p_a_o05_2 = p_a_o15_2 = p_a_o05_x2 = p_a_o15_x2 = 0.0
+    p_h_t15_1 = p_h_t15_1x = p_a_t15_2 = p_a_t15_x2 = 0.0
 
     for i in range(max_g + 1):
         for j in range(max_g + 1):
@@ -65,6 +66,9 @@ def poisson_probs(lam_h: float, lam_a: float, max_g: int = 9) -> dict[str, float
                 if i >= 2:
                     p_h_o15_1 += p
                     p_h_o15_1x += p
+                if tot >= 2:
+                    p_h_t15_1 += p
+                    p_h_t15_1x += p
             elif i == j:
                 p_draw += p
                 if i >= 1:
@@ -75,6 +79,9 @@ def poisson_probs(lam_h: float, lam_a: float, max_g: int = 9) -> dict[str, float
                     p_a_o05_x2 += p
                 if j >= 2:
                     p_a_o15_x2 += p
+                if tot >= 2:
+                    p_h_t15_1x += p
+                    p_a_t15_x2 += p
             else:
                 p_a_win += p
                 if j >= 1:
@@ -83,6 +90,9 @@ def poisson_probs(lam_h: float, lam_a: float, max_g: int = 9) -> dict[str, float
                 if j >= 2:
                     p_a_o15_2 += p
                     p_a_o15_x2 += p
+                if tot >= 2:
+                    p_a_t15_2 += p
+                    p_a_t15_x2 += p
 
     return {
         "1": p_h_win,
@@ -100,10 +110,14 @@ def poisson_probs(lam_h: float, lam_a: float, max_g: int = 9) -> dict[str, float
         "BB_H_1_O15": p_h_o15_1,
         "BB_H_1X_O05": p_h_o05_1x,
         "BB_H_1X_O15": p_h_o15_1x,
+        "BB_H_1_T15": p_h_t15_1,
+        "BB_H_1X_T15": p_h_t15_1x,
         "BB_A_2_O05": p_a_o05_2,
         "BB_A_2_O15": p_a_o15_2,
         "BB_A_X2_O05": p_a_o05_x2,
         "BB_A_X2_O15": p_a_o15_x2,
+        "BB_A_2_T15": p_a_t15_2,
+        "BB_A_X2_T15": p_a_t15_x2,
     }
 
 
@@ -177,17 +191,18 @@ def estimate_team_lambdas(
 
 
 def rolling_team_summary(hist: list[tuple[int, int]], window: int = 10) -> dict[str, float]:
-    """Compute win%, unbeaten%, +0.5%, +1.5%, GF avg, GA avg over recent matches."""
+    """Compute win%, unbeaten%, +0.5%, +1.5%, total +1.5%, GF avg, GA avg over recent matches."""
     sub = hist[-window:]
     n = len(sub)
     if n == 0:
-        return {"n": 0, "win_pct": 0.0, "unbeaten_pct": 0.0, "o05_pct": 0.0, "o15_pct": 0.0, "gf_avg": 0.0, "ga_avg": 0.0}
+        return {"n": 0, "win_pct": 0.0, "unbeaten_pct": 0.0, "o05_pct": 0.0, "o15_pct": 0.0, "tot_o15_pct": 0.0, "gf_avg": 0.0, "ga_avg": 0.0}
     return {
         "n": n,
         "win_pct": sum(1 for gf, ga in sub if gf > ga) / n,
         "unbeaten_pct": sum(1 for gf, ga in sub if gf >= ga) / n,
         "o05_pct": sum(1 for gf, _ in sub if gf >= 1) / n,
         "o15_pct": sum(1 for gf, _ in sub if gf >= 2) / n,
+        "tot_o15_pct": sum(1 for gf, ga in sub if (gf + ga) >= 2) / n,
         "gf_avg": sum(gf for gf, _ in sub) / n,
         "ga_avg": sum(ga for _, ga in sub) / n,
     }

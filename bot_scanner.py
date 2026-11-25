@@ -37,10 +37,14 @@ MARKET_NAMES = {
     "BB_H_1_O15": "Mismo partido: Local Gana + Local +1.5 goles",
     "BB_H_1X_O05": "Mismo partido: Local 1X + Local +0.5 goles",
     "BB_H_1X_O15": "Mismo partido: Local 1X + Local +1.5 goles",
+    "BB_H_1_T15": "Mismo partido: Local Gana + +1.5 goles en el partido",
+    "BB_H_1X_T15": "Mismo partido: Local 1X + +1.5 goles en el partido",
     "BB_A_2_O05": "Mismo partido: Visita Gana + Visita +0.5 goles",
     "BB_A_2_O15": "Mismo partido: Visita Gana + Visita +1.5 goles",
     "BB_A_X2_O05": "Mismo partido: Visita X2 + Visita +0.5 goles",
     "BB_A_X2_O15": "Mismo partido: Visita X2 + Visita +1.5 goles",
+    "BB_A_2_T15": "Mismo partido: Visita Gana + +1.5 goles en el partido",
+    "BB_A_X2_T15": "Mismo partido: Visita X2 + +1.5 goles en el partido",
 }
 
 
@@ -67,10 +71,14 @@ def build_match_markets(m: UpcomingMatch) -> dict[str, float]:
         "BB_H_1_O15": from_p(mp["BB_H_1_O15"], 1.10),
         "BB_H_1X_O05": from_p(mp["BB_H_1X_O05"], 1.10),
         "BB_H_1X_O15": from_p(mp["BB_H_1X_O15"], 1.10),
+        "BB_H_1_T15": from_p(mp["BB_H_1_T15"], 1.10),
+        "BB_H_1X_T15": from_p(mp["BB_H_1X_T15"], 1.10),
         "BB_A_2_O05": from_p(mp["BB_A_2_O05"], 1.10),
         "BB_A_2_O15": from_p(mp["BB_A_2_O15"], 1.10),
         "BB_A_X2_O05": from_p(mp["BB_A_X2_O05"], 1.10),
         "BB_A_X2_O15": from_p(mp["BB_A_X2_O15"], 1.10),
+        "BB_A_2_T15": from_p(mp["BB_A_2_T15"], 1.10),
+        "BB_A_X2_T15": from_p(mp["BB_A_X2_T15"], 1.10),
     }
 
 
@@ -89,10 +97,14 @@ def grade_market(market: str, hg: int, ag: int) -> bool:
         "BB_H_1_O15": hg > ag and hg >= 2,
         "BB_H_1X_O05": hg >= ag and hg >= 1,
         "BB_H_1X_O15": hg >= ag and hg >= 2,
+        "BB_H_1_T15": hg > ag and (hg + ag) >= 2,
+        "BB_H_1X_T15": hg >= ag and (hg + ag) >= 2,
         "BB_A_2_O05": ag > hg and ag >= 1,
         "BB_A_2_O15": ag > hg and ag >= 2,
         "BB_A_X2_O05": ag >= hg and ag >= 1,
         "BB_A_X2_O15": ag >= hg and ag >= 2,
+        "BB_A_2_T15": ag > hg and (hg + ag) >= 2,
+        "BB_A_X2_T15": ag >= hg and (hg + ag) >= 2,
     }
     return checks[market]
 
@@ -181,16 +193,24 @@ def evaluate_match(
             bb_cands.append("BB_H_1_O05")
         if h_stat["unbeaten_pct"] >= 0.75 and h_stat["o15_pct"] >= 0.50 and h_stat["gf_avg"] >= 1.5 and a_stat["ga_avg"] >= 1.2:
             bb_cands.append("BB_H_1X_O15")
+        if h_stat["unbeaten_pct"] >= 0.70 and h_stat["tot_o15_pct"] >= 0.70 and (h_stat["gf_avg"] + a_stat["gf_avg"]) >= 2.2:
+            bb_cands.append("BB_H_1X_T15")
+        if h_stat["win_pct"] >= 0.55 and h_stat["tot_o15_pct"] >= 0.75 and h_stat["gf_avg"] >= 1.3:
+            bb_cands.append("BB_H_1_T15")
         if a_stat["unbeaten_pct"] >= 0.70 and a_stat["o05_pct"] >= 0.75 and a_stat["gf_avg"] >= 1.2:
             bb_cands.append("BB_A_X2_O05")
         if a_stat["win_pct"] >= 0.55 and a_stat["o05_pct"] >= 0.80 and a_stat["gf_avg"] >= 1.4:
             bb_cands.append("BB_A_2_O05")
+        if a_stat["unbeaten_pct"] >= 0.70 and a_stat["tot_o15_pct"] >= 0.70 and (h_stat["gf_avg"] + a_stat["gf_avg"]) >= 2.2:
+            bb_cands.append("BB_A_X2_T15")
+        if a_stat["win_pct"] >= 0.55 and a_stat["tot_o15_pct"] >= 0.75 and a_stat["gf_avg"] >= 1.3:
+            bb_cands.append("BB_A_2_T15")
     bb_valid = []
     for k in bb_cands:
         cp, blk = _cal_prob(k)
-        if not blk and 1.20 <= mkt_odds[k] <= 1.90:
+        if not blk and 1.20 <= mkt_odds[k] <= 1.90 and cp >= 0.62:
             bb_valid.append((k, mkt_odds[k], cp))
-    best_opt_b = min(bb_valid, key=lambda x: abs(x[1] - 1.50)) if bb_valid else None
+    best_opt_b = max(bb_valid, key=lambda x: (x[2], -abs(x[1] - 1.45))) if bb_valid else None
 
     # Best individual pick for daily accuracy tracking ("BOT_DIARIO")
     safe_pool = []
@@ -516,10 +536,24 @@ def build_dual_serial_ladders(
     min_gap_minutes: int = 135,
     max_items: int = 10,
 ) -> tuple[list[dict], list[dict]]:
-    """Build 2 independent chronological ladders (Serie 1 & Serie 2) >=2h15m apart using only vetted matches."""
-    del next_global  # Kept in signature for compatibility; unvetted global matches must never enter official Series
+    """Build 2 independent chronological ladders (>=2h15m apart) using 2-leg same-match combos."""
+    del next_global  # Unvetted global matches never enter official Series
     pool: dict[str, dict] = {}
-    goal_combo_keys = {"BB_H_1_O05", "BB_H_1_O15", "BB_H_1X_O15", "BB_A_2_O05", "BB_A_2_O15", "BB_A_X2_O15", "H_O15", "A_O15"}
+    # Every match in Serie 1 & Serie 2 combines (1/1X/2/X2) + (team goals or total match goals)
+    same_match_combo_keys = {
+        "BB_H_1X_O05",
+        "BB_H_1_O05",
+        "BB_H_1X_O15",
+        "BB_H_1_O15",
+        "BB_H_1X_T15",
+        "BB_H_1_T15",
+        "BB_A_X2_O05",
+        "BB_A_2_O05",
+        "BB_A_X2_O15",
+        "BB_A_2_O15",
+        "BB_A_X2_T15",
+        "BB_A_2_T15",
+    }
 
     for m in matches_detail:
         hs = m.get("h_stat") or {}
@@ -527,34 +561,45 @@ def build_dual_serial_ladders(
         if int(hs.get("n", 0)) < 5 or int(as_.get("n", 0)) < 5:
             continue
 
-        pick = m.get("opt_b_pick") or m.get("opt_a_leg")
-        # Only upgrade very low odds (<1.30) when a high-confidence (>=68%) goal combo preserves safety
-        if pick and float(pick["odds"]) < 1.30:
-            goal_mk = max(
-                (
-                    mk
-                    for mk in (m.get("all_markets") or [])
-                    if mk["key"] in goal_combo_keys and 1.32 <= mk["odds"] <= 1.85 and mk["prob"] >= 68.0
-                ),
-                key=lambda x: x["prob"],
-                default=None,
-            )
-            if goal_mk:
-                pick = goal_mk
+        def _side_ok(mkt_key: str) -> bool:
+            if mkt_key.startswith("BB_H_"):
+                return float(hs.get("unbeaten_pct", 0.0)) >= 0.60
+            if mkt_key.startswith("BB_A_"):
+                return float(as_.get("unbeaten_pct", 0.0)) >= 0.60
+            return False
 
-        if not pick or float(pick["prob"]) < 66.0 or float(pick["odds"]) < 1.18:
-            best_mk = max(
-                (mk for mk in (m.get("all_markets") or []) if 1.20 <= mk["odds"] <= 1.85 and mk["prob"] >= 68.0),
-                key=lambda x: (x["prob"], x["ev_pct"] > 0),
-                default=None,
-            )
-            if not best_mk:
+        pick = m.get("opt_b_pick")
+        if pick and float(pick.get("prob", 0.0)) < 62.0:
+            pick = None
+
+        if not pick:
+            combo_cands = [
+                mk
+                for mk in (m.get("all_markets") or [])
+                if mk["key"] in same_match_combo_keys
+                and _side_ok(mk["key"])
+                and 1.20 <= mk["odds"] <= 1.90
+                and mk["prob"] >= 64.0
+            ]
+            if not combo_cands:
                 continue
-            pick = best_mk
+            pick = max(combo_cands, key=lambda x: (x["prob"], x["ev_pct"] > 0))
 
-        pk_key = pick.get("key") or next((k for k, v in MARKET_NAMES.items() if v == pick.get("market_name")), "1X")
+        pk_key = pick.get("key") or next((k for k, v in MARKET_NAMES.items() if v == pick.get("market_name")), "BB_H_1X_O05")
         alt_mk = max(
-            (mk for mk in (m.get("all_markets") or []) if mk["key"] != pk_key and 1.18 <= mk["odds"] <= 1.90 and mk["prob"] >= 65.0),
+            (
+                mk
+                for mk in (m.get("all_markets") or [])
+                if mk["key"] in same_match_combo_keys
+                and mk["key"] != pk_key
+                and _side_ok(mk["key"])
+                and 1.20 <= mk["odds"] <= 1.90
+                and mk["prob"] >= 62.0
+            ),
+            key=lambda x: x["prob"],
+            default=None,
+        ) or max(
+            (mk for mk in (m.get("all_markets") or []) if mk["key"] != pk_key and 1.18 <= mk["odds"] <= 1.90 and mk["prob"] >= 68.0),
             key=lambda x: x["prob"],
             default=None,
         )

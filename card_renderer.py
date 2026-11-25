@@ -52,6 +52,7 @@ def literal_market_text(market_name: str, home: str, away: str) -> str:
         .replace("Visitante +1.5 goles", f"{away} anota +1.5 goles (mín. 2)")
         .replace("Visita +0.5 goles", f"{away} anota +0.5 goles (mín. 1)")
         .replace("Visita +1.5 goles", f"{away} anota +1.5 goles (mín. 2)")
+        .replace("+1.5 goles en el partido", "+1.5 goles totales en el partido")
     )
 
 

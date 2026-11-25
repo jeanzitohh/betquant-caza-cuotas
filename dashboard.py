@@ -693,7 +693,8 @@ HTML_PAGE = """<!DOCTYPE html>
         .replace('Visitante +0.5 goles', `${away} anota +0.5 goles (mín. 1)`)
         .replace('Visitante +1.5 goles', `${away} anota +1.5 goles (mín. 2)`)
         .replace('Visita +0.5 goles', `${away} anota +0.5 goles (mín. 1)`)
-        .replace('Visita +1.5 goles', `${away} anota +1.5 goles (mín. 2)`);
+        .replace('Visita +1.5 goles', `${away} anota +1.5 goles (mín. 2)`)
+        .replace('+1.5 goles en el partido', '+1.5 goles totales en el partido');
     }
 
     if (SUPABASE_ENABLED) {
@@ -1278,8 +1279,10 @@ HTML_PAGE = """<!DOCTYPE html>
       'H_O05': 'Local +0.5 goles', 'H_O15': 'Local +1.5 goles', 'A_O05': 'Visitante +0.5 goles', 'A_O15': 'Visitante +1.5 goles',
       'BB_H_1_O05': 'Local Gana + +0.5 goles', 'BB_H_1_O15': 'Local Gana + +1.5 goles',
       'BB_H_1X_O05': 'Local 1X + +0.5 goles', 'BB_H_1X_O15': 'Local 1X + +1.5 goles',
+      'BB_H_1_T15': 'Local Gana + +1.5 goles partido', 'BB_H_1X_T15': 'Local 1X + +1.5 goles partido',
       'BB_A_2_O05': 'Visita Gana + +0.5 goles', 'BB_A_2_O15': 'Visita Gana + +1.5 goles',
-      'BB_A_X2_O05': 'Visita X2 + +0.5 goles', 'BB_A_X2_O15': 'Visita X2 + +1.5 goles'
+      'BB_A_X2_O05': 'Visita X2 + +0.5 goles', 'BB_A_X2_O15': 'Visita X2 + +1.5 goles',
+      'BB_A_2_T15': 'Visita Gana + +1.5 goles partido', 'BB_A_X2_T15': 'Visita X2 + +1.5 goles partido'
     };
     function humanMkt(m) {
       if (!m) return '';
