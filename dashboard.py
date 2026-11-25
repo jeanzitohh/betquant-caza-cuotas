@@ -272,6 +272,7 @@ HTML_PAGE = """<!DOCTYPE html>
     .b-warn { background: var(--amber-bg); color: var(--amber); }
     .b-lost { background: var(--red-bg); color: var(--red); }
     .b-pend { background: var(--blue-bg); color: var(--blue); }
+    .b-learning { background: rgba(16, 185, 129, 0.16); color: #047857; border: 1px solid rgba(16, 185, 129, 0.45); font-weight: 700; }
 
     /* Sticky Slip Sidebar */
     .slip-panel { position: sticky; top: 82px; padding: 18px; }
@@ -524,6 +525,7 @@ HTML_PAGE = """<!DOCTYPE html>
                 <button class="seg-btn" onclick="setChannelFilter('serie', this)">En Serie</button>
                 <button class="seg-btn" onclick="setChannelFilter('combo', this)">Combinadas</button>
                 <button class="seg-btn" onclick="setChannelFilter('settled', this)">Resultados</button>
+                <button class="seg-btn" onclick="setChannelFilter('learning', this)">🧠 Modo Aprendizaje</button>
                 <button class="seg-btn" onclick="setChannelFilter('daily', this)">Cierres</button>
               </div>
             </div>
@@ -1914,6 +1916,7 @@ HTML_PAGE = """<!DOCTYPE html>
       serie: ['En Serie', 'b-pend'],
       settled: ['Resultado', 'b-pos'],
       daily: ['Cierre Diario', 'b-pos'],
+      learning: ['🧠 Modo Aprendizaje', 'b-learning'],
       announcement: ['Anuncio Admin', 'b-warn']
     };
 

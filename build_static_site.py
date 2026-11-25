@@ -157,3 +157,9 @@ def export_static_site(scan_res: dict, report_res: dict) -> str:
             f.write("")
 
     return DOCS_DIR
+
+
+if __name__ == "__main__":
+    out = export_static_site()
+    print(f"Static site exported successfully to {out}")
+

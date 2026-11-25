@@ -581,6 +581,143 @@ def render_serial_ladder_card(ladder: list[dict], chunk_label: str = "") -> byte
     return buf.getvalue()
 
 
+def render_learning_card(an: dict) -> bytes:
+    """Render a dedicated 1200x820 Post-Match Learning Card with match stats and model verification."""
+    img = _create_backdrop(1200, 820)
+    lg_label = str(an.get("league_label") or an.get("league") or "FÚTBOL").upper()
+    _draw_brand_header(img, "MODO APRENDIZAJE • REVISIÓN POST-PARTIDO", f"{lg_label} • FINALIZADO")
+    _glass_panel(img, (48, 98, 1152, 782), radius=26)
+
+    d = ImageDraw.Draw(img)
+    home = str(an.get("home_team", "Local"))
+    away = str(an.get("away_team", "Visitante"))
+    hg = an.get("home_score", 0)
+    ag = an.get("away_score", 0)
+    won = (an.get("status") == "WON")
+    profit = float(an.get("profit_u") or 0.0)
+
+    # 1. Teams & Final Score
+    f_teams = _load_font(30, "bold")
+    f_score = _load_font(46, "bold")
+    f_sub = _load_font(15, "reg")
+    f_lbl = _load_font(14, "semi")
+    f_bold = _load_font(16, "bold")
+
+    d.text((80, 118), home, font=f_teams, fill=(255, 255, 255, 255))
+    score_str = f"{hg}  -  {ag}"
+    sw = d.textlength(score_str, font=f_score)
+    d.text(((1200 - sw) / 2, 110), score_str, font=f_score, fill=(253, 224, 71, 255))
+    aw = d.textlength(away, font=f_teams)
+    d.text((1120 - aw, 118), away, font=f_teams, fill=(255, 255, 255, 255))
+
+    # 2. Verification Badge
+    badge_txt = f"PRONÓSTICO VERIFICADO  ✅  ({profit:+.2f}u)" if won else f"DESVIACIÓN CUANTITATIVA  ❌  ({profit:+.2f}u)"
+    b_fill = (34, 197, 94, 35) if won else (239, 68, 68, 35)
+    b_brd = (74, 222, 128, 160) if won else (248, 113, 113, 160)
+    b_col = (74, 222, 128, 255) if won else (248, 113, 113, 255)
+    _glass_panel(img, (260, 180, 940, 226), radius=14, fill=b_fill, border=b_brd)
+    bw = d.textlength(badge_txt, font=f_bold)
+    d.text(((1200 - bw) / 2, 192), badge_txt, font=f_bold, fill=b_col)
+
+    # 3. Scorers ticker
+    goals = an.get("goals") or []
+    if goals:
+        g_parts = []
+        for g in goals[:4]:
+            clk = g.get("minute") or g.get("clock") or ""
+            t = g.get("text", "").replace("Goal! ", "")
+            # keep player name if identifiable
+            short_t = t.split("(")[0].strip() if "(" in t else t[:25]
+            g_parts.append(f"⚽ {short_t} {clk}")
+        ticker = "   •   ".join(g_parts)
+    else:
+        ticker = "Sin anotaciones en tiempo reglamentario"
+    tw = d.textlength(ticker, font=f_sub)
+    if tw > 1000:
+        ticker = ticker[:85] + "..."
+        tw = d.textlength(ticker, font=f_sub)
+    d.text(((1200 - tw) / 2, 240), ticker, font=f_sub, fill=(203, 213, 225, 220))
+
+    # 4. Match Statistics Comparison (Posesión, Remates, Córners)
+    _glass_panel(img, (80, 276, 1120, 460), radius=18)
+    d.text((104, 290), "MÉTRICAS CLAVE OBSERVADAS EN CAMPO", font=f_lbl, fill=(147, 197, 253, 255))
+
+    stats = an.get("stats") or {}
+    try:
+        h_pos = int(round(float(str(stats.get("h_pos", 50)).replace("%", "") or 50)))
+    except (ValueError, TypeError):
+        h_pos = 50
+    a_pos = 100 - h_pos
+    h_shots = stats.get("h_shots", "0")
+    a_shots = stats.get("a_shots", "0")
+    h_on = stats.get("h_ontarget", "0")
+    a_on = stats.get("a_ontarget", "0")
+    h_cor = stats.get("h_corners", "0")
+    a_cor = stats.get("a_corners", "0")
+
+    # Possession bar
+    d.text((104, 320), f"{home} {h_pos}%", font=f_lbl, fill=(255, 255, 255, 240))
+    d.text((1040, 320), f"{a_pos}% {away}", font=f_lbl, fill=(255, 255, 255, 240))
+    bar_x, bar_y, bar_w, bar_h = 104, 344, 992, 14
+    w_h = int(bar_w * (h_pos / 100.0))
+    d.rounded_rectangle((bar_x, bar_y, bar_x + w_h, bar_y + bar_h), radius=6, fill=(139, 92, 246, 255))
+    d.rounded_rectangle((bar_x + w_h, bar_y, bar_x + bar_w, bar_y + bar_h), radius=6, fill=(59, 130, 246, 255))
+
+    # Shot & corner counters
+    shots_lbl = f"Remates (al arco):  {h_shots} ({h_on})   vs   {a_shots} ({a_on})"
+    corn_lbl = f"Tiros de esquina:  {h_cor}   vs   {a_cor}"
+    d.text((104, 380), shots_lbl, font=f_bold, fill=(226, 232, 240, 255))
+    d.text((104, 414), corn_lbl, font=f_sub, fill=(148, 163, 184, 255))
+
+    # 5. Quantitative Verification Box (Left) & Algorithm Learning (Right)
+    _glass_panel(img, (80, 480, 580, 746), radius=18)
+    _glass_panel(img, (600, 480, 1120, 746), radius=18)
+
+    # Left: Pronóstico evaluado
+    d.text((104, 498), "VERIFICACIÓN DEL PRONÓSTICO", font=f_lbl, fill=(147, 197, 253, 255))
+    m_name = str(an.get("market_desc") or an.get("market") or "")
+    if len(m_name) > 36:
+        m_name = m_name[:34] + "..."
+    d.text((104, 528), f"Jugada: {m_name}", font=f_bold, fill=(255, 255, 255, 255))
+    d.text((104, 560), f"Cuota: @{an.get('odds', 1.50):.2f}  |  Prob. previa: {an.get('prob_pct', 65):.1f}%", font=f_sub, fill=(203, 213, 225, 240))
+    v_analysis = str(an.get("verif_analysis") or "")
+    # wrap text
+    words = v_analysis.split()
+    lines = []
+    cur = []
+    for w in words:
+        cur.append(w)
+        if len(" ".join(cur)) > 42:
+            lines.append(" ".join(cur))
+            cur = []
+    if cur:
+        lines.append(" ".join(cur))
+    for idx_l, line_str in enumerate(lines[:4]):
+        d.text((104, 598 + idx_l * 28), line_str, font=f_sub, fill=(203, 213, 225, 220))
+
+    # Right: Modo Aprendizaje & Calibración
+    d.text((624, 498), "APRENDIZAJE & CALIBRACIÓN DEL MODELO", font=f_lbl, fill=(253, 224, 71, 255))
+    l_note = str(an.get("learning_note") or "")
+    words_l = l_note.split()
+    lines_l = []
+    cur_l = []
+    for w in words_l:
+        cur_l.append(w)
+        if len(" ".join(cur_l)) > 42:
+            lines_l.append(" ".join(cur_l))
+            cur_l = []
+    if cur_l:
+        lines_l.append(" ".join(cur_l))
+    for idx_l, line_str in enumerate(lines_l[:5]):
+        d.text((624, 536 + idx_l * 28), line_str, font=f_sub, fill=(226, 232, 240, 240))
+
+    d.text((624, 706), "⚡ Calibración registrada en motor cuantitativo", font=f_lbl, fill=(74, 222, 128, 255) if won else (248, 113, 113, 255))
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
 def png_to_webp_data_url(png_bytes: bytes, max_w: int = 1120) -> str:
     """Compress a PNG card into a crisp high-quality WebP data URL for Supabase Realtime feed."""
     img = Image.open(io.BytesIO(png_bytes)).convert("RGB")

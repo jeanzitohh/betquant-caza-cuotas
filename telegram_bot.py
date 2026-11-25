@@ -15,6 +15,7 @@ try:
     from card_renderer import (
         literal_market_text,
         render_daily_summary_card,
+        render_learning_card,
         render_match_card,
         render_parlay_card,
         render_serial_ladder_card,
@@ -24,6 +25,7 @@ try:
     HAS_CARDS = True
 except ImportError:
     HAS_CARDS = False
+    render_learning_card = None
 
     def literal_market_text(market_name: str, home: str, away: str) -> str:
         return market_name
@@ -60,12 +62,28 @@ def tg_api(token: str, method: str, params: dict | None = None, timeout: int = 2
         return None
 
 
+def _safe_tg_caption(text: str, max_len: int = 950) -> str:
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len]
+    last_nl = cut.rfind("\n")
+    if last_nl > 400:
+        cut = cut[:last_nl]
+    for tag in ["b", "i", "code", "u", "s"]:
+        opens = cut.count(f"<{tag}>")
+        closes = cut.count(f"</{tag}>")
+        if opens > closes:
+            cut += f"</{tag}>" * (opens - closes)
+    return cut
+
+
 def send_photo_bytes(token: str, chat_id: str, png_bytes: bytes, caption: str) -> bool:
     """Upload a PNG forecast card to Telegram using multipart/form-data."""
     if not token or not chat_id or not png_bytes:
         return False
     boundary = f"----CazaCuotas{uuid.uuid4().hex}"
-    fields = {"chat_id": chat_id, "caption": caption[:1000], "parse_mode": "HTML"}
+    safe_cap = _safe_tg_caption(caption, max_len=940)
+    fields = {"chat_id": chat_id, "caption": safe_cap, "parse_mode": "HTML"}
     body = bytearray()
     for k, v in fields.items():
         body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode("utf-8"))
@@ -83,6 +101,24 @@ def send_photo_bytes(token: str, chat_id: str, png_bytes: bytes, caption: str) -
     except urllib.error.HTTPError as exc:
         err = exc.read().decode("utf-8", errors="ignore")
         print(f"Telegram sendPhoto HTTP {exc.code}: {err[:160]}")
+        # Fallback: send photo with empty caption then caption via send_html
+        try:
+            fields_fb = {"chat_id": chat_id}
+            body_fb = bytearray()
+            for k, v in fields_fb.items():
+                body_fb.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode("utf-8"))
+            body_fb.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"caza_cuotas_card.png\"\r\nContent-Type: image/png\r\n\r\n".encode("utf-8"))
+            body_fb.extend(png_bytes)
+            body_fb.extend(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+            req_fb = urllib.request.Request(url, data=bytes(body_fb), method="POST")
+            req_fb.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+            with urllib.request.urlopen(req_fb, timeout=25) as resp2:
+                parsed2 = json.loads(resp2.read().decode("utf-8"))
+                if parsed2.get("ok"):
+                    send_html(token, chat_id, caption)
+                    return True
+        except Exception:
+            pass
         return False
     except Exception:
         return False
@@ -378,6 +414,26 @@ def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_
                     db.mark_alert_sent(eff_key)
                     sent_count += 1
 
+    # 3b. Post-Match Learning Reports (Modo Aprendizaje)
+    for an in db.get_recent_post_match_learnings(limit=6):
+        key = f"tg_learn:{an['event_id']}:{an['forecast_market']}"
+        if not db.was_alert_sent(key):
+            cap = an.get("body_html", "")
+            if HAS_CARDS and render_learning_card:
+                try:
+                    png = render_learning_card(an)
+                    if send_photo_bytes(token, channel_id, png, cap):
+                        db.mark_alert_sent(key)
+                        sent_count += 1
+                except Exception:
+                    if send_html(token, channel_id, cap):
+                        db.mark_alert_sent(key)
+                        sent_count += 1
+            else:
+                if send_html(token, channel_id, cap):
+                    db.mark_alert_sent(key)
+                    sent_count += 1
+
     # 4. Daily Serial Turn-by-Turn Schedule in 1:1 synced chunks (image count == caption count, never clipped)
     ladder = scan.get("serial_ladder") or []
     if ladder:
@@ -434,6 +490,11 @@ def handle_command(text: str, chat_id: str = "") -> str:
         return format_daily_effectiveness_block(PaperTradingDB().get_summary())
     if cmd == "/historial":
         return format_history_block(PaperTradingDB().get_summary())
+    if cmd in ("/aprendizaje", "/learning"):
+        learnings = PaperTradingDB().get_recent_post_match_learnings(limit=3)
+        if not learnings:
+            return "<b>🧠 MODO APRENDIZAJE • CAZA CUOTAS</b>\n\nAún no hay análisis post-partido registrados hoy."
+        return "\n\n━━━━━━━━━━━━━━━\n\n".join(l["body_html"] for l in learnings)
     if cmd == "/liquidar":
         st = run_settle_pipeline()
         rep = PaperTradingDB().get_summary()

@@ -145,6 +145,78 @@ class PaperTradingDB:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS post_match_learnings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id TEXT NOT NULL,
+                    league TEXT NOT NULL,
+                    match_date TEXT NOT NULL,
+                    home_team TEXT NOT NULL,
+                    away_team TEXT NOT NULL,
+                    home_score INTEGER NOT NULL,
+                    away_score INTEGER NOT NULL,
+                    forecast_market TEXT NOT NULL,
+                    forecast_odds REAL NOT NULL,
+                    forecast_prob REAL NOT NULL,
+                    verdict TEXT NOT NULL,
+                    profit_u REAL NOT NULL,
+                    verif_analysis TEXT NOT NULL,
+                    learning_note TEXT NOT NULL,
+                    stats_json TEXT NOT NULL,
+                    body_html TEXT NOT NULL,
+                    card_webp TEXT,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(event_id, forecast_market)
+                )
+                """
+            )
+
+    def record_post_match_learning(self, an: dict) -> bool:
+        """Insert a post-match learning analysis record. Returns True if inserted, False if duplicate."""
+        now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        stats_json = json.dumps(an.get("stats") or {}, ensure_ascii=False)
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                INSERT OR IGNORE INTO post_match_learnings (
+                    event_id, league, match_date, home_team, away_team,
+                    home_score, away_score, forecast_market, forecast_odds, forecast_prob,
+                    verdict, profit_u, verif_analysis, learning_note, stats_json,
+                    body_html, card_webp, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(an.get("event_id", "")),
+                    str(an.get("league", "")),
+                    str(an.get("match_date", now[:10])),
+                    str(an.get("home_team", "")),
+                    str(an.get("away_team", "")),
+                    int(an.get("home_score", 0)),
+                    int(an.get("away_score", 0)),
+                    str(an.get("market", "")),
+                    float(an.get("odds", 1.50)),
+                    float(an.get("prob_pct", 65.0)),
+                    str(an.get("status", "WON")),
+                    float(an.get("profit_u", 0.0)),
+                    str(an.get("verif_analysis", "")),
+                    str(an.get("learning_note", "")),
+                    stats_json,
+                    str(an.get("body_html", "")),
+                    str(an.get("card_webp", "")),
+                    now,
+                ),
+            )
+            return cur.rowcount > 0
+
+    def get_recent_post_match_learnings(self, limit: int = 15) -> list[dict]:
+        """Fetch the most recent post-match learning reports."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM post_match_learnings ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     def was_alert_sent(self, alert_key: str) -> bool:
         with self._connect() as conn:

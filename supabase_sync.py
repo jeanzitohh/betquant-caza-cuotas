@@ -327,6 +327,21 @@ def publish_supabase_channel(
         })
         push_headline = (f"Resultados Liquidados ({rep.get('won',0)}/{rep.get('settled',0)} acertados)", unposted_settled[0]["title"])
 
+    # 4b. Post-Match Learning Reports (Modo Aprendizaje)
+    recent_learnings = db.get_recent_post_match_learnings(limit=8)
+    for an in recent_learnings:
+        pkey = f"sb_learn:{an['event_id']}:{an['forecast_market']}"
+        if pkey in existing_keys:
+            continue
+        new_rows.append({
+            "post_key": pkey,
+            "kind": "learning",
+            "title": f"🧠 Aprendizaje: {an['home_team']} {an['home_score']}-{an['away_score']} {an['away_team']}",
+            "body_html": an.get("body_html", ""),
+            "image_data": an.get("card_webp") or "",
+        })
+        push_headline = (f"Modo Aprendizaje: {an['home_team']} vs {an['away_team']}", f"Veredicto: {an.get('verdict','')} ({an.get('profit_u',0):+.2f}u)")
+
     # 5. Daily Effectiveness Closing Card
     settled_days = [d for d in (rep.get("daily_stats") or []) if d["settled"] > 0]
     if settled_days:

@@ -345,6 +345,87 @@ def fetch_espn_match_result(league: str, match_date: str, event_id: str) -> tupl
     return None
 
 
+def fetch_espn_match_summary(league: str, match_date: str, event_id: str) -> dict | None:
+    """Fetch rich match statistics, final score, scorers, key events, and lineups from ESPN summary."""
+    primary_lg = league.split("+")[0].strip() if league else "all"
+    candidate_leagues = [primary_lg]
+    if primary_lg != "all":
+        candidate_leagues.append("all")
+
+    for lg in candidate_leagues:
+        url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{lg}/summary?event={event_id}"
+        data = fetch_json(url)
+        if not data:
+            continue
+        header = data.get("header") or {}
+        comp = (header.get("competitions") or [{}])[0]
+        st_type = comp.get("status", {}).get("type", {})
+        completed = bool(st_type.get("completed", False))
+        status_desc = st_type.get("description", "")
+        status_detail = st_type.get("detail", "")
+
+        comps = comp.get("competitors") or []
+        home_c = next((c for c in comps if c.get("homeAway") == "home"), None)
+        away_c = next((c for c in comps if c.get("homeAway") == "away"), None)
+        if not home_c or not away_c:
+            continue
+
+        home_team = home_c.get("team", {}).get("displayName", "")
+        away_team = away_c.get("team", {}).get("displayName", "")
+        home_score = int(home_c.get("score") or 0)
+        away_score = int(away_c.get("score") or 0)
+        home_logo = home_c.get("team", {}).get("logo", "")
+        away_logo = away_c.get("team", {}).get("logo", "")
+
+        goals: list[dict] = []
+        red_cards: list[dict] = []
+        for ev in data.get("keyEvents", []):
+            ev_type = (ev.get("type") or {}).get("text", "")
+            clk = (ev.get("clock") or {}).get("displayValue", "")
+            txt = ev.get("text", "")
+            if ev_type == "Goal":
+                goals.append({"minute": clk, "text": txt})
+            elif "Red Card" in ev_type or "red card" in txt.lower():
+                red_cards.append({"minute": clk, "text": txt})
+
+        stats_out = {"home": {}, "away": {}}
+        box = data.get("boxscore", {})
+        for t in box.get("teams", []):
+            ha = t.get("homeAway")
+            if ha in ("home", "away"):
+                t_stats = {s["name"]: s.get("displayValue", "") for s in t.get("statistics", [])}
+                stats_out[ha] = {
+                    "possession": t_stats.get("possessionPct", "50"),
+                    "shots": t_stats.get("totalShots", "0"),
+                    "shots_on_target": t_stats.get("shotsOnTarget", "0"),
+                    "corners": t_stats.get("wonCorners", "0"),
+                    "fouls": t_stats.get("foulsCommitted", "0"),
+                    "yellow_cards": t_stats.get("yellowCards", "0"),
+                    "saves": t_stats.get("saves", "0"),
+                }
+
+        league_label = (data.get("season") or {}).get("name") or league
+        return {
+            "event_id": str(event_id),
+            "league": league,
+            "league_label": league_label,
+            "completed": completed,
+            "status_desc": status_desc,
+            "status_detail": status_detail,
+            "home_team": home_team,
+            "away_team": away_team,
+            "home_score": home_score,
+            "away_score": away_score,
+            "home_logo": home_logo,
+            "away_logo": away_logo,
+            "goals": goals,
+            "red_cards": red_cards,
+            "stats": stats_out,
+        }
+    return None
+
+
+
 def enrich_with_apifootball(matches: list[UpcomingMatch], api_key: str) -> tuple[int, str | None]:
     """Optional multi-bookmaker line shopping using API-Football; stops early if free plan blocks season."""
     if not api_key or not matches:

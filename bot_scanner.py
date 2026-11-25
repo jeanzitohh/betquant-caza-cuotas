@@ -7,6 +7,7 @@ from providers import (
     UpcomingMatch,
     enrich_with_apifootball,
     fetch_espn_match_result,
+    fetch_espn_match_summary,
     fetch_espn_upcoming,
     fetch_next_global_matches,
     fetch_recent_history,
@@ -726,12 +727,27 @@ def run_settle_pipeline() -> dict:
     pending = db.get_pending()
     pending_user = db.get_pending_user_bets()
 
+    score_cache: dict[tuple[str, str, str], tuple[bool, int, int] | None] = {}
+    summary_cache: dict[tuple[str, str, str], dict | None] = {}
+
+    def _get_result(league: str, match_date: str, event_id: str) -> tuple[bool, int, int] | None:
+        key = (league, match_date, event_id)
+        if key not in score_cache:
+            score_cache[key] = fetch_espn_match_result(league, match_date, event_id)
+        return score_cache[key]
+
+    def _get_summary(league: str, match_date: str, event_id: str) -> dict | None:
+        key = (league, match_date, event_id)
+        if key not in summary_cache:
+            summary_cache[key] = fetch_espn_match_summary(league, match_date, event_id)
+        return summary_cache[key]
+
     def _evaluate_legs(legs: list[dict]) -> tuple[bool, bool, list[str]]:
         any_lost = False
         all_done = True
         notes = []
         for leg in legs:
-            res = fetch_espn_match_result(leg["league"], leg["match_date"], leg["event_id"])
+            res = _get_result(leg["league"], leg["match_date"], leg["event_id"])
             if res is None or not res[0]:
                 all_done = False
                 continue
@@ -742,15 +758,53 @@ def run_settle_pipeline() -> dict:
                 any_lost = True
         return any_lost, all_done, notes
 
+    learnings_generated: list[dict] = []
+
+    def _trigger_learning_analysis(tr_dict: dict) -> None:
+        try:
+            from post_match_learning import generate_post_match_learning_analysis
+            from card_renderer import render_learning_card, png_to_webp_data_url
+        except Exception:
+            return
+
+        for leg in tr_dict.get("legs", []):
+            eid = str(leg.get("event_id", ""))
+            lg = str(leg.get("league", ""))
+            m_date = str(leg.get("match_date", ""))
+            if not eid:
+                continue
+            summary = _get_summary(lg, m_date, eid)
+            if not summary or not summary.get("completed"):
+                continue
+
+            an = generate_post_match_learning_analysis(summary, tr_dict)
+            try:
+                png = render_learning_card(an)
+                an["card_webp"] = png_to_webp_data_url(png)
+            except Exception:
+                an["card_webp"] = ""
+
+            if db.record_post_match_learning(an):
+                learnings_generated.append(an)
+
     settled_now = 0
     for tr in pending:
         any_lost, all_done, notes = _evaluate_legs(tr["legs"])
         if any_lost:
-            db.settle_trade(tr["id"], "LOST", -tr["stake_u"], " | ".join(notes))
+            loss_u = -float(tr["stake_u"])
+            db.settle_trade(tr["id"], "LOST", loss_u, " | ".join(notes))
+            tr["status"] = "LOST"
+            tr["profit_u"] = loss_u
+            tr["result_note"] = " | ".join(notes)
+            _trigger_learning_analysis(tr)
             settled_now += 1
         elif all_done and notes:
-            profit = tr["stake_u"] * (tr["odds"] - 1.0)
+            profit = float(tr["stake_u"]) * (float(tr["odds"]) - 1.0)
             db.settle_trade(tr["id"], "WON", profit, " | ".join(notes))
+            tr["status"] = "WON"
+            tr["profit_u"] = profit
+            tr["result_note"] = " | ".join(notes)
+            _trigger_learning_analysis(tr)
             settled_now += 1
 
     user_settled = 0
@@ -769,6 +823,7 @@ def run_settle_pipeline() -> dict:
         "settled_now": settled_now,
         "still_pending": len(pending) - settled_now,
         "user_settled": user_settled,
+        "learnings": learnings_generated,
     }
 
 
