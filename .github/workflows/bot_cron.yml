@@ -21,10 +21,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar Pillow para tarjetas PNG de Telegram
-        run: pip install pillow
+      - name: Instalar Pillow y Web Push para tarjetas PNG y alertas PWA
+        run: pip install pillow pywebpush
 
-      - name: Ejecutar liquidación, escaneo, Telegram y web estática
+      - name: Ejecutar liquidación, escaneo, canal PWA y web estática
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
@@ -32,6 +32,8 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
         run: python cloud_runner.py
 
       - name: Guardar cambios (historial y GitHub Pages)
