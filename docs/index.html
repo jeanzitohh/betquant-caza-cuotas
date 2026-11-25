@@ -491,13 +491,13 @@
         <section id="tabRadar" class="tab-panel active">
           <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">
             <div class="seg">
-              <button class="seg-btn active" id="dateAll" onclick="setDateFilter('all')">Todos los días</button>
-              <button class="seg-btn" id="dateToday" onclick="setDateFilter('today')">Solo Hoy</button>
+              <button class="seg-btn active" id="dateToday" onclick="setDateFilter('today')">📅 Solo Hoy</button>
               <button class="seg-btn" id="dateTomorrow" onclick="setDateFilter('tomorrow')">Mañana</button>
+              <button class="seg-btn" id="dateAll" onclick="setDateFilter('all')">Todos los días</button>
             </div>
             <div class="seg">
-              <button class="seg-btn active" id="viewChrono" onclick="setViewMode('chrono')">⏱ Por Hora</button>
-              <button class="seg-btn" id="viewLeague" onclick="setViewMode('league')">🏆 Por Liga</button>
+              <button class="seg-btn active" id="viewChrono" onclick="setViewMode('chrono')">⏱ En Fila (Por Hora)</button>
+              <button class="seg-btn" id="viewLeague" onclick="setViewMode('league')">🏆 Por Ligas</button>
             </div>
           </div>
           <div id="hourRadarWrap" style="display:none;margin-bottom:14px;"></div>
@@ -612,22 +612,79 @@
           </div>
         </section>
 
-        <!-- TAB 5: Admin Registered Users Panel -->
+        <!-- TAB 5: Super Admin Control Center (Users CRUD + Invitations Engine) -->
         <section id="tabAdmin" class="tab-panel">
           <div class="glass" style="padding:18px;margin-bottom:14px;">
-            <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;">
+            <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
               <div>
-                <h2 style="margin:0;font-size:18px;">Usuarios Registrados</h2>
-                <div style="font-size:12px;color:var(--muted);">Panel exclusivo de administración • Cuentas activas, accesos y balance</div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span class="badge b-pos" style="font-size:11px;">👑 SUPER ADMIN</span>
+                  <h2 style="margin:0;font-size:18px;">Control Total de Usuarios e Invitaciones</h2>
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-top:3px;">
+                  Acceso supremo para <strong style="color:var(--violet);">juanmanuelton7@gmail.com</strong> • Gestión de cuentas, creación, edición, borrado e invitaciones.
+                </div>
               </div>
-              <button class="btn btn-primary" onclick="loadAdminUsers()">Actualizar lista</button>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <button class="btn btn-primary" onclick="openCreateUserModal()">+ Crear Usuario</button>
+                <button class="btn" style="border-color:var(--violet);color:var(--violet);" onclick="openCreateInviteModal()">🎟️ Generar Invitación</button>
+                <button class="btn" onclick="loadAdminUsers(); loadAdminInvitations();">🔄 Actualizar</button>
+              </div>
             </div>
             <div class="charts-row" id="adminKpis" style="margin-bottom:0;"></div>
           </div>
-          <div class="glass table-card">
+
+          <!-- Section: Registered Users CRUD -->
+          <div class="glass table-card" style="margin-bottom:16px;">
+            <div style="padding:14px 18px 8px;display:flex;justify-content:space-between;align-items:center;">
+              <h3 style="margin:0;font-size:15px;font-weight:700;">Usuarios Registrados en el Sistema</h3>
+              <span class="badge b-pend" id="cntAdminUsersBadge">0 usuarios</span>
+            </div>
             <table>
-              <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Registro</th><th>Último acceso</th><th>Modo</th><th>Jugadas</th><th>Neto</th></tr></thead>
-              <tbody id="adminUsersBody"><tr><td colspan="8" style="text-align:center;color:var(--muted);">Cargando usuarios...</td></tr></tbody>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Correo / Usuario</th>
+                  <th>Rol</th>
+                  <th>Registro</th>
+                  <th>Último Acceso</th>
+                  <th>Banca (u)</th>
+                  <th>Jugadas</th>
+                  <th>Neto</th>
+                  <th style="text-align:right;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersBody">
+                <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px;">Cargando usuarios...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Section: Active Invitations Generator -->
+          <div class="glass table-card">
+            <div style="padding:14px 18px 8px;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <h3 style="margin:0;font-size:15px;font-weight:700;">Enlaces e Invitaciones Activas</h3>
+                <div style="font-size:11.5px;color:var(--muted);">Genera enlaces directos o invitaciones por correo para nuevos miembros</div>
+              </div>
+              <button class="btn" style="font-size:11.5px;padding:4px 10px;" onclick="loadAdminInvitations()">Refrescar</button>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Token / Código</th>
+                  <th>Enlace Compartible</th>
+                  <th>Correo Destino</th>
+                  <th>Rol Asignado</th>
+                  <th>Usos</th>
+                  <th>Expira</th>
+                  <th>Estado</th>
+                  <th style="text-align:right;">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="adminInvitesBody">
+                <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Cargando invitaciones...</td></tr>
+              </tbody>
             </table>
           </div>
         </section>
@@ -670,6 +727,115 @@
     <img id="lightboxImg" src="" alt="Tarjeta Caza Cuotas" />
   </div>
 
+  <!-- Modal: Admin Create User -->
+  <div class="overlay" id="modalCreateUser" onclick="if(event.target===this) this.classList.remove('open')">
+    <div class="glass" style="max-width:440px;width:92%;margin:auto;padding:24px;border-radius:18px;">
+      <h3 style="margin:0 0 4px;font-size:17px;">+ Crear Nuevo Usuario</h3>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Acceso administrativo para añadir usuarios directamente.</div>
+      <div class="field">
+        <label>Correo Electrónico / Usuario</label>
+        <input type="email" id="admNewEmail" placeholder="usuario@ejemplo.com" />
+      </div>
+      <div class="field">
+        <label>Nombre Completo / Alias</label>
+        <input type="text" id="admNewName" placeholder="Juan Pérez" />
+      </div>
+      <div class="field">
+        <label>Contraseña Provisional (mín. 6 caracteres)</label>
+        <input type="password" id="admNewPass" placeholder="••••••••" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field">
+          <label>Rol de Usuario</label>
+          <select id="admNewRole">
+            <option value="member">Miembro Estándar</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Banca Inicial (u)</label>
+          <input type="number" id="admNewBank" value="100.0" min="10" step="5" />
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+        <button class="btn" onclick="document.getElementById('modalCreateUser').classList.remove('open')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveCreateUser()">Guardar Usuario</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Admin Edit User -->
+  <div class="overlay" id="modalEditUser" onclick="if(event.target===this) this.classList.remove('open')">
+    <div class="glass" style="max-width:440px;width:92%;margin:auto;padding:24px;border-radius:18px;">
+      <h3 style="margin:0 0 4px;font-size:17px;">✏️ Editar Usuario</h3>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;" id="admEditEmailLabel">Modificando usuario</div>
+      <input type="hidden" id="admEditUid" />
+      <div class="field">
+        <label>Nombre / Alias</label>
+        <input type="text" id="admEditName" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field">
+          <label>Rol</label>
+          <select id="admEditRole">
+            <option value="member">Miembro</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Banca (u)</label>
+          <input type="number" id="admEditBank" min="10" step="5" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Nueva Contraseña (opcional para restablecer)</label>
+        <input type="password" id="admEditPass" placeholder="Dejar vacío si no cambia" />
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+        <button class="btn" onclick="document.getElementById('modalEditUser').classList.remove('open')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveEditUser()">Actualizar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Admin Create Invitation -->
+  <div class="overlay" id="modalCreateInvite" onclick="if(event.target===this) this.classList.remove('open')">
+    <div class="glass" style="max-width:440px;width:92%;margin:auto;padding:24px;border-radius:18px;">
+      <h3 style="margin:0 0 4px;font-size:17px;">🎟️ Crear Invitación o Enlace</h3>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Genera un enlace directo para invitar amigos o miembros VIP.</div>
+      <div class="field">
+        <label>Correo Destino (opcional)</label>
+        <input type="email" id="admInvEmail" placeholder="Dejar vacío para enlace público" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field">
+          <label>Rol Asignado</label>
+          <select id="admInvRole">
+            <option value="member">Miembro</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Usos Permitidos</label>
+          <input type="number" id="admInvMaxUses" value="1" min="1" max="500" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Vigencia de la Invitación</label>
+        <select id="admInvDays">
+          <option value="1">1 día</option>
+          <option value="7" selected>7 días</option>
+          <option value="30">30 días</option>
+          <option value="365">1 año</option>
+        </select>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+        <button class="btn" onclick="document.getElementById('modalCreateInvite').classList.remove('open')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveCreateInvite()">Generar Enlace</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const STATIC_MODE = true;
     const SUPABASE_URL = "https://bgrqvmebewrkbanqxiyo.supabase.co";
@@ -683,7 +849,7 @@
     const LEAGUE_SHORT = { 'col.1': 'COL', 'uefa.champions': 'UCL', 'eng.1': 'ENG', 'esp.1': 'ESP', 'ita.1': 'ITA', 'ger.1': 'GER', 'fra.1': 'FRA' };
 
     let currentScope = 'all';
-    let dateFilter = 'all';
+    let dateFilter = 'today';
     let viewMode = 'chrono';
     let selectedLeague = null;
     let favOnly = false;
@@ -1414,16 +1580,28 @@
         const isFav = favorites.has(m.event_id);
         const bestPick = m.opt_a_leg || m.opt_b_pick;
         const code = LEAGUE_SHORT[m.league] || m.league.toUpperCase().slice(0, 3);
-        const lgPill = showLeagueTag ? `<span class="badge b-pend" style="font-size:10px;padding:2px 7px;">${code}</span> ` : '';
+        const lgPill = `<span style="display:inline-flex;align-items:center;gap:5px;"><img src="./logos/${m.league}.png" alt="${code}" style="width:16px;height:16px;object-fit:contain;" onerror="this.style.display='none'" /><span class="badge b-pend" style="font-size:10px;padding:2px 7px;">${code}</span></span> `;
         const pairHintHtml = (bestPick && Number(bestPick.odds) < 1.50 && m.pair_hint)
           ? `<div style="font-size:11px;color:var(--orange);font-weight:600;margin-top:2px;">🔗 Para 1.50+: + ${m.pair_hint.partner_title} → @${Number(m.pair_hint.combo_odds).toFixed(2)}</div>`
           : '';
         return `<article class="match-card">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-            <span class="num" style="font-size:11.5px;color:var(--muted);">${lgPill}${m.kickoff_col} COL ${m.ou_line ? '• O/U ' + m.ou_line : ''}</span>
+            <span class="num" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);">${lgPill}${m.kickoff_col} COL ${m.ou_line ? '• O/U ' + m.ou_line : ''}</span>
             <button class="fav-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite('${m.event_id}')" title="Marcar favorito">★</button>
           </div>
-          <div style="font-size:15px;font-weight:700;text-align:center;">${m.home} <span style="color:var(--orange);">vs</span> ${m.away}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0 6px;">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+              ${m.home_logo ? `<img src="${m.home_logo}" alt="${m.home}" style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline-flex';" />` : ''}
+              <span class="team-fallback" style="${m.home_logo ? 'display:none;' : 'display:inline-flex;'}width:24px;height:24px;border-radius:6px;background:rgba(124,58,237,0.15);color:var(--violet);font-size:10px;font-weight:800;align-items:center;justify-content:center;flex-shrink:0;">${m.home.slice(0,2).toUpperCase()}</span>
+              <span style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${m.home}">${m.home}</span>
+            </div>
+            <span style="color:var(--orange);font-weight:800;font-size:11.5px;padding:0 4px;flex-shrink:0;">VS</span>
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:1;min-width:0;text-align:right;">
+              <span style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${m.away}">${m.away}</span>
+              ${m.away_logo ? `<img src="${m.away_logo}" alt="${m.away}" style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline-flex';" />` : ''}
+              <span class="team-fallback" style="${m.away_logo ? 'display:none;' : 'display:inline-flex;'}width:24px;height:24px;border-radius:6px;background:rgba(14,165,233,0.15);color:var(--cyan);font-size:10px;font-weight:800;align-items:center;justify-content:center;flex-shrink:0;">${m.away.slice(0,2).toUpperCase()}</span>
+            </div>
+          </div>
           <div>
             <div class="prob-stack"><div class="ps-1" style="width:${p1.toFixed(1)}%"></div><div class="ps-x" style="width:${px.toFixed(1)}%"></div><div class="ps-2" style="width:${p2.toFixed(1)}%"></div></div>
             <div class="num" style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;">
@@ -1461,6 +1639,26 @@
       };
 
       if (viewMode === 'chrono') {
+        if (dateFilter === 'today' || dateFilter === 'tomorrow') {
+          const dateLabel = dateFilter === 'today' ? `Hoy (${colDateOffset(0)})` : `Mañana (${colDateOffset(1)})`;
+          const cards = list.map(m => renderMatchCardHtml(m, lastScan.matches.indexOf(m), true)).join('');
+          document.getElementById('leaguesContainer').innerHTML = `
+            <section class="glass league-section">
+              <div class="league-header">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div class="league-emblem" style="background:linear-gradient(135deg,#7C3AED,#0EA5E9);">⏱</div>
+                  <div>
+                    <h2 style="margin:0;font-size:16px;font-weight:700;">Partidos de ${dateLabel}</h2>
+                    <div style="font-size:11.5px;color:var(--muted);">Fila cronológica única organizada por hora de inicio</div>
+                  </div>
+                </div>
+                <span class="badge b-pend">${list.length} ${list.length === 1 ? 'partido' : 'partidos'}</span>
+              </div>
+              <div class="matches-grid">${cards}</div>
+            </section>`;
+          return;
+        }
+
         const byDay = {};
         list.forEach(m => {
           const dayKey = String(m.kickoff_col || '').slice(0, 10) || 'Próximos';
@@ -2042,42 +2240,328 @@
     async function loadAdminUsers() {
       const body = document.getElementById('adminUsersBody');
       const kpis = document.getElementById('adminKpis');
-      if (!body || !SUPABASE_ENABLED || !currentUser || !currentUser.is_admin) return;
-      body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);">Consultando usuarios...</td></tr>';
-      const { data, error } = await sbClient.rpc('admin_list_users');
-      if (error) {
-        body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--amber);">Ejecuta la migración v3 en Supabase SQL Editor para habilitar admin_list_users (${error.message}).</td></tr>`;
-        return;
+      if (!body || !currentUser || !currentUser.is_admin) return;
+      body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px;">Consultando usuarios...</td></tr>';
+      let rows = [];
+      if (SUPABASE_ENABLED) {
+        const { data, error } = await sbClient.rpc('admin_list_users');
+        if (error) {
+          body.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--amber);padding:20px;">Error al consultar usuarios (${error.message}).</td></tr>`;
+          return;
+        }
+        rows = data || [];
+      } else {
+        try {
+          const res = await fetch('/api/admin/users');
+          if (!res.ok) { body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--amber);padding:20px;">No autorizado.</td></tr>'; return; }
+          const d = await res.json();
+          rows = (d.users || []).map(u => ({
+            user_id: u.id,
+            email: u.username,
+            display_name: u.display_name,
+            is_admin: Boolean(u.is_admin),
+            stake_mode: u.stake_mode,
+            bankroll_base: u.bankroll_base,
+            created_at: u.created_at,
+            last_sign_in_at: null,
+            total_bets: u.total_bets,
+            pending_bets: u.pending_bets,
+            net_profit_u: u.net_profit_u
+          }));
+        } catch (e) {
+          body.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--amber);padding:20px;">Error cargando usuarios: ${e.message}</td></tr>`;
+          return;
+        }
       }
-      const rows = data || [];
+
       const cntEl = document.getElementById('cntAdminUsers');
       if (cntEl) cntEl.textContent = String(rows.length);
+      const cntBadge = document.getElementById('cntAdminUsersBadge');
+      if (cntBadge) cntBadge.textContent = `${rows.length} ${rows.length === 1 ? 'usuario' : 'usuarios'}`;
       const admins = rows.filter(r => r.is_admin).length;
       const totalBets = rows.reduce((s, r) => s + Number(r.total_bets || 0), 0);
       const active7d = rows.filter(r => r.last_sign_in_at && (Date.now() - new Date(r.last_sign_in_at).getTime()) <= 7 * 86400000).length;
       if (kpis) {
         kpis.innerHTML = `
           <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Total Usuarios</div><div class="num" style="font-size:22px;font-weight:800;">${rows.length}</div></div>
-          <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Activos (7 días)</div><div class="num" style="font-size:22px;font-weight:800;color:var(--green);">${active7d}</div></div>
+          <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Activos Recientes</div><div class="num" style="font-size:22px;font-weight:800;color:var(--green);">${active7d || rows.length}</div></div>
           <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Administradores</div><div class="num" style="font-size:22px;font-weight:800;color:var(--violet);">${admins}</div></div>
-          <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Jugadas Usuarios</div><div class="num" style="font-size:22px;font-weight:800;">${totalBets}</div></div>`;
+          <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Jugadas de Usuarios</div><div class="num" style="font-size:22px;font-weight:800;">${totalBets}</div></div>`;
       }
       body.innerHTML = rows.map(r => {
         const net = Number(r.net_profit_u || 0);
         const netCol = net >= 0 ? 'var(--green)' : 'var(--red)';
         const reg = r.created_at ? formatColTime(r.created_at) : '—';
-        const last = r.last_sign_in_at ? formatColTime(r.last_sign_in_at) : 'Sin acceso';
+        const last = r.last_sign_in_at ? formatColTime(r.last_sign_in_at) : 'Activo';
+        const uid = r.user_id || r.id;
+        const mail = r.email || r.username || '—';
+        const dname = r.display_name || mail.split('@')[0];
+        const isSelf = (currentUser && (currentUser.email === mail || currentUser.username === mail));
+        const delBtn = isSelf || mail === 'juanmanuelton7@gmail.com'
+          ? `<span style="font-size:11px;color:var(--muted);" title="Cuenta protegida">Protegido</span>`
+          : `<button class="btn" style="padding:4px 8px;font-size:11.5px;color:var(--red);border-color:rgba(239,68,68,0.3);" onclick="deleteUser('${uid}', '${mail}')" title="Eliminar usuario">🗑️</button>`;
         return `<tr>
-          <td><strong>${r.display_name || '—'}</strong></td>
-          <td class="num">${r.email || '—'}</td>
-          <td><span class="badge ${r.is_admin ? 'b-pos' : 'b-pend'}">${r.is_admin ? 'Admin' : 'Miembro'}</span></td>
+          <td><strong>${dname}</strong></td>
+          <td class="num" style="font-size:12px;">${mail}</td>
+          <td><span class="badge ${r.is_admin ? 'b-pos' : 'b-pend'}">${r.is_admin ? 'Admin 👑' : 'Miembro'}</span></td>
           <td class="num">${reg}</td>
           <td class="num">${last}</td>
-          <td>${r.stake_mode || 'flat'}</td>
+          <td class="num" style="font-weight:700;">${Number(r.bankroll_base || 100).toFixed(0)}u</td>
           <td class="num">${r.total_bets || 0} (${r.pending_bets || 0} pend.)</td>
           <td class="num" style="font-weight:700;color:${netCol};">${net >= 0 ? '+' : ''}${net.toFixed(2)}u</td>
+          <td style="text-align:right;">
+            <div style="display:inline-flex;gap:6px;align-items:center;">
+              <button class="btn" style="padding:4px 8px;font-size:11.5px;" onclick="openEditUserModal('${uid}', '${mail}', '${dname.replace(/'/g, "\'")}', ${Boolean(r.is_admin)}, ${r.bankroll_base || 100})" title="Editar usuario">✏️</button>
+              ${delBtn}
+            </div>
+          </td>
         </tr>`;
-      }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);">No hay usuarios registrados.</td></tr>';
+      }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">No hay usuarios registrados.</td></tr>';
+    }
+
+    function openCreateUserModal() {
+      document.getElementById('admNewEmail').value = '';
+      document.getElementById('admNewName').value = '';
+      document.getElementById('admNewPass').value = '';
+      document.getElementById('admNewRole').value = 'member';
+      document.getElementById('admNewBank').value = '100.0';
+      document.getElementById('modalCreateUser').classList.add('open');
+    }
+
+    async function saveCreateUser() {
+      const email = document.getElementById('admNewEmail').value.trim();
+      const name = document.getElementById('admNewName').value.trim();
+      const pass = document.getElementById('admNewPass').value;
+      const role = document.getElementById('admNewRole').value;
+      const bank = parseFloat(document.getElementById('admNewBank').value) || 100.0;
+      if (!email || pass.length < 6) {
+        alert('Ingresa un correo válido y contraseña de al menos 6 caracteres.');
+        return;
+      }
+      setStatus(true, 'Creando usuario...');
+      try {
+        if (SUPABASE_ENABLED) {
+          const { data, error } = await sbClient.auth.signUp({
+            email,
+            password: pass,
+            options: { data: { display_name: name || email.split('@')[0], is_admin: role === 'admin' } }
+          });
+          if (error) throw error;
+        } else {
+          const r = await fetch('/api/admin/users/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: email, display_name: name, password: pass, is_admin: role === 'admin', bankroll_base: bank })
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || 'Error al crear usuario');
+        }
+        document.getElementById('modalCreateUser').classList.remove('open');
+        await loadAdminUsers();
+        setStatus(false, 'Usuario creado exitosamente.');
+      } catch (err) {
+        alert('Error: ' + err.message);
+        setStatus(false, 'Error creando usuario.');
+      }
+    }
+
+    function openEditUserModal(uid, email, name, isAdmin, bank) {
+      document.getElementById('admEditUid').value = uid;
+      document.getElementById('admEditEmailLabel').textContent = `Usuario: ${email}`;
+      document.getElementById('admEditName').value = name;
+      document.getElementById('admEditRole').value = isAdmin ? 'admin' : 'member';
+      document.getElementById('admEditBank').value = bank || 100.0;
+      document.getElementById('admEditPass').value = '';
+      document.getElementById('modalEditUser').classList.add('open');
+    }
+
+    async function saveEditUser() {
+      const uid = document.getElementById('admEditUid').value;
+      const name = document.getElementById('admEditName').value.trim();
+      const role = document.getElementById('admEditRole').value;
+      const bank = parseFloat(document.getElementById('admEditBank').value) || 100.0;
+      const pass = document.getElementById('admEditPass').value;
+      setStatus(true, 'Actualizando usuario...');
+      try {
+        if (SUPABASE_ENABLED) {
+          const { error } = await sbClient.rpc('admin_update_user', {
+            p_user_id: uid,
+            p_display_name: name,
+            p_is_admin: role === 'admin',
+            p_bankroll_base: bank
+          });
+          if (error) throw error;
+        } else {
+          const r = await fetch('/api/admin/users/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: uid, display_name: name, is_admin: role === 'admin', bankroll_base: bank, password: pass || null })
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || 'Error actualizando usuario');
+        }
+        document.getElementById('modalEditUser').classList.remove('open');
+        await loadAdminUsers();
+        setStatus(false, 'Usuario actualizado correctamente.');
+      } catch (err) {
+        alert('Error: ' + err.message);
+        setStatus(false, 'Error al actualizar.');
+      }
+    }
+
+    async function deleteUser(uid, email) {
+      if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente al usuario ${email}? Esta acción no se puede deshacer.`)) {
+        return;
+      }
+      setStatus(true, 'Eliminando usuario...');
+      try {
+        if (SUPABASE_ENABLED) {
+          const { error } = await sbClient.rpc('admin_delete_user', { p_user_id: uid });
+          if (error) throw error;
+        } else {
+          const r = await fetch('/api/admin/users/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: uid })
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || 'Error al eliminar usuario');
+        }
+        await loadAdminUsers();
+        setStatus(false, `Usuario ${email} eliminado.`);
+      } catch (err) {
+        alert('Error: ' + err.message);
+        setStatus(false, 'Error al eliminar.');
+      }
+    }
+
+    // --- Invitation System JS ---
+
+    function openCreateInviteModal() {
+      document.getElementById('admInvEmail').value = '';
+      document.getElementById('admInvRole').value = 'member';
+      document.getElementById('admInvMaxUses').value = '1';
+      document.getElementById('admInvDays').value = '7';
+      document.getElementById('modalCreateInvite').classList.add('open');
+    }
+
+    async function saveCreateInvite() {
+      const email = document.getElementById('admInvEmail').value.trim() || null;
+      const role = document.getElementById('admInvRole').value;
+      const maxUses = parseInt(document.getElementById('admInvMaxUses').value, 10) || 1;
+      const days = parseInt(document.getElementById('admInvDays').value, 10) || 7;
+      setStatus(true, 'Generando enlace de invitación...');
+      try {
+        let token = '';
+        if (SUPABASE_ENABLED) {
+          const { data, error } = await sbClient.rpc('admin_create_invitation', {
+            p_email: email,
+            p_role: role,
+            p_max_uses: maxUses,
+            p_days_valid: days
+          });
+          if (error) throw error;
+          token = data;
+        } else {
+          const r = await fetch('/api/admin/invitations/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, role, max_uses: maxUses, days_valid: days })
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || 'Error creando invitación');
+          token = d.invitation.token;
+        }
+        document.getElementById('modalCreateInvite').classList.remove('open');
+        await loadAdminInvitations();
+        copyInviteLink(token);
+        setStatus(false, 'Enlace de invitación generado y copiado al portapapeles.');
+      } catch (err) {
+        alert('Error: ' + err.message);
+        setStatus(false, 'Error al generar invitación.');
+      }
+    }
+
+    async function loadAdminInvitations() {
+      const body = document.getElementById('adminInvitesBody');
+      if (!body || !currentUser || !currentUser.is_admin) return;
+      body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Consultando invitaciones...</td></tr>';
+      let rows = [];
+      if (SUPABASE_ENABLED) {
+        const { data, error } = await sbClient.rpc('admin_list_invitations');
+        if (error) {
+          body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--amber);padding:16px;">Error cargando invitaciones (${error.message}).</td></tr>`;
+          return;
+        }
+        rows = data || [];
+      } else {
+        try {
+          const r = await fetch('/api/admin/invitations');
+          if (!r.ok) return;
+          const d = await r.json();
+          rows = d.invitations || [];
+        } catch (e) {
+          body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--amber);padding:16px;">Error: ${e.message}</td></tr>`;
+          return;
+        }
+      }
+
+      body.innerHTML = rows.map(i => {
+        const url = `${window.location.origin}${window.location.pathname}#invite=${i.token}`;
+        const isExp = i.expires_at && new Date(i.expires_at).getTime() < Date.now();
+        const isFull = i.uses_count >= i.max_uses;
+        const statusBadge = isFull ? '<span class="badge b-pend">Agotada</span>' : (isExp ? '<span class="badge b-pend" style="color:var(--red);">Expirada</span>' : '<span class="badge b-pos">Activa ✓</span>');
+        const expStr = i.expires_at ? formatColTime(i.expires_at) : 'Sin límite';
+        return `<tr>
+          <td class="num" style="font-weight:700;"><code>${i.token}</code></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <input type="text" readonly value="${url}" style="font-size:11px;padding:3px 6px;width:180px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:6px;" />
+              <button class="btn" style="padding:3px 8px;font-size:11px;" onclick="copyInviteLink('${i.token}')">📋 Copiar</button>
+            </div>
+          </td>
+          <td>${i.email || '<span style="color:var(--muted);">Enlace Público</span>'}</td>
+          <td><span class="badge ${i.role === 'admin' ? 'b-pos' : 'b-pend'}">${i.role === 'admin' ? 'Admin 👑' : 'Miembro'}</span></td>
+          <td class="num">${i.uses_count} / ${i.max_uses}</td>
+          <td class="num">${expStr}</td>
+          <td>${statusBadge}</td>
+          <td style="text-align:right;">
+            <button class="btn" style="padding:4px 8px;font-size:11px;color:var(--red);border-color:rgba(239,68,68,0.3);" onclick="deleteInvite(${i.id})" title="Revocar invitación">🗑️</button>
+          </td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px;">No hay invitaciones creadas todavía.</td></tr>';
+    }
+
+    async function deleteInvite(id) {
+      if (!confirm('¿Revocar y eliminar esta invitación?')) return;
+      try {
+        if (SUPABASE_ENABLED) {
+          const { error } = await sbClient.rpc('admin_delete_invitation', { p_id: id });
+          if (error) throw error;
+        } else {
+          await fetch('/api/admin/invitations/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invite_id: id })
+          });
+        }
+        await loadAdminInvitations();
+      } catch (err) {
+        alert('Error revocando invitación: ' + err.message);
+      }
+    }
+
+    function copyInviteLink(token) {
+      const url = `${window.location.origin}${window.location.pathname}#invite=${token}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => {
+          setStatus(false, 'Enlace de invitación copiado al portapapeles.');
+        }).catch(() => {
+          prompt('Copia tu enlace de invitación:', url);
+        });
+      } else {
+        prompt('Copia tu enlace de invitación:', url);
+      }
     }
 
     async function sendAdminPost() {

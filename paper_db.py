@@ -93,9 +93,33 @@ class PaperTradingDB:
                     username TEXT NOT NULL UNIQUE,
                     display_name TEXT NOT NULL,
                     password_hash TEXT NOT NULL,
+                    is_admin INTEGER NOT NULL DEFAULT 0,
                     stake_mode TEXT NOT NULL DEFAULT 'flat',
                     fib_step INTEGER NOT NULL DEFAULT 0,
                     bankroll_base REAL NOT NULL DEFAULT 100.0,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+
+            # Ensure juanmanuelton7@gmail.com has full super-admin privileges
+            conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'juanmanuelton7@gmail.com'")
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS invitations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    token TEXT NOT NULL UNIQUE,
+                    email TEXT,
+                    role TEXT NOT NULL DEFAULT 'member',
+                    max_uses INTEGER NOT NULL DEFAULT 1,
+                    uses_count INTEGER NOT NULL DEFAULT 0,
+                    created_by INTEGER,
+                    expires_at TEXT,
                     created_at TEXT NOT NULL
                 )
                 """
@@ -501,7 +525,8 @@ class PaperTradingDB:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT u.id, u.username, u.display_name, u.stake_mode, u.fib_step, u.bankroll_base, u.created_at
+                SELECT u.id, u.username, u.display_name, COALESCE(u.is_admin, 0) AS is_admin,
+                       u.stake_mode, u.fib_step, u.bankroll_base, u.created_at
                 FROM sessions s
                 JOIN users u ON u.id = s.user_id
                 WHERE s.token = ? AND s.expires_at > ?
@@ -509,6 +534,135 @@ class PaperTradingDB:
                 (token, now_iso),
             ).fetchone()
         return dict(row) if row else None
+
+    # --- Super Admin User Management & Invitation System ---
+
+    def list_all_users(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT u.id, u.username, u.display_name, COALESCE(u.is_admin, 0) AS is_admin,
+                       u.stake_mode, u.bankroll_base, u.created_at,
+                       COUNT(ub.id) AS total_bets,
+                       SUM(CASE WHEN ub.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_bets,
+                       COALESCE(SUM(ub.profit_u), 0.0) AS net_profit_u
+                FROM users u
+                LEFT JOIN user_bets ub ON ub.user_id = u.id
+                GROUP BY u.id
+                ORDER BY u.created_at DESC
+                """
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def admin_create_user(
+        self, username: str, display_name: str, password: str, is_admin: bool = False, bankroll_base: float = 100.0
+    ) -> tuple[bool, str, dict | None]:
+        uname = username.strip().lower()
+        dname = display_name.strip() or uname
+        if len(uname) < 3 or len(password) < 6:
+            return False, "Usuario mínimo 3 caracteres y contraseña mínimo 6.", None
+        now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        pw_hash = _hash_password(password)
+        try:
+            with self._connect() as conn:
+                cur = conn.execute(
+                    """
+                    INSERT INTO users (username, display_name, password_hash, is_admin, stake_mode, fib_step, bankroll_base, created_at)
+                    VALUES (?, ?, ?, ?, 'flat', 0, ?, ?)
+                    """,
+                    (uname, dname, pw_hash, 1 if is_admin else 0, max(10.0, float(bankroll_base)), now),
+                )
+                uid = cur.lastrowid
+                row = conn.execute("SELECT id, username, display_name, is_admin, bankroll_base, created_at FROM users WHERE id = ?", (uid,)).fetchone()
+            return True, "Usuario creado exitosamente.", dict(row) if row else None
+        except sqlite3.IntegrityError:
+            return False, "El nombre de usuario o correo ya existe.", None
+
+    def admin_update_user(
+        self, user_id: int, display_name: str, is_admin: bool, bankroll_base: float, new_password: str | None = None
+    ) -> tuple[bool, str]:
+        with self._connect() as conn:
+            if new_password and len(new_password.strip()) >= 6:
+                pw_hash = _hash_password(new_password.strip())
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET display_name = ?, is_admin = ?, bankroll_base = ?, password_hash = ?
+                    WHERE id = ?
+                    """,
+                    (display_name.strip(), 1 if is_admin else 0, max(10.0, float(bankroll_base)), pw_hash, user_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET display_name = ?, is_admin = ?, bankroll_base = ?
+                    WHERE id = ?
+                    """,
+                    (display_name.strip(), 1 if is_admin else 0, max(10.0, float(bankroll_base)), user_id),
+                )
+        return True, "Usuario actualizado correctamente."
+
+    def admin_delete_user(self, user_id: int) -> tuple[bool, str]:
+        with self._connect() as conn:
+            # Protect juanmanuelton7@gmail.com
+            u = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
+            if u and u["username"] == "juanmanuelton7@gmail.com":
+                return False, "No se puede eliminar la cuenta del Super Administrador principal."
+            conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM user_bets WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM user_favorites WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        return True, "Usuario eliminado correctamente."
+
+    def create_invitation(
+        self, created_by: int | None, email: str | None = None, role: str = "member", max_uses: int = 1, days_valid: int = 7
+    ) -> dict:
+        token = secrets.token_urlsafe(16)
+        now = dt.datetime.now(dt.timezone.utc)
+        exp = (now + dt.timedelta(days=days_valid)).isoformat(timespec="seconds")
+        clean_email = email.strip().lower() if email else None
+        clean_role = "admin" if role == "admin" else "member"
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO invitations (token, email, role, max_uses, uses_count, created_by, expires_at, created_at)
+                VALUES (?, ?, ?, ?, 0, ?, ?, ?)
+                """,
+                (token, clean_email, clean_role, max(1, int(max_uses)), created_by, exp, now.isoformat(timespec="seconds")),
+            )
+            inv_id = cur.lastrowid
+            row = conn.execute("SELECT * FROM invitations WHERE id = ?", (inv_id,)).fetchone()
+        return dict(row)
+
+    def list_invitations(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM invitations ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_invitation(self, invite_id: int) -> bool:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM invitations WHERE id = ?", (invite_id,))
+        return True
+
+    def validate_invitation(self, token: str) -> tuple[bool, str, dict | None]:
+        if not token:
+            return False, "Token de invitación requerido.", None
+        now_iso = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        with self._connect() as conn:
+            inv = conn.execute("SELECT * FROM invitations WHERE token = ?", (token.strip(),)).fetchone()
+        if not inv:
+            return False, "Invitación no válida o no encontrada.", None
+        if inv["expires_at"] and inv["expires_at"] < now_iso:
+            return False, "Esta invitación ha expirado.", None
+        if inv["uses_count"] >= inv["max_uses"]:
+            return False, "Esta invitación ya alcanzó el número máximo de usos.", None
+        return True, "Invitación válida.", dict(inv)
+
+    def consume_invitation(self, token: str) -> bool:
+        with self._connect() as conn:
+            conn.execute("UPDATE invitations SET uses_count = uses_count + 1 WHERE token = ?", (token.strip(),))
+        return True
 
     def logout_session(self, token: str | None) -> None:
         if not token:

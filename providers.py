@@ -48,6 +48,8 @@ class UpcomingMatch:
     o_over: float | None
     o_under: float | None
     provider_name: str
+    home_logo: str = ""
+    away_logo: str = ""
     sharp_probs: tuple[float, float, float] | None = None
     best_soft_odds: dict[str, tuple[float, str]] | None = None  # key -> (odds, bookmaker)
 
@@ -154,6 +156,8 @@ def fetch_espn_upcoming(leagues: list[str], days_ahead: int = 3) -> list[Upcomin
                 o1, ox, o2, ou_line, o_over, o_under, prov = parsed_odds
                 kick = ev.get("date", "")
                 seen_ids.add(eid)
+                home_logo = home.get("team", {}).get("logo") or ""
+                away_logo = away.get("team", {}).get("logo") or ""
                 matches.append(
                     UpcomingMatch(
                         league=lg,
@@ -170,6 +174,8 @@ def fetch_espn_upcoming(leagues: list[str], days_ahead: int = 3) -> list[Upcomin
                         o_over=o_over,
                         o_under=o_under,
                         provider_name=prov,
+                        home_logo=home_logo,
+                        away_logo=away_logo,
                     )
                 )
 

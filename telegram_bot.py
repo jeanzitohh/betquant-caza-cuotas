@@ -378,26 +378,37 @@ def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_
                 db.mark_alert_sent(key)
                 sent_count += 1
 
-    # 3. Newly settled trades — both individual picks & finished combinadas (+ PNG results card)
+    # 3. Newly settled trades — Confirmation of WON / LOST with scores and card
     settled_msgs = []
     settled_raw = []
     for tr in db.get_recent_settled(limit=25):
-        key = f"settled:{tr['id']}:{tr['status']}"
+        key = f"settled_v3:{tr['id']}:{tr['status']}"
         if not db.was_alert_sent(key):
-            icon = "✅ GANADA" if tr["status"] == "WON" else "❌ PERDIDA"
-            kind = "Combinada" if tr.get("strategy") == "FORMULA_OPT_A" else "Individual"
+            won = (tr["status"] == "WON")
+            icon = "✅ ¡ACERTADA / GANADA!" if won else "❌ NO SE DIO / PERDIDA"
+            kind = "Combinada" if tr.get("strategy") == "FORMULA_OPT_A" else "Apuesta Directa"
+            note = html.escape(tr.get("result_note") or "").replace("(W)", " ✅").replace("(L)", " ❌")
             settled_msgs.append(
-                f"{icon} <i>[{kind}]</i> | <b>{html.escape(tr['title'])}</b>\n"
-                f"  @<code>{tr['odds']}</code> → <b>{tr['profit_u']:+.2f}u</b> ({html.escape(tr.get('result_note') or '')})"
+                f"<b>{icon}</b> <i>[{kind}]</i>\n"
+                f"⚽ <b>{html.escape(tr['title'])}</b>\n"
+                f"🎯 Cuota: <code>@{tr['odds']}</code> • Balance: <b>{tr['profit_u']:+.2f}u</b>\n"
+                f"📋 Marcador: <code>{note}</code>"
             )
             settled_raw.append(tr)
             db.mark_alert_sent(key)
     if settled_msgs:
         rep = db.get_summary()
-        body = "<b>🏁 CAZA CUOTAS • RESULTADOS LIQUIDADOS</b>\n\n" + "\n\n".join(settled_msgs) + "\n\n" + format_daily_effectiveness_block(rep)
+        body = (
+            "<b>🏁 CAZA CUOTAS • VERIFICACIÓN DE RESULTADOS</b>\n\n"
+            + "\n\n━━━━━━━━━━━━━━━\n\n".join(settled_msgs)
+            + "\n\n"
+            + format_daily_effectiveness_block(rep)
+        )
         if HAS_CARDS:
             png = render_settled_card(settled_raw, rep)
             if send_photo_bytes(token, channel_id, png, body):
+                sent_count += 1
+            elif send_html(token, channel_id, body):
                 sent_count += 1
         elif send_html(token, channel_id, body):
             sent_count += 1
@@ -412,26 +423,6 @@ def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_
                 ok = send_photo_bytes(token, channel_id, render_daily_summary_card(rep), cap) if HAS_CARDS else send_html(token, channel_id, cap)
                 if ok:
                     db.mark_alert_sent(eff_key)
-                    sent_count += 1
-
-    # 3b. Post-Match Learning Reports (Modo Aprendizaje)
-    for an in db.get_recent_post_match_learnings(limit=6):
-        key = f"tg_learn:{an['event_id']}:{an['forecast_market']}"
-        if not db.was_alert_sent(key):
-            cap = an.get("body_html", "")
-            if HAS_CARDS and render_learning_card:
-                try:
-                    png = render_learning_card(an)
-                    if send_photo_bytes(token, channel_id, png, cap):
-                        db.mark_alert_sent(key)
-                        sent_count += 1
-                except Exception:
-                    if send_html(token, channel_id, cap):
-                        db.mark_alert_sent(key)
-                        sent_count += 1
-            else:
-                if send_html(token, channel_id, cap):
-                    db.mark_alert_sent(key)
                     sent_count += 1
 
     # 4. Daily Serial Turn-by-Turn Schedule in 1:1 synced chunks (image count == caption count, never clipped)

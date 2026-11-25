@@ -186,41 +186,27 @@ def evaluate_match(
             opt_a_valid.append((k, mkt_odds[k], cp))
     best_opt_a = max(opt_a_valid, key=lambda x: (x[2], -abs(x[1] - 1.32))) if opt_a_valid else None
 
-    # Exclude bookmaker-blocked Bet Builders (1/1X/2/X2 + same team +0.5 goals);
-    # use universally enabled 2-leg same-match combos (+1.5 match goals or +1.5 team goals).
-    bb_cands = []
-    if h_stat["n"] >= 5 and a_stat["n"] >= 5:
-        if h_stat["unbeaten_pct"] >= 0.70 and h_stat["tot_o15_pct"] >= 0.70 and (h_stat["gf_avg"] + a_stat["gf_avg"]) >= 2.2:
-            bb_cands.append("BB_H_1X_T15")
-        if h_stat["win_pct"] >= 0.55 and h_stat["tot_o15_pct"] >= 0.75 and h_stat["gf_avg"] >= 1.3:
-            bb_cands.append("BB_H_1_T15")
-        if h_stat["unbeaten_pct"] >= 0.70 and h_stat["o15_pct"] >= 0.45 and h_stat["gf_avg"] >= 1.4 and a_stat["ga_avg"] >= 1.1:
-            bb_cands.append("BB_H_1X_O15")
-        if h_stat["win_pct"] >= 0.55 and h_stat["o15_pct"] >= 0.50 and h_stat["gf_avg"] >= 1.5 and a_stat["ga_avg"] >= 1.1:
-            bb_cands.append("BB_H_1_O15")
-        if a_stat["unbeaten_pct"] >= 0.70 and a_stat["tot_o15_pct"] >= 0.70 and (h_stat["gf_avg"] + a_stat["gf_avg"]) >= 2.2:
-            bb_cands.append("BB_A_X2_T15")
-        if a_stat["win_pct"] >= 0.55 and a_stat["tot_o15_pct"] >= 0.75 and a_stat["gf_avg"] >= 1.3:
-            bb_cands.append("BB_A_2_T15")
-        if a_stat["unbeaten_pct"] >= 0.70 and a_stat["o15_pct"] >= 0.45 and a_stat["gf_avg"] >= 1.4 and h_stat["ga_avg"] >= 1.1:
-            bb_cands.append("BB_A_X2_O15")
-        if a_stat["win_pct"] >= 0.55 and a_stat["o15_pct"] >= 0.50 and a_stat["gf_avg"] >= 1.5 and h_stat["ga_avg"] >= 1.1:
-            bb_cands.append("BB_A_2_O15")
-    bb_valid = []
-    for k in bb_cands:
-        cp, blk = _cal_prob(k)
-        if not blk and 1.25 <= mkt_odds[k] <= 1.95 and cp >= 0.60:
-            bb_valid.append((k, mkt_odds[k], cp))
-    best_opt_b = max(bb_valid, key=lambda x: (x[1] >= 1.50 and x[2] >= 0.62, x[2], -abs(x[1] - 1.62))) if bb_valid else None
+    # Straight real bookmaker markets ONLY (1, X, 2, 1X, X2, H_O15, A_O15, etc.)
+    # Synthetic same-match Bet Builders are blocked because bookmakers apply correlation discounts.
+    straight_cands = []
+    for k in ("1X", "X2", "1", "2", "H_O15", "A_O15", "H_O05", "A_O05"):
+        if k in mkt_odds and not k.startswith("BB_"):
+            straight_cands.append(k)
 
-    # Best individual pick for daily accuracy tracking ("BOT_DIARIO")
-    blocked_bb = {"BB_H_1_O05", "BB_H_1X_O05", "BB_A_2_O05", "BB_A_X2_O05"}
+    opt_b_valid = []
+    for k in straight_cands:
+        cp, blk = _cal_prob(k)
+        if not blk and 1.25 <= mkt_odds[k] <= 2.10 and cp >= 0.55:
+            opt_b_valid.append((k, mkt_odds[k], cp))
+    best_opt_b = max(opt_b_valid, key=lambda x: (x[1] >= 1.45, x[2], -abs(x[1] - 1.55))) if opt_b_valid else None
+
+    # Best individual pick for daily accuracy tracking ("BOT_DIARIO") — Straight markets only
     safe_pool = []
     for k, odd in mkt_odds.items():
-        if k in blocked_bb or not (1.20 <= odd <= 1.75):
+        if k.startswith("BB_") or not (1.20 <= odd <= 1.75):
             continue
         cp, blk = _cal_prob(k)
-        if not blk and cp >= 0.70:
+        if not blk and cp >= 0.65:
             safe_pool.append((k, odd, cp))
     best_daily_safe = max(safe_pool, key=lambda x: (x[2], -abs(x[1] - 1.40))) if safe_pool else None
 
@@ -459,6 +445,8 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 "kickoff_col": m.kickoff_col,
                 "home": m.home,
                 "away": m.away,
+                "home_logo": getattr(m, "home_logo", "") or "",
+                "away_logo": getattr(m, "away_logo", "") or "",
                 "o1": m.o1,
                 "ox": m.ox,
                 "o2": m.o2,
@@ -640,6 +628,10 @@ def build_dual_serial_ladders(
             "league_label": m["league_label"],
             "kickoff_col": m["kickoff_col"],
             "title": f"{m['home']} vs {m['away']}",
+            "home": m["home"],
+            "away": m["away"],
+            "home_logo": m.get("home_logo", ""),
+            "away_logo": m.get("away_logo", ""),
             "market": pk_key,
             "market_name": pick.get("market_name") or pick.get("name", ""),
             "odds": round(float(pick["odds"]), 2),

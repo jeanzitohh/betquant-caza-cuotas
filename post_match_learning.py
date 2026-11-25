@@ -162,6 +162,8 @@ def generate_post_match_learning_analysis(
         "league": league,
         "home_team": home,
         "away_team": away,
+        "home_logo": summary.get("home_logo", ""),
+        "away_logo": summary.get("away_logo", ""),
         "home_score": hg,
         "away_score": ag,
         "final_score": f"{hg}-{ag}",

@@ -73,7 +73,7 @@ self.addEventListener('notificationclick', event => {
 """
 
 
-def export_static_site(scan_res: dict, report_res: dict) -> str:
+def export_static_site(scan_res: dict | None = None, report_res: dict | None = None) -> str:
     """Export installable PWA bundle (docs/index.html, manifest.webmanifest, sw.js, icons, data.json)."""
     os.makedirs(DOCS_DIR, exist_ok=True)
     env = load_env()
@@ -83,14 +83,17 @@ def export_static_site(scan_res: dict, report_res: dict) -> str:
     sb_ready = bool(sb_url and sb_anon)
     now_col = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M")
 
+    safe_scan = scan_res or {"matches": [], "parlays_a": []}
+    safe_rep = report_res or {}
+
     if sb_ready:
         # Strict auth-only gate: never expose unauthenticated radar data in public static JSON
         payload = {"auth_required": True, "generated_col": now_col}
     else:
         payload = {
             "generated_col": now_col,
-            "scan": scan_res,
-            "report": report_res,
+            "scan": safe_scan,
+            "report": safe_rep,
         }
     with open(os.path.join(DOCS_DIR, "data.json"), "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False)

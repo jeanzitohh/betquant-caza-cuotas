@@ -1,10 +1,73 @@
 import base64
+import hashlib
 import io
 import os
+import urllib.request
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FONTS_DIR = os.path.join(BASE_DIR, "fonts")
+
+_LOGO_CACHE: dict[str, Image.Image] = {}
+
+
+def _fetch_or_load_logo(url_or_path: str, size: tuple[int, int] = (48, 48)) -> Image.Image | None:
+    """Fetch or load from disk/cache an official PNG logo (team badge or league emblem)."""
+    if not url_or_path:
+        return None
+    cache_key = f"{url_or_path}_{size[0]}x{size[1]}"
+    if cache_key in _LOGO_CACHE:
+        return _LOGO_CACHE[cache_key]
+
+    # 1. Local file candidate
+    cand = url_or_path if os.path.isabs(url_or_path) else os.path.join(BASE_DIR, url_or_path)
+    if os.path.isfile(cand):
+        try:
+            with Image.open(cand) as im:
+                im = im.convert("RGBA")
+                im.thumbnail(size, Image.Resampling.LANCZOS)
+                _LOGO_CACHE[cache_key] = im
+                return im
+        except Exception:
+            pass
+
+    # 2. Check league key in logos/ or docs/logos/
+    for ldir in (os.path.join(BASE_DIR, "logos"), os.path.join(BASE_DIR, "docs", "logos")):
+        lpath = os.path.join(ldir, f"{url_or_path}.png")
+        if os.path.isfile(lpath):
+            try:
+                with Image.open(lpath) as im:
+                    im = im.convert("RGBA")
+                    im.thumbnail(size, Image.Resampling.LANCZOS)
+                    _LOGO_CACHE[cache_key] = im
+                    return im
+            except Exception:
+                pass
+
+    # 3. Remote HTTP/HTTPS URL with persistent disk cache
+    if url_or_path.startswith("http://") or url_or_path.startswith("https://"):
+        cache_dir = os.path.join(BASE_DIR, ".cache", "logos")
+        os.makedirs(cache_dir, exist_ok=True)
+        fname = hashlib.md5(url_or_path.encode("utf-8")).hexdigest() + ".png"
+        local_f = os.path.join(cache_dir, fname)
+        if not os.path.isfile(local_f):
+            try:
+                req = urllib.request.Request(url_or_path, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    with open(local_f, "wb") as out_f:
+                        out_f.write(resp.read())
+            except Exception:
+                return None
+        if os.path.isfile(local_f):
+            try:
+                with Image.open(local_f) as im:
+                    im = im.convert("RGBA")
+                    im.thumbnail(size, Image.Resampling.LANCZOS)
+                    _LOGO_CACHE[cache_key] = im
+                    return im
+            except Exception:
+                return None
+    return None
 
 FONT_CANDIDATES_BOLD = [
     os.path.join(FONTS_DIR, "Poppins-Bold.ttf"),
@@ -87,7 +150,7 @@ def _draw_progress_bar(img: Image.Image, x: int, y: int, w: int, h: int, pct: fl
     _composite_rect(img, (x, y, x + fw, y + h), radius=h // 2, fill=fill_col)
 
 
-def _draw_brand_header(img: Image.Image, tag_text: str, right_text: str) -> None:
+def _draw_brand_header(img: Image.Image, tag_text: str, right_text: str, league_key: str = "") -> None:
     f_brand = _load_font(25, "bold")
     f_tag = _load_font(17, "semi")
     f_right = _load_font(19, "semi")
@@ -102,8 +165,18 @@ def _draw_brand_header(img: Image.Image, tag_text: str, right_text: str) -> None
 
     rw = d.textlength(right_text, font=f_right)
     _composite_rect(img, (int(1152 - rw - 34), 34, 1152, 76), radius=21, fill=(255, 255, 255, 28), outline=(255, 255, 255, 70), width=1)
-    d = ImageDraw.Draw(img)
-    d.text((1152 - rw - 17, 42), right_text, font=f_right, fill=(248, 250, 252, 255))
+
+    lg_im = _fetch_or_load_logo(league_key, (34, 34)) if league_key else None
+    if lg_im:
+        # draw league logo inside right badge
+        lx = int(1152 - rw - 74)
+        _composite_rect(img, (lx, 34, 1152, 76), radius=21, fill=(255, 255, 255, 34), outline=(255, 255, 255, 70), width=1)
+        img.paste(lg_im, (lx + 6, 38), lg_im)
+        d = ImageDraw.Draw(img)
+        d.text((lx + 46, 42), right_text, font=f_right, fill=(248, 250, 252, 255))
+    else:
+        d = ImageDraw.Draw(img)
+        d.text((1152 - rw - 17, 42), right_text, font=f_right, fill=(248, 250, 252, 255))
 
 
 def _form_dots(d: ImageDraw.ImageDraw, x: int, y: int, scores: list[str]) -> None:
@@ -124,7 +197,7 @@ def _form_dots(d: ImageDraw.ImageDraw, x: int, y: int, scores: list[str]) -> Non
 def render_match_card(m: dict) -> bytes:
     """Render an explicit, detailed 1200x780 PNG card with winner forecast, goal percentages, and literal bet."""
     img = _create_backdrop(1200, 780)
-    _draw_brand_header(img, m.get("league_label", m["league"]).upper(), f"{m['kickoff_col']} COL")
+    _draw_brand_header(img, m.get("league_label", m["league"]).upper(), f"{m['kickoff_col']} COL", league_key=m.get("league", ""))
     _glass_panel(img, (48, 102, 1152, 742), radius=28)
 
     d = ImageDraw.Draw(img)
@@ -132,9 +205,18 @@ def render_match_card(m: dict) -> bytes:
     f_sub = _load_font(17, "reg")
     f_lbl = _load_font(17, "semi")
 
+    # Team logos & matchup title
+    h_logo = _fetch_or_load_logo(m.get("home_logo", ""), (52, 52))
+    a_logo = _fetch_or_load_logo(m.get("away_logo", ""), (52, 52))
+    if h_logo:
+        img.paste(h_logo, (76, 114), h_logo)
+    if a_logo:
+        img.paste(a_logo, (1072, 114), a_logo)
+
+    d = ImageDraw.Draw(img)
     title = f"{m['home']}   vs   {m['away']}"
     tw = d.textlength(title, font=f_team)
-    if tw > 1040:
+    if tw > 920:
         f_team = _load_font(25, "bold")
         tw = d.textlength(title, font=f_team)
     d.text(((1200 - tw) / 2, 120), title, font=f_team, fill=(255, 255, 255, 255))
@@ -585,7 +667,7 @@ def render_learning_card(an: dict) -> bytes:
     """Render a dedicated 1200x820 Post-Match Learning Card with match stats and model verification."""
     img = _create_backdrop(1200, 820)
     lg_label = str(an.get("league_label") or an.get("league") or "FÚTBOL").upper()
-    _draw_brand_header(img, "MODO APRENDIZAJE • REVISIÓN POST-PARTIDO", f"{lg_label} • FINALIZADO")
+    _draw_brand_header(img, "MODO APRENDIZAJE • REVISIÓN POST-PARTIDO", f"{lg_label} • FINALIZADO", league_key=an.get("league", ""))
     _glass_panel(img, (48, 98, 1152, 782), radius=26)
 
     d = ImageDraw.Draw(img)
@@ -596,19 +678,34 @@ def render_learning_card(an: dict) -> bytes:
     won = (an.get("status") == "WON")
     profit = float(an.get("profit_u") or 0.0)
 
-    # 1. Teams & Final Score
-    f_teams = _load_font(30, "bold")
+    # 1. Teams & Final Score with official team crests
+    f_teams = _load_font(28, "bold")
     f_score = _load_font(46, "bold")
     f_sub = _load_font(15, "reg")
     f_lbl = _load_font(14, "semi")
     f_bold = _load_font(16, "bold")
 
-    d.text((80, 118), home, font=f_teams, fill=(255, 255, 255, 255))
+    h_logo = _fetch_or_load_logo(an.get("home_logo", ""), (50, 50))
+    a_logo = _fetch_or_load_logo(an.get("away_logo", ""), (50, 50))
+    if h_logo:
+        img.paste(h_logo, (80, 110), h_logo)
+        hx = 140
+    else:
+        hx = 80
+
+    if a_logo:
+        img.paste(a_logo, (1070, 110), a_logo)
+        ax_right = 1060
+    else:
+        ax_right = 1120
+
+    d = ImageDraw.Draw(img)
+    d.text((hx, 118), home[:20], font=f_teams, fill=(255, 255, 255, 255))
     score_str = f"{hg}  -  {ag}"
     sw = d.textlength(score_str, font=f_score)
     d.text(((1200 - sw) / 2, 110), score_str, font=f_score, fill=(253, 224, 71, 255))
-    aw = d.textlength(away, font=f_teams)
-    d.text((1120 - aw, 118), away, font=f_teams, fill=(255, 255, 255, 255))
+    aw = d.textlength(away[:20], font=f_teams)
+    d.text((ax_right - aw, 118), away[:20], font=f_teams, fill=(255, 255, 255, 255))
 
     # 2. Verification Badge
     badge_txt = f"PRONÓSTICO VERIFICADO  ✅  ({profit:+.2f}u)" if won else f"DESVIACIÓN CUANTITATIVA  ❌  ({profit:+.2f}u)"
