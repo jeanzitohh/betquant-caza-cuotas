@@ -244,6 +244,37 @@ HTML_PAGE = """<!DOCTYPE html>
     .overlay.open { display: flex; }
     .drawer { width: min(560px, 100%); background: rgba(255,255,255,0.92); padding: 22px; overflow-y: auto; }
 
+    /* Internal Telegram-style Live Channel */
+    .channel-shell { display: flex; flex-direction: column; gap: 12px; }
+    .channel-feed {
+      display: flex; flex-direction: column; gap: 14px;
+      max-height: 68vh; overflow-y: auto; padding: 6px 4px;
+    }
+    .channel-msg {
+      background: rgba(255,255,255,0.88); border: 1px solid var(--border);
+      border-radius: 20px; padding: 14px 16px; box-shadow: 0 6px 18px rgba(15,23,42,0.04);
+    }
+    .channel-img {
+      width: 100%; border-radius: 14px; margin: 10px 0; cursor: zoom-in;
+      border: 1px solid var(--border); display: block;
+    }
+    .channel-body { font-size: 13px; line-height: 1.5; color: var(--text); white-space: pre-line; }
+    .channel-body code { background: #F1F5F9; padding: 1px 6px; border-radius: 6px; font-family: 'Poppins', sans-serif; font-weight: 600; }
+    .composer-box {
+      padding: 14px; display: flex; flex-direction: column; gap: 9px;
+      border: 1px solid rgba(124,58,237,0.22);
+    }
+    .composer-box textarea {
+      width: 100%; min-height: 64px; padding: 10px 12px; border-radius: 14px;
+      border: 1px solid var(--border-strong); font-size: 13px; resize: vertical; background: #FFFFFF;
+    }
+    .lightbox {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.82); backdrop-filter: blur(8px);
+      z-index: 90; display: none; align-items: center; justify-content: center; padding: 18px; cursor: zoom-out;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img { max-width: min(1100px, 96vw); max-height: 92vh; border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
+
     @media (max-width: 1020px) {
       .main-wrap, .gate-grid { grid-template-columns: 1fr; }
       .slip-panel { position: static; }
@@ -347,6 +378,8 @@ HTML_PAGE = """<!DOCTYPE html>
           </div>
           <button class="btn" id="btnHourRadar" onclick="toggleHourRadar()">⏱ En Serie</button>
           <button class="btn" id="btnFavFilter" onclick="toggleFavOnly()">★ Favoritos</button>
+          <button class="btn" id="btnPush" onclick="togglePushNotifications()" title="Activar notificaciones push">🔔 Alertas</button>
+          <button class="btn" id="btnInstallPwa" style="display:none;" onclick="installPwa()">📲 Instalar App</button>
           <button class="btn btn-primary" id="btnScan" onclick="runScan()">Actualizar</button>
           <button class="btn" id="btnSettle" onclick="runSettle()">Liquidar</button>
           <button class="btn" onclick="doLogout()">Salir</button>
@@ -365,6 +398,7 @@ HTML_PAGE = """<!DOCTYPE html>
         <div class="tabs-row">
           <div style="display:flex;flex-wrap:wrap;gap:7px;">
             <button class="tab-btn active" onclick="switchTab('tabRadar', this)">Partidos por Liga <span class="pill-cnt" id="cntRadar">0</span></button>
+            <button class="tab-btn" id="btnTabChannel" onclick="switchTab('tabChannel', this); markChannelRead()">📢 Canal En Vivo <span class="pill-cnt" id="cntChannel">0</span></button>
             <button class="tab-btn" onclick="switchTab('tabAnalyzer', this)">Analizar Mi Cuota</button>
             <button class="tab-btn" onclick="switchTab('tabCombos', this)">Pronósticos y Combinadas <span class="pill-cnt" id="cntCombos">0</span></button>
             <button class="tab-btn" onclick="switchTab('tabAccount', this)">Mi Rendimiento <span class="pill-cnt" id="cntMyBets">0</span></button>
@@ -376,6 +410,43 @@ HTML_PAGE = """<!DOCTYPE html>
         <section id="tabRadar" class="tab-panel active">
           <div id="hourRadarWrap" style="display:none;margin-bottom:14px;"></div>
           <div class="leagues-stack" id="leaguesContainer"></div>
+        </section>
+
+        <!-- TAB: Internal Live Channel (Images + Announcements + Realtime + Web Push) -->
+        <section id="tabChannel" class="tab-panel">
+          <div class="channel-shell">
+            <div class="glass" style="padding:14px 16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
+              <div>
+                <strong style="font-size:15px;">Canal Caza Cuotas En Vivo</strong>
+                <div style="font-size:12px;color:var(--muted);">Tarjetas gráficas, combinadas, turnos en serie y resultados liquidados al instante</div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;" id="channelFilters">
+                <button class="seg-btn active" onclick="setChannelFilter('all', this)">Todo</button>
+                <button class="seg-btn" onclick="setChannelFilter('match', this)">Partidos</button>
+                <button class="seg-btn" onclick="setChannelFilter('serie', this)">En Serie</button>
+                <button class="seg-btn" onclick="setChannelFilter('combo', this)">Combinadas</button>
+                <button class="seg-btn" onclick="setChannelFilter('settled', this)">Resultados</button>
+                <button class="seg-btn" onclick="setChannelFilter('daily', this)">Cierres</button>
+              </div>
+            </div>
+
+            <div class="glass composer-box" id="adminComposer" style="display:none;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong style="font-size:13px;color:var(--violet);">Publicar anuncio en el Canal (Solo Administradores)</strong>
+                <span style="font-size:11px;color:var(--muted);" id="adminImgName">Sin imagen adjunta</span>
+              </div>
+              <textarea id="adminPostText" placeholder="Escribe un anuncio, aviso en vivo o recomendación para todos los miembros..."></textarea>
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <label class="btn" style="font-size:12px;padding:6px 12px;">
+                  📷 Adjuntar imagen
+                  <input type="file" id="adminPostFile" accept="image/*" style="display:none;" onchange="handleAdminImageSelect(this)" />
+                </label>
+                <button class="btn btn-primary" id="btnSendAdminPost" onclick="sendAdminPost()">Enviar al Canal</button>
+              </div>
+            </div>
+
+            <div class="channel-feed" id="channelFeed"></div>
+          </div>
         </section>
 
         <!-- TAB 2: Custom Odds Analyzer -->
@@ -481,10 +552,16 @@ HTML_PAGE = """<!DOCTYPE html>
     </aside>
   </div>
 
+  <!-- Fullscreen Lightbox for Channel Graphics -->
+  <div class="lightbox" id="imgLightbox" onclick="this.classList.remove('open')">
+    <img id="lightboxImg" src="" alt="Tarjeta Caza Cuotas" />
+  </div>
+
   <script>
     const STATIC_MODE = false;
     const SUPABASE_URL = '';
     const SUPABASE_ANON_KEY = '';
+    const VAPID_PUBLIC_KEY = '';
     const SUPABASE_ENABLED = STATIC_MODE && Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
     const sbClient = SUPABASE_ENABLED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
     const FIB_SEQ = [1, 2, 3, 5, 8];
@@ -504,6 +581,120 @@ HTML_PAGE = """<!DOCTYPE html>
     let rawCloudGen = '';
     let lastScan = { matches: [], parlays_a: [], opt_b: [], next_global: [] };
     let slip = []; // [{event_id, league, match_date, title, market, market_name, odds, prob}]
+    let channelPosts = [];
+    let channelFilter = 'all';
+    let channelSub = null;
+    let adminImgDataUrl = '';
+    let deferredInstallPrompt = null;
+    let swReg = null;
+
+    if (STATIC_MODE && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        swReg = reg;
+        updatePushButtonState();
+      }).catch(() => {});
+    }
+
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      const b = document.getElementById('btnInstallPwa');
+      if (b) b.style.display = 'inline-flex';
+    });
+
+    const isIosSafari = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone;
+    if (STATIC_MODE && isIosSafari) {
+      const b = document.getElementById('btnInstallPwa');
+      if (b) b.style.display = 'inline-flex';
+    }
+
+    async function installPwa() {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        document.getElementById('btnInstallPwa').style.display = 'none';
+      } else if (isIosSafari) {
+        alert('Para instalar Caza Cuotas en iPhone/iPad: toca el botón Compartir (cuadro con flecha) en Safari y elige "Agregar a inicio".');
+      }
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = atob(base64);
+      return Uint8Array.from([...rawData].map(ch => ch.charCodeAt(0)));
+    }
+
+    async function updatePushButtonState() {
+      const btn = document.getElementById('btnPush');
+      if (!btn || !('Notification' in window)) return;
+      if (Notification.permission === 'granted') {
+        btn.textContent = '🔔 Alertas Activas';
+        btn.classList.add('b-pos');
+      } else {
+        btn.textContent = '🔔 Alertas';
+        btn.classList.remove('b-pos');
+      }
+    }
+
+    async function togglePushNotifications() {
+      if (!('Notification' in window)) {
+        setStatus(false, 'Tu navegador no soporta notificaciones push.');
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      updatePushButtonState();
+      if (perm !== 'granted') {
+        setStatus(false, 'Permiso de notificaciones denegado en el navegador.');
+        return;
+      }
+      if (SUPABASE_ENABLED && currentUser && swReg && 'PushManager' in window && VAPID_PUBLIC_KEY) {
+        try {
+          let sub = await swReg.pushManager.getSubscription();
+          if (!sub) {
+            sub = await swReg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            });
+          }
+          const js = sub.toJSON();
+          await sbClient.from('push_subscriptions').upsert({
+            user_id: currentUser.id,
+            endpoint: js.endpoint,
+            p256dh: js.keys.p256dh,
+            auth: js.keys.auth
+          });
+          setStatus(false, '¡Notificaciones push activadas! Te avisaremos cuando salgan pronósticos y resultados.');
+        } catch (err) {
+          setStatus(false, 'Alertas activas dentro de la app.');
+        }
+      } else {
+        setStatus(false, 'Notificaciones activas cuando la app esté abierta.');
+      }
+    }
+
+    function literalTeamMarket(mktName, title) {
+      if (!mktName || !title || !title.includes(' vs ')) return mktName || '';
+      const [home, away] = title.split(' vs ').map(x => x.trim());
+      return mktName
+        .replace(/Mismo partido:\s*/g, '')
+        .replace(/BetBuilder:\s*/g, '')
+        .replace(/Local o Empate \(1X\)/g, `${home} Gana o Empata (1X)`)
+        .replace(/Visitante o Empate \(X2\)/g, `${away} Gana o Empata (X2)`)
+        .replace(/Gana Local \(1\)/g, `${home} Gana directo (1)`)
+        .replace(/Gana Visitante \(2\)/g, `${away} Gana directo (2)`)
+        .replace(/Local 1X/g, `${home} Gana o Empata (1X)`)
+        .replace(/Visita X2/g, `${away} Gana o Empata (X2)`)
+        .replace(/Local Gana/g, `${home} Gana`)
+        .replace(/Visita Gana/g, `${away} Gana`)
+        .replace(/Local \+0\.5 goles/g, `${home} anota +0.5 goles (mín. 1)`)
+        .replace(/Local \+1\.5 goles/g, `${home} anota +1.5 goles (mín. 2)`)
+        .replace(/Visitante \+0\.5 goles/g, `${away} anota +0.5 goles (mín. 1)`)
+        .replace(/Visitante \+1\.5 goles/g, `${away} anota +1.5 goles (mín. 2)`)
+        .replace(/Visita \+0\.5 goles/g, `${away} anota +0.5 goles (mín. 1)`)
+        .replace(/Visita \+1\.5 goles/g, `${away} anota +1.5 goles (mín. 2)`);
+    }
 
     if (SUPABASE_ENABLED) {
       document.getElementById('authUserLabel').textContent = 'Correo electrónico';
@@ -592,13 +783,17 @@ HTML_PAGE = """<!DOCTYPE html>
           display_name: prof.display_name,
           stake_mode: prof.stake_mode || 'flat',
           fib_step: Number(prof.fib_step || 0),
-          bankroll_base: Number(prof.bankroll_base || 100)
+          bankroll_base: Number(prof.bankroll_base || 100),
+          is_admin: Boolean(prof.is_admin)
         };
         userSummary = buildUserSummaryFromRows(prof, betRes.data || [], favorites);
         document.getElementById('authGate').style.display = 'none';
         document.getElementById('appShell').style.display = 'block';
+        document.getElementById('adminComposer').style.display = currentUser.is_admin ? 'flex' : 'none';
         renderUserUI();
         if (!lastScan.matches.length) await runScan(false);
+        await loadChannelPosts();
+        subscribeChannelRealtime();
         return;
       }
       if (STATIC_MODE) {
@@ -681,11 +876,13 @@ HTML_PAGE = """<!DOCTYPE html>
 
     async function doLogout() {
       if (SUPABASE_ENABLED) {
+        if (channelSub && sbClient) { sbClient.removeChannel(channelSub); channelSub = null; }
         await sbClient.auth.signOut();
         rawCloudScan = null;
       } else {
         await fetch('/api/auth/logout', { method: 'POST' });
       }
+      channelPosts = [];
       lastScan = { matches: [], parlays_a: [], opt_b: [] };
       slip = [];
       await checkAuth();
@@ -737,8 +934,11 @@ HTML_PAGE = """<!DOCTYPE html>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;">
             ${items.map(s => {
               const ps = s.probs_summary || {};
-              const meta = ps.o15 !== undefined ? `<div style="font-size:11px;color:var(--sub);margin-bottom:4px;">1X2: ${Math.round(ps.p1)}%/${Math.round(ps.px)}%/${Math.round(ps.p2)}% • Goles est: ${s.lam_h} vs ${s.lam_a} • +1.5: ${Math.round(ps.o15)}%</div>` : '';
-              const alt = s.alt_market_name ? `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Alt: ${s.alt_market_name} @${Number(s.alt_odds).toFixed(2)} (${s.alt_prob}%)</div>` : '<div style="margin-bottom:4px;"></div>';
+              const mainLit = literalTeamMarket(s.market_name, s.title);
+              const altLit = s.alt_market_name ? literalTeamMarket(s.alt_market_name, s.title) : '';
+              const meta = ps.o15 !== undefined ? `<div style="font-size:11px;color:var(--sub);margin-bottom:5px;">1X2: ${Math.round(ps.p1)}%/${Math.round(ps.px)}%/${Math.round(ps.p2)}% • Goles est: ${s.lam_h} vs ${s.lam_a} • +1.5: ${Math.round(ps.o15)}%</div>` : '';
+              const mainBox = `<div style="background:#F5F3FF;border:1px solid rgba(124,58,237,0.18);border-radius:10px;padding:7px 9px;margin-bottom:5px;"><div style="font-size:10px;font-weight:700;color:var(--violet);text-transform:uppercase;">👉 Jugada principal</div><div style="font-size:12px;font-weight:700;color:var(--text);">${mainLit} <strong class="num">@${Number(s.odds).toFixed(2)}</strong> (${s.prob}%)</div></div>`;
+              const alt = altLit ? `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;"><strong>Alternativa segura:</strong> ${altLit} @${Number(s.alt_odds).toFixed(2)} (${s.alt_prob}%)</div>` : '<div style="margin-bottom:4px;"></div>';
               return `
               <div class="mini-box" style="padding:12px;border-radius:14px;">
                 <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
@@ -746,11 +946,10 @@ HTML_PAGE = """<!DOCTYPE html>
                   <span class="num" style="color:var(--muted);">${s.kickoff_col} COL</span>
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">${s.league_label}</div>
-                <div style="font-size:13px;font-weight:700;margin-bottom:4px;">${s.title}</div>
-                ${meta}${alt}
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-                  <span style="font-size:11.5px;font-weight:600;">${s.market_name} <strong class="num">@${Number(s.odds).toFixed(2)}</strong> (${s.prob}%)</span>
-                  <button class="btn btn-primary" style="padding:4px 9px;font-size:11px;" onclick="addLegToSlip('${s.event_id}','${s.league}','${s.kickoff_col.slice(0,10)}','${s.title.replace(/'/g,'')}','${s.market}','${s.market_name.replace(/'/g,'')}',${s.odds},${(s.prob/100).toFixed(3)})">+ Cupón</button>
+                <div style="font-size:13.5px;font-weight:700;margin-bottom:4px;">${s.title}</div>
+                ${meta}${mainBox}${alt}
+                <div style="display:flex;justify-content:flex-end;">
+                  <button class="btn btn-primary" style="padding:5px 11px;font-size:11px;" onclick="addLegToSlip('${s.event_id}','${s.league}','${s.kickoff_col.slice(0,10)}','${s.title.replace(/'/g,'')}','${s.market}','${mainLit.replace(/'/g,'')}',${s.odds},${(s.prob/100).toFixed(3)})">+ Agregar al Cupón</button>
                 </div>
               </div>`;
             }).join('')}
@@ -1348,6 +1547,181 @@ HTML_PAGE = """<!DOCTYPE html>
       }
       await fetch('/api/user/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({stake_mode, bankroll_base: 100}) });
       await checkAuth();
+    }
+
+    const KIND_BADGE = {
+      match: ['Partido', 'b-pend'],
+      combo: ['Combinada', 'b-pos'],
+      serie: ['En Serie', 'b-pend'],
+      settled: ['Resultado', 'b-pos'],
+      daily: ['Cierre Diario', 'b-pos'],
+      announcement: ['Anuncio Admin', 'b-warn']
+    };
+
+    function formatColTime(isoStr) {
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleString('es-CO', { timeZone: 'America/Bogota', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      } catch (e) { return ''; }
+    }
+
+    function setChannelFilter(kind, btn) {
+      channelFilter = kind;
+      document.querySelectorAll('#channelFilters .seg-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderChannelPosts();
+    }
+
+    function markChannelRead() {
+      const box = document.getElementById('cntChannel');
+      if (box) box.textContent = String(channelPosts.length);
+    }
+
+    function openLightbox(src) {
+      document.getElementById('lightboxImg').src = src;
+      document.getElementById('imgLightbox').classList.add('open');
+    }
+
+    async function loadChannelPosts() {
+      if (!SUPABASE_ENABLED) return;
+      const { data, error } = await sbClient
+        .from('channel_posts')
+        .select('*')
+        .order('id', { ascending: false })
+        .limit(45);
+      if (!error && data) {
+        channelPosts = data;
+        document.getElementById('cntChannel').textContent = String(channelPosts.length);
+        renderChannelPosts();
+      }
+      if (window.location.hash === '#canal') {
+        const b = document.getElementById('btnTabChannel');
+        if (b) switchTab('tabChannel', b);
+      }
+    }
+
+    function subscribeChannelRealtime() {
+      if (!SUPABASE_ENABLED || channelSub) return;
+      channelSub = sbClient
+        .channel('channel-posts-live')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'channel_posts' }, payload => {
+          const post = payload.new;
+          if (!post || channelPosts.some(x => x.id === post.id)) return;
+          channelPosts.unshift(post);
+          document.getElementById('cntChannel').textContent = String(channelPosts.length);
+          renderChannelPosts();
+          if (document.hidden && 'Notification' in window && Notification.permission === 'granted' && swReg) {
+            swReg.showNotification(post.title || 'Caza Cuotas • Canal En Vivo', {
+              body: (post.body_html || '').replace(/<[^>]+>/g, ' ').slice(0, 140),
+              icon: './icon-192.png',
+              tag: 'caza-live-' + post.id
+            }).catch(() => {});
+          }
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'channel_posts' }, payload => {
+          const oldRow = payload.old;
+          if (!oldRow) return;
+          channelPosts = channelPosts.filter(x => x.id !== oldRow.id);
+          document.getElementById('cntChannel').textContent = String(channelPosts.length);
+          renderChannelPosts();
+        })
+        .subscribe();
+    }
+
+    function renderChannelPosts() {
+      const box = document.getElementById('channelFeed');
+      if (!box) return;
+      if (!SUPABASE_ENABLED) {
+        box.innerHTML = '<div class="glass" style="padding:26px;text-align:center;color:var(--muted);">El Canal En Vivo funciona en la versión web conectada a la nube.</div>';
+        return;
+      }
+      const list = channelPosts.filter(p => channelFilter === 'all' || p.kind === channelFilter);
+      if (!list.length) {
+        box.innerHTML = '<div class="glass" style="padding:28px;text-align:center;color:var(--muted);">No hay publicaciones en esta categoría todavía.</div>';
+        return;
+      }
+      box.innerHTML = list.map(p => {
+        const [kLabel, kCls] = KIND_BADGE[p.kind] || ['Pronóstico', 'b-pend'];
+        const delBtn = (currentUser && currentUser.is_admin)
+          ? `<button onclick="deleteAdminPost(${p.id})" title="Borrar mensaje" style="border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;">🗑</button>`
+          : '';
+        return `
+          <article class="channel-msg">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-weight:700;font-size:13px;color:var(--violet);">${p.author_name || 'Caza Cuotas'}</span>
+                <span class="badge ${kCls}">${kLabel}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="num" style="font-size:11px;color:var(--muted);">${formatColTime(p.created_at)}</span>
+                ${delBtn}
+              </div>
+            </div>
+            ${p.image_data ? `<img class="channel-img" src="${p.image_data}" loading="lazy" alt="${p.title}" onclick="openLightbox(this.src)" />` : ''}
+            <div class="channel-body">${p.body_html || ''}</div>
+          </article>`;
+      }).join('');
+    }
+
+    function handleAdminImageSelect(input) {
+      const file = input.files && input.files[0];
+      if (!file) { adminImgDataUrl = ''; document.getElementById('adminImgName').textContent = 'Sin imagen adjunta'; return; }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 900;
+          const scale = Math.min(1, maxW / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          adminImgDataUrl = canvas.toDataURL('image/webp', 0.82);
+          document.getElementById('adminImgName').textContent = file.name + ' ✓';
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function sendAdminPost() {
+      if (!SUPABASE_ENABLED || !currentUser || !currentUser.is_admin) return;
+      const txtEl = document.getElementById('adminPostText');
+      const txt = txtEl.value.trim();
+      if (!txt && !adminImgDataUrl) return;
+      const btn = document.getElementById('btnSendAdminPost');
+      btn.disabled = true;
+      try {
+        const safeTxt = txt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const { error } = await sbClient.from('channel_posts').insert({
+          post_key: 'adm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          kind: 'announcement',
+          title: 'Anuncio Oficial',
+          body_html: safeTxt ? `📢 <b>${safeTxt}</b>` : '📢 <b>Imagen compartida</b>',
+          image_data: adminImgDataUrl || null,
+          author_name: currentUser.display_name || 'Admin Caza Cuotas'
+        });
+        if (!error) {
+          txtEl.value = '';
+          adminImgDataUrl = '';
+          document.getElementById('adminPostFile').value = '';
+          document.getElementById('adminImgName').textContent = 'Sin imagen adjunta';
+          await loadChannelPosts();
+          setStatus(false, 'Anuncio publicado en el Canal En Vivo.');
+        } else {
+          setStatus(false, 'Error publicando anuncio: ' + error.message);
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function deleteAdminPost(postId) {
+      if (!SUPABASE_ENABLED || !currentUser || !currentUser.is_admin) return;
+      await sbClient.from('channel_posts').delete().eq('id', postId);
+      channelPosts = channelPosts.filter(x => x.id !== postId);
+      document.getElementById('cntChannel').textContent = String(channelPosts.length);
+      renderChannelPosts();
     }
 
     checkAuth();

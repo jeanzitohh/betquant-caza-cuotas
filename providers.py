@@ -287,7 +287,13 @@ def fetch_next_global_matches(limit: int = 8) -> list[dict]:
                 continue
             o1, ox, o2, ou_line, _, _, prov = odds
             lg_id = str((ev.get("league") or {}).get("id", ""))
-            lg_label = lg_map.get(lg_id) or (ev.get("season") or {}).get("slug") or "Fútbol Internacional"
+            raw_lg = lg_map.get(lg_id) or (ev.get("season") or {}).get("slug") or "Fútbol Internacional"
+            slug_map = {
+                "group-stage": "Torneo Internacional",
+                "league-stage": "Torneo Internacional",
+                "regular-season": "Liga Nacional",
+            }
+            lg_label = slug_map.get(raw_lg, raw_lg)
             rows.append(
                 (
                     k_dt,

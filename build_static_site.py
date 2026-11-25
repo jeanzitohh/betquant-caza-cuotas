@@ -2,19 +2,84 @@ import datetime as dt
 import json
 import os
 
+from card_renderer import render_app_icon
 from dashboard import HTML_PAGE
 from providers import load_env
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOCS_DIR = os.path.join(BASE_DIR, "docs")
 
+SW_JS = """const CACHE_NAME = 'caza-cuotas-v2';
+const SHELL_URLS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+
+self.addEventListener('install', event => {
+  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(SHELL_URLS).catch(() => {})));
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = event.request.url;
+  if (!url.startsWith(self.location.origin)) return;
+  event.respondWith(
+    fetch(event.request)
+      .then(resp => {
+        if (resp && resp.status === 200) {
+          const clone = resp.clone();
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        }
+        return resp;
+      })
+      .catch(() => caches.match(event.request))
+  );
+});
+
+self.addEventListener('push', event => {
+  let payload = { title: 'Caza Cuotas', body: 'Nuevo pronóstico o resultado disponible en el Canal.', url: './#canal' };
+  try {
+    if (event.data) payload = { ...payload, ...event.data.json() };
+  } catch (e) {}
+  event.waitUntil(
+    self.registration.showNotification(payload.title || 'Caza Cuotas', {
+      body: payload.body || '',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      tag: 'caza-cuotas-alert',
+      renotify: true,
+      data: { url: payload.url || './#canal' }
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || './#canal';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const client of list) {
+        if ('focus' in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+    })
+  );
+});
+"""
+
 
 def export_static_site(scan_res: dict, report_res: dict) -> str:
-    """Export static GitHub Pages bundle (docs/index.html + docs/data.json)."""
+    """Export installable PWA bundle (docs/index.html, manifest.webmanifest, sw.js, icons, data.json)."""
     os.makedirs(DOCS_DIR, exist_ok=True)
     env = load_env()
     sb_url = env.get("SUPABASE_URL", "").strip()
     sb_anon = env.get("SUPABASE_ANON_KEY", "").strip()
+    vapid_pub = env.get("VAPID_PUBLIC_KEY", "").strip()
     sb_ready = bool(sb_url and sb_anon)
     now_col = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M")
 
@@ -30,17 +95,49 @@ def export_static_site(scan_res: dict, report_res: dict) -> str:
     with open(os.path.join(DOCS_DIR, "data.json"), "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False)
 
+    # PWA Icons & Manifest & Service Worker
+    for sz in (192, 512):
+        with open(os.path.join(DOCS_DIR, f"icon-{sz}.png"), "wb") as f:
+            f.write(render_app_icon(sz))
+
+    manifest = {
+        "name": "Caza Cuotas",
+        "short_name": "Caza Cuotas",
+        "description": "Pronósticos deportivos, cuotas y canal en vivo.",
+        "start_url": "./",
+        "scope": "./",
+        "display": "standalone",
+        "background_color": "#FAFBFD",
+        "theme_color": "#7C3AED",
+        "orientation": "portrait-primary",
+        "icons": [
+            {"src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+        ],
+    }
+    with open(os.path.join(DOCS_DIR, "manifest.webmanifest"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+    with open(os.path.join(DOCS_DIR, "sw.js"), "w", encoding="utf-8") as f:
+        f.write(SW_JS)
+
     static_html = HTML_PAGE.replace("const STATIC_MODE = false;", "const STATIC_MODE = true;")
-    static_html = static_html.replace(
-        "const SUPABASE_URL = '';", f"const SUPABASE_URL = {json.dumps(sb_url)};"
-    ).replace(
-        "const SUPABASE_ANON_KEY = '';", f"const SUPABASE_ANON_KEY = {json.dumps(sb_anon)};"
+    static_html = (
+        static_html.replace("const SUPABASE_URL = '';", f"const SUPABASE_URL = {json.dumps(sb_url)};")
+        .replace("const SUPABASE_ANON_KEY = '';", f"const SUPABASE_ANON_KEY = {json.dumps(sb_anon)};")
+        .replace("const VAPID_PUBLIC_KEY = '';", f"const VAPID_PUBLIC_KEY = {json.dumps(vapid_pub)};")
+    )
+    pwa_head = (
+        '  <link rel="manifest" href="./manifest.webmanifest" />\n'
+        '  <link rel="apple-touch-icon" href="./icon-192.png" />\n'
+        '  <meta name="theme-color" content="#7C3AED" />\n'
+        '  <meta name="apple-mobile-web-app-capable" content="yes" />\n'
+        '  <meta name="apple-mobile-web-app-status-bar-style" content="default" />\n'
     )
     if sb_ready:
-        static_html = static_html.replace(
-            "</head>",
-            '  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n</head>',
-        )
+        pwa_head += '  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
+    static_html = static_html.replace("</head>", pwa_head + "</head>")
+
     with open(os.path.join(DOCS_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(static_html)
 

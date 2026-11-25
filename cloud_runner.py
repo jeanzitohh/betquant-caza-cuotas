@@ -4,7 +4,7 @@ from bot_scanner import DEFAULT_LEAGUES, grade_market, run_scan_pipeline, run_se
 from build_static_site import export_static_site
 from paper_db import PaperTradingDB
 from providers import fetch_espn_match_result, load_env
-from supabase_sync import settle_supabase_bets, upsert_radar_snapshot
+from supabase_sync import publish_supabase_channel, settle_supabase_bets, upsert_radar_snapshot
 from telegram_bot import poll_updates, publish_channel_updates
 
 
@@ -23,9 +23,11 @@ def main() -> None:
     db = PaperTradingDB()
     summary = db.get_summary()
 
-    # 3. Sincronizar Supabase si hay credenciales configuradas
+    # 3. Sincronizar Supabase (Radar + Canal Interno + Notificaciones Push)
     sb_url = env.get("SUPABASE_URL", "").strip()
     sb_service = env.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    vapid_pub = env.get("VAPID_PUBLIC_KEY", "").strip()
+    vapid_priv = env.get("VAPID_PRIVATE_KEY", "").strip()
     if sb_url and sb_service:
         try:
             sb_settled, sb_pending = settle_supabase_bets(
@@ -33,7 +35,13 @@ def main() -> None:
             )
             now_col = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M")
             upsert_radar_snapshot(sb_url, sb_service, now_col, scan_res, summary)
-            print(f"Supabase Sync OK: radar actualizado; apuestas usuarios {sb_settled} liquidadas, {sb_pending} pendientes.")
+            ch_posts, push_sent = publish_supabase_channel(
+                sb_url, sb_service, vapid_pub, vapid_priv, scan_res, db, summary
+            )
+            print(
+                f"Supabase Sync OK: radar actualizado; apuestas usuarios {sb_settled} liq/{sb_pending} pend; "
+                f"Canal PWA +{ch_posts} post(s), Push enviados={push_sent}."
+            )
         except Exception as exc:
             print(f"Supabase Sync Error: {exc}")
     else:

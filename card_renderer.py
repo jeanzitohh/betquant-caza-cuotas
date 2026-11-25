@@ -1,3 +1,4 @@
+import base64
 import io
 import os
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -569,4 +570,46 @@ def render_serial_ladder_card(ladder: list[dict], chunk_label: str = "") -> byte
 
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def png_to_webp_data_url(png_bytes: bytes, max_w: int = 900) -> str:
+    """Compress a PNG card into a compact base64 WebP data URL (~45-65 KB) for Supabase Realtime feed."""
+    img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+    if img.width > max_w:
+        new_h = int(img.height * (max_w / img.width))
+        img = img.resize((max_w, new_h), Image.Resampling.LANCZOS)
+    out = io.BytesIO()
+    img.save(out, format="WEBP", quality=82, method=4)
+    return "data:image/webp;base64," + base64.b64encode(out.getvalue()).decode("ascii")
+
+
+def render_app_icon(size: int = 512) -> bytes:
+    """Generate the official Caza Cuotas squircle PWA icon PNG."""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    pad = int(size * 0.04)
+    rad = int(size * 0.24)
+    grad = Image.new("RGBA", (size, size), (124, 58, 237, 255))
+    gd = ImageDraw.Draw(grad)
+    for y in range(size):
+        t = y / max(1, size - 1)
+        r = int(124 + (249 - 124) * t)
+        g = int(58 + (115 - 58) * t)
+        b = int(237 + (22 - 237) * t)
+        gd.line([(0, y), (size, y)], fill=(r, g, b, 255))
+    mask = Image.new("L", (size, size), 0)
+    md = ImageDraw.Draw(mask)
+    md.rounded_rectangle((pad, pad, size - pad, size - pad), radius=rad, fill=255)
+    img.paste(grad, (0, 0), mask)
+
+    s = size / 32.0
+    d = ImageDraw.Draw(img)
+    crown = [(5 * s, 10 * s), (9 * s, 5 * s), (13 * s, 9 * s), (19 * s, 9 * s), (23 * s, 5 * s), (27 * s, 10 * s), (25 * s, 22 * s), (16 * s, 27 * s), (7 * s, 22 * s)]
+    d.polygon(crown, fill=(15, 15, 30, 235), outline=(255, 255, 255, 240))
+    visor = [(8.5 * s, 13 * s), (14.5 * s, 13 * s), (16 * s, 14.5 * s), (17.5 * s, 13 * s), (23.5 * s, 13 * s), (23.5 * s, 17.5 * s), (17 * s, 18.2 * s), (16 * s, 16.5 * s), (15 * s, 18.2 * s), (8.5 * s, 17.5 * s)]
+    d.polygon(visor, fill=(249, 115, 22, 255), outline=(253, 224, 71, 255))
+    d.ellipse((14.6 * s, 20.1 * s, 17.4 * s, 22.9 * s), fill=(248, 250, 252, 255))
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
     return buf.getvalue()

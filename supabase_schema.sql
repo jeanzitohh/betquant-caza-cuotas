@@ -67,3 +67,55 @@ drop policy if exists "Users insert own pending bets" on public.user_bets;
 create policy "Users insert own pending bets"
   on public.user_bets for insert
   to authenticated with check (auth.uid() = user_id and status = 'PENDING');
+
+-- v2: Admin role, internal Telegram-style Channel feed (Realtime + RLS) & Web Push Subscriptions
+alter table public.user_profiles add column if not exists is_admin boolean not null default false;
+
+create table if not exists public.channel_posts (
+  id bigserial primary key,
+  post_key text unique not null,
+  created_at timestamptz not null default now(),
+  kind text not null default 'match',
+  title text not null,
+  body_html text not null,
+  image_data text,
+  author_name text not null default 'Caza Cuotas'
+);
+alter table public.channel_posts enable row level security;
+drop policy if exists "Authenticated users read channel" on public.channel_posts;
+create policy "Authenticated users read channel"
+  on public.channel_posts for select
+  to authenticated using (true);
+drop policy if exists "Admins insert channel posts" on public.channel_posts;
+create policy "Admins insert channel posts"
+  on public.channel_posts for insert
+  to authenticated with check (
+    exists (select 1 from public.user_profiles p where p.user_id = auth.uid() and p.is_admin = true)
+  );
+drop policy if exists "Admins delete channel posts" on public.channel_posts;
+create policy "Admins delete channel posts"
+  on public.channel_posts for delete
+  to authenticated using (
+    exists (select 1 from public.user_profiles p where p.user_id = auth.uid() and p.is_admin = true)
+  );
+
+create table if not exists public.push_subscriptions (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, endpoint)
+);
+alter table public.push_subscriptions enable row level security;
+drop policy if exists "Users manage own push subscriptions" on public.push_subscriptions;
+create policy "Users manage own push subscriptions"
+  on public.push_subscriptions for all
+  to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+do $$
+begin
+  alter publication supabase_realtime add table public.channel_posts;
+exception when duplicate_object then
+  null;
+end $$;
