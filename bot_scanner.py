@@ -33,14 +33,14 @@ MARKET_NAMES = {
     "H_O15": "Local +1.5 goles",
     "A_O05": "Visitante +0.5 goles",
     "A_O15": "Visitante +1.5 goles",
-    "BB_H_1_O05": "BetBuilder: Local Gana + Local +0.5 goles",
-    "BB_H_1_O15": "BetBuilder: Local Gana + Local +1.5 goles",
-    "BB_H_1X_O05": "BetBuilder: Local 1X + Local +0.5 goles",
-    "BB_H_1X_O15": "BetBuilder: Local 1X + Local +1.5 goles",
-    "BB_A_2_O05": "BetBuilder: Visita Gana + Visita +0.5 goles",
-    "BB_A_2_O15": "BetBuilder: Visita Gana + Visita +1.5 goles",
-    "BB_A_X2_O05": "BetBuilder: Visita X2 + Visita +0.5 goles",
-    "BB_A_X2_O15": "BetBuilder: Visita X2 + Visita +1.5 goles",
+    "BB_H_1_O05": "Mismo partido: Local Gana + Local +0.5 goles",
+    "BB_H_1_O15": "Mismo partido: Local Gana + Local +1.5 goles",
+    "BB_H_1X_O05": "Mismo partido: Local 1X + Local +0.5 goles",
+    "BB_H_1X_O15": "Mismo partido: Local 1X + Local +1.5 goles",
+    "BB_A_2_O05": "Mismo partido: Visita Gana + Visita +0.5 goles",
+    "BB_A_2_O15": "Mismo partido: Visita Gana + Visita +1.5 goles",
+    "BB_A_X2_O05": "Mismo partido: Visita X2 + Visita +0.5 goles",
+    "BB_A_X2_O15": "Mismo partido: Visita X2 + Visita +1.5 goles",
 }
 
 

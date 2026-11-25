@@ -277,7 +277,7 @@
           </div>
           <div class="feature-item">
             <div class="feat-icon">+</div>
-            <div><strong>Armador de Combinadas &amp; Cupón</strong><div style="font-size:12px;color:var(--muted);">Arma tus propias jugadas, evalúa la probabilidad conjunta y simula tu bankroll.</div></div>
+            <div><strong>Armador de Combinadas &amp; Cupón</strong><div style="font-size:12px;color:var(--muted);">Arma tus propias jugadas, evalúa la probabilidad conjunta y gestiona tu balance.</div></div>
           </div>
         </div>
       </div>
@@ -334,7 +334,7 @@
             <button class="seg-btn" id="scopeAll" onclick="setScope('all')">Todas</button>
             <button class="seg-btn" id="scopeCol" onclick="setScope('col.1')">Colombia</button>
           </div>
-          <button class="btn" id="btnHourRadar" onclick="toggleHourRadar()">⏱ En Serie / Hora</button>
+          <button class="btn" id="btnHourRadar" onclick="toggleHourRadar()">⏱ En Serie</button>
           <button class="btn" id="btnFavFilter" onclick="toggleFavOnly()">★ Favoritos</button>
           <button class="btn btn-primary" id="btnScan" onclick="runScan()">Actualizar</button>
           <button class="btn" id="btnSettle" onclick="runSettle()">Liquidar</button>
@@ -396,7 +396,7 @@
           <div class="matches-grid" id="combosGrid"></div>
         </section>
 
-        <!-- TAB 4: Personal Account Performance, Charts & Fibonacci -->
+        <!-- TAB 4: Personal Account Performance & Charts -->
         <section id="tabAccount" class="tab-panel">
           <div class="charts-row">
             <div class="glass" style="padding:18px;">
@@ -409,29 +409,20 @@
               <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Resumen Personal</div>
               <div id="myRingsWrap" style="display:flex;justify-content:space-around;margin-top:12px;"></div>
             </div>
-            <div class="glass" style="padding:18px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Fibonacci (1-2-3-5-8)</span>
-                <span class="badge b-warn">Base 2u</span>
-              </div>
-              <div style="font-size:12px;color:var(--sub);margin-top:6px;">Pérdidas seguidas: <strong class="num" id="fibLossVal">3</strong></div>
-              <input type="range" min="1" max="5" value="3" id="fibSlider" oninput="renderFibSim()" style="width:100%;accent-color:#EA580C;margin:6px 0;" />
-              <div id="fibChartWrap"></div>
-            </div>
           </div>
 
           <div class="glass" style="padding:18px;margin-bottom:14px;" id="botEffectivenessCard"></div>
 
           <div class="glass" style="padding:16px 18px;margin-bottom:14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
             <div>
-              <strong>Configuración de Stake Personal</strong>
-              <div style="font-size:12px;color:var(--sub);" id="stakeModeDesc">Modo actual: Stake Fijo (2.0u)</div>
+              <strong>Configuración de Montos</strong>
+              <div style="font-size:12px;color:var(--sub);" id="stakeModeDesc">Modo actual: Monto Fijo (2.0u)</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center;">
               <select id="prefMode" style="padding:8px 12px;border-radius:10px;border:1px solid var(--border-strong);background:#FFFFFF;">
-                <option value="flat">Stake Fijo (2u)</option>
-                <option value="fibonacci_3">Fibonacci Poco Capital (1-2-3)</option>
-                <option value="fibonacci">Fibonacci Completo (1-2-3-5-8)</option>
+                <option value="flat">Monto Fijo (2u)</option>
+                <option value="fibonacci_3">Progresión Conservadora</option>
+                <option value="fibonacci">Progresión Escalonada</option>
               </select>
               <button class="btn btn-primary" onclick="savePrefs()">Guardar</button>
             </div>
@@ -724,8 +715,8 @@
             <div style="display:flex;align-items:center;gap:10px;">
               <div class="league-emblem" style="background:linear-gradient(135deg,#7C3AED,#F97316);">🪜</div>
               <div>
-                <h2 style="margin:0;font-size:15.5px;font-weight:700;">Ruta en Serie (Fibonacci Paso a Paso)</h2>
-                <div style="font-size:11.5px;color:var(--muted);">1 partido por turno (≥2h30m entre inicios). Termina uno, miras si ganaste o subes escalón, y pasas al siguiente.</div>
+                <h2 style="margin:0;font-size:15.5px;font-weight:700;">Pronósticos en Serie (Por Turnos)</h2>
+                <div style="font-size:11.5px;color:var(--muted);">1 partido por turno (≥2h15m entre inicios) para conocer el resultado antes de jugar el siguiente.</div>
               </div>
             </div>
             <span class="badge b-pos">${ladder.length} turnos</span>
@@ -789,7 +780,7 @@
     }
 
     function evBadge(ev) {
-      return ev > 0 ? `<span class="badge b-pos">Ventaja +${ev}%</span>` : `<span class="badge b-warn">Margen ${ev}%</span>`;
+      return ev > 0 ? '<span class="badge b-pos">Cuota con valor</span>' : '<span class="badge b-warn">Cuota ajustada</span>';
     }
 
     function formDots(scores) {
@@ -1013,11 +1004,11 @@
         const pModel = (mk.prob || 50.0) / 100.0;
         const impl = 1.0 / Math.max(customOdds, 1.01);
         const evPct = (pModel * customOdds - 1.0) * 100.0;
-        const kellyFull = Math.max(0.0, (pModel * customOdds - 1.0) / Math.max(customOdds - 1.0, 0.01));
-        const kellyQU = Number((100.0 * kellyFull * 0.25).toFixed(2));
+        const valRatio = Math.max(0.0, (pModel * customOdds - 1.0) / Math.max(customOdds - 1.0, 0.01));
+        const unitSug = Number((100.0 * valRatio * 0.25).toFixed(2));
         const verdict = evPct > 2.0
-          ? 'Tu cuota supera la probabilidad estimada (apuesta con valor).'
-          : (evPct >= -2.0 ? 'Cuota muy justa respecto a la probabilidad estimada.' : 'La cuota que te ofrecen es baja para el riesgo estadístico.');
+          ? 'Tu cuota supera la probabilidad estimada (cuota con valor).'
+          : (evPct >= -2.0 ? 'Cuota muy justa respecto a la probabilidad estimada.' : 'La cuota que te ofrecen es baja para el riesgo del partido.');
         d = {
           market_name: mk.name || market,
           lam_h: m.lam_h,
@@ -1026,7 +1017,7 @@
           market_prob_pct: Number((mk.impl || 50.0).toFixed(1)),
           implied_prob_pct: Number((impl * 100.0).toFixed(1)),
           ev_pct: Number(evPct.toFixed(1)),
-          kelly_quarter_u: kellyQU,
+          suggested_u: unitSug,
           verdict
         };
       } else {
@@ -1043,15 +1034,15 @@
           <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;">
             <div>
               <strong style="font-size:15.5px;">${m.home} vs ${m.away}</strong> • ${d.market_name} @<strong class="num">${customOdds.toFixed(2)}</strong>
-              <div style="font-size:12px;color:var(--muted);">Goles esperados Poisson: ${d.lam_h} vs ${d.lam_a}</div>
+              <div style="font-size:12px;color:var(--muted);">Goles estimados: ${d.lam_h} vs ${d.lam_a}</div>
             </div>
             ${evBadge(d.ev_pct)}
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;">
-            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Prob. Modelo</div><div class="num" style="font-size:20px;font-weight:700;">${d.model_prob_pct}%</div></div>
+            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Prob. Estimada</div><div class="num" style="font-size:20px;font-weight:700;">${d.model_prob_pct}%</div></div>
             <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Exige tu Cuota</div><div class="num" style="font-size:20px;font-weight:700;">${d.implied_prob_pct}%</div></div>
-            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Prob. Mercado Justa</div><div class="num" style="font-size:20px;font-weight:700;">${d.market_prob_pct}%</div></div>
-            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Stake Kelly (1/4)</div><div class="num" style="font-size:20px;font-weight:700;color:var(--violet);">${d.kelly_quarter_u}u</div></div>
+            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Prob. de Mercado</div><div class="num" style="font-size:20px;font-weight:700;">${d.market_prob_pct}%</div></div>
+            <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Unidad Sugerida</div><div class="num" style="font-size:20px;font-weight:700;color:var(--violet);">${d.suggested_u}u</div></div>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
             <span style="font-size:12.5px;color:${good?'var(--green)':'var(--amber)'};font-weight:600;">${d.verdict}</span>
@@ -1151,8 +1142,8 @@
       sum.innerHTML = `
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span>Cuota Total (${slip.length})</span><strong class="num" style="font-size:18px;">@${totalOdds.toFixed(2)}</strong></div>
         <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-bottom:6px;"><span>Probabilidad Real vs Exigida</span><span class="num"><strong>${(totalProb*100).toFixed(1)}%</strong> / ${(impl*100).toFixed(1)}%</span></div>
-        <div style="margin-bottom:10px;">${evBadge(parseFloat(ev.toFixed(1)))} <span style="font-size:11.5px;color:var(--muted);">${ev>0?'Tiene valor frente a la cuota':'La cuota no cubre el riesgo estadístico'}</span></div>
-        <div class="field" style="margin-bottom:10px;"><label>Monto a simular (unidades)</label><input type="number" step="0.5" min="0.5" id="slipStake" value="${defStake}"/></div>
+        <div style="margin-bottom:10px;">${evBadge(parseFloat(ev.toFixed(1)))} <span style="font-size:11.5px;color:var(--muted);">${ev>0?'Buena relación cuota / probabilidad':'Cuota ajustada frente al riesgo del partido'}</span></div>
+        <div class="field" style="margin-bottom:10px;"><label>Monto (unidades)</label><input type="number" step="0.5" min="0.5" id="slipStake" value="${defStake}"/></div>
         <button class="btn btn-primary" style="width:100%;padding:10px;" onclick="saveSlip()">Guardar en Mi Cuenta</button>`;
     }
 
@@ -1226,10 +1217,10 @@
       document.getElementById('myRoiBadge').innerHTML = `<span class="badge ${d.roi_pct>=0?'b-pos':'b-lost'}">ROI ${d.roi_pct>=0?'+':''}${d.roi_pct}%</span>`;
       document.getElementById('prefMode').value = u.stake_mode;
       const modeDesc = u.stake_mode === 'fibonacci_3'
-        ? `Modo actual: Fibonacci Poco Capital 1-2-3 (Próximo stake: ${d.next_fib_stake}u)`
+        ? `Modo actual: Progresión Conservadora (Próximo monto: ${d.next_fib_stake}u)`
         : (u.stake_mode === 'fibonacci'
-          ? `Modo actual: Fibonacci Completo 1-2-3-5-8 (Próximo stake: ${d.next_fib_stake}u)`
-          : 'Modo actual: Stake Fijo (2.0u)');
+          ? `Modo actual: Progresión Escalonada (Próximo monto: ${d.next_fib_stake}u)`
+          : 'Modo actual: Monto Fijo (2.0u)');
       document.getElementById('stakeModeDesc').textContent = modeDesc;
 
       const pts = d.equity_curve && d.equity_curve.length > 1 ? d.equity_curve : [100, 100];
@@ -1250,7 +1241,6 @@
         const cls = t.status === 'WON' ? 'b-pos' : (t.status === 'LOST' ? 'b-lost' : 'b-pend');
         return `<tr><td class="num">#${t.id}</td><td class="num">${t.match_date}</td><td>${t.title}</td><td>${t.market_name}</td><td class="num">${t.odds.toFixed(2)}</td><td class="num">${t.stake_u}u</td><td><span class="badge ${cls}">${t.status}</span></td><td class="num">${t.profit_u>=0?'+':''}${t.profit_u.toFixed(2)}u</td></tr>`;
       }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);">Aún no has guardado jugadas.</td></tr>';
-      renderFibSim();
       renderBotEffectiveness();
     }
 
@@ -1259,58 +1249,32 @@
       if (!box) return;
       const rep = botReport;
       if (!rep) {
-        box.innerHTML = '<div style="font-size:12.5px;color:var(--muted);">Cargando medición diaria del bot...</div>';
+        box.innerHTML = '<div style="font-size:12.5px;color:var(--muted);">Cargando efectividad diaria...</div>';
         return;
       }
       const daily = rep.daily_stats || [];
       const settledDays = daily.filter(d => d.settled > 0);
       const latest = settledDays[0];
       const headline = latest
-        ? `${latest.date}: <strong>${latest.won} de ${latest.settled} efectivos (${latest.accuracy_pct}%)</strong>`
-        : `Seguimiento activo: ${rep.pending || 0} pronósticos pendientes por finalizar`;
-      const calEntries = Object.entries(rep.calibration || {}).sort((a, b) => b[1].settled - a[1].settled).slice(0, 6);
+        ? `${latest.date}: <strong>${latest.won} de ${latest.settled} acertados (${latest.accuracy_pct}%)</strong>`
+        : `Seguimiento activo: ${rep.pending || 0} pronósticos en curso`;
 
       box.innerHTML = `
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
           <div>
-            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Efectividad Diaria del Bot &amp; Auto-Calibración</div>
-            <div style="font-size:14px;margin-top:2px;">${headline} • Global: <strong>${rep.won}/${rep.settled} (${rep.accuracy_pct || 0}%)</strong></div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Efectividad Diaria de Pronósticos</div>
+            <div style="font-size:14px;margin-top:2px;">${headline} • Acumulado: <strong>${rep.won}/${rep.settled} (${rep.accuracy_pct || 0}%)</strong></div>
           </div>
-          <span class="badge ${rep.roi_pct >= 0 ? 'b-pos' : 'b-warn'}">ROI Bot ${rep.roi_pct >= 0 ? '+' : ''}${rep.roi_pct}%</span>
+          <span class="badge ${rep.roi_pct >= 0 ? 'b-pos' : 'b-warn'}">Balance ${rep.roi_pct >= 0 ? '+' : ''}${rep.roi_pct}%</span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
-          <div class="mini-box" style="padding:10px;">
-            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">ACIERTO POR DÍA</div>
-            ${daily.slice(0, 5).map(d => `
-              <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
-                <span class="num">${d.date}</span>
-                <span>${d.settled > 0 ? `<strong>${d.won}/${d.settled}</strong> (${d.accuracy_pct}%)` : `${d.pending} pend.`}</span>
-              </div>`).join('') || '<div style="font-size:12px;color:var(--muted);">Sin registros aún.</div>'}
-          </div>
-          <div class="mini-box" style="padding:10px;">
-            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">AUTO-MEJORA POR MERCADO</div>
-            ${calEntries.map(([mk, st]) => `
-              <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
-                <code>${mk}</code>
-                <span><strong>${st.won}/${st.settled}</strong> (${st.win_rate_pct}%) • ${st.status}</span>
-              </div>`).join('') || '<div style="font-size:12px;color:var(--muted);">Esperando primeros resultados liquidados para calibrar pesos.</div>'}
-          </div>
+        <div class="mini-box" style="padding:10px;">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">ACIERTO POR JORNADA</div>
+          ${daily.slice(0, 5).map(d => `
+            <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">
+              <span class="num">${d.date}</span>
+              <span>${d.settled > 0 ? `<strong>${d.won} de ${d.settled}</strong> (${d.accuracy_pct}%)` : `${d.pending} pendientes`}</span>
+            </div>`).join('') || '<div style="font-size:12px;color:var(--muted);">Sin registros aún.</div>'}
         </div>`;
-    }
-
-    function renderFibSim() {
-      const k = parseInt(document.getElementById('fibSlider').value, 10);
-      document.getElementById('fibLossVal').textContent = k;
-      const seq = [1, 2, 3, 5, 8];
-      let fibSum = 0, flatSum = 0;
-      const bars = [];
-      for (let i = 0; i < k; i++) { fibSum += 2 * seq[i]; flatSum += 2; bars.push(2 * seq[i]); }
-      const maxS = Math.max(...bars, 4);
-      document.getElementById('fibChartWrap').innerHTML = `
-        <div style="display:flex;align-items:flex-end;gap:4px;height:52px;margin-top:4px;">
-          ${bars.map(s => `<div style="flex:1;height:${Math.max(6, Math.round((s/maxS)*44))}px;border-radius:5px;background:linear-gradient(180deg,#F97316,#7C3AED);" title="${s}u"></div>`).join('')}
-        </div>
-        <div style="font-size:11px;color:var(--sub);margin-top:6px;">Secuencia 1-2-3-5-8: <strong style="color:var(--red);">${fibSum}u</strong> vs <strong style="color:var(--green);">${flatSum}u</strong> (Fijo)</div>`;
     }
 
     async function savePrefs() {

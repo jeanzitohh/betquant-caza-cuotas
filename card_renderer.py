@@ -36,6 +36,7 @@ def literal_market_text(market_name: str, home: str, away: str) -> str:
     """Turn generic Local/Visita labels into explicit team names in Spanish."""
     return (
         market_name.replace("BetBuilder: ", "")
+        .replace("Mismo partido: ", "")
         .replace("Local o Empate (1X)", f"{home} Gana o Empata (1X)")
         .replace("Visitante o Empate (X2)", f"{away} Gana o Empata (X2)")
         .replace("Gana Local (1)", f"{home} Gana directo (1)")
@@ -222,19 +223,19 @@ def render_match_card(m: dict) -> bytes:
     if m.get("opt_b_pick"):
         pb = m["opt_b_pick"]
         lit = literal_market_text(pb["market_name"], m["home"], m["away"])
-        pick_txt = f"APUESTA SUGERIDA: {lit}  @~{pb['odds']:.2f}"
-        ev_txt = f"Prob {pb['prob']}% | EV {pb['ev_pct']:+.1f}%"
+        pick_txt = f"PRONÓSTICO SUGERIDO: {lit}  @~{pb['odds']:.2f}"
+        ev_txt = f"Prob. {pb['prob']}% • {'Cuota con valor' if pb['ev_pct'] > 0 else 'Cuota estándar'}"
         ev_col = (74, 222, 128, 255) if pb["ev_pct"] > 0 else (251, 191, 36, 255)
     elif m.get("opt_a_leg"):
         pa = m["opt_a_leg"]
         lit = literal_market_text(pa["market_name"], m["home"], m["away"])
         pick_txt = f"SELECCIÓN SUGERIDA: {lit}  @{pa['odds']:.2f}"
-        ev_txt = f"Prob {pa['prob']}% | EV {pa['ev_pct']:+.1f}%"
+        ev_txt = f"Prob. {pa['prob']}% • {'Cuota con valor' if pa['ev_pct'] > 0 else 'Cuota estándar'}"
         ev_col = (74, 222, 128, 255) if pa["ev_pct"] > 0 else (251, 191, 36, 255)
     else:
         win_side = f"{m['home']} Gana o Empata (1X)" if p1 >= p2 else f"{m['away']} Gana o Empata (X2)"
-        pick_txt = f"LECTURA GENERAL: {win_side} • Partido +1.5 goles ({tot_o15:.0f}%)"
-        ev_txt = "Fuera de rango 1.20–1.90"
+        pick_txt = f"LECTURA DEL PARTIDO: {win_side} • Partido +1.5 goles ({tot_o15:.0f}%)"
+        ev_txt = "Mercado estándar"
         ev_col = (203, 213, 225, 255)
 
     _glass_panel(img, (84, 632, 1116, 718), radius=18, fill=(124, 58, 237, 65), border=(167, 139, 250, 130))
@@ -251,7 +252,127 @@ def render_match_card(m: dict) -> bytes:
         f_pk = cand_f
     d.text((108, 648), pick_txt, font=f_pk, fill=(255, 255, 255, 255))
     d.text((1092 - ew, 648), ev_txt, font=f_ev, fill=ev_col)
-    d.text((108, 684), "Análisis estadístico Caza Cuotas (simulación educativa)", font=_load_font(14, "reg"), fill=(226, 232, 240, 255))
+    d.text((108, 684), "Caza Cuotas • Pronóstico Deportivo", font=_load_font(14, "reg"), fill=(226, 232, 240, 255))
+
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def render_daily_summary_card(rep: dict) -> bytes:
+    """Render a crisp 1200x720 PNG card for the daily closing accuracy report."""
+    daily = rep.get("daily_stats") or []
+    settled_days = [d for d in daily if d["settled"] > 0]
+    latest = settled_days[0] if settled_days else {"date": "Hoy", "won": rep.get("won", 0), "settled": rep.get("settled", 0), "accuracy_pct": rep.get("accuracy_pct", 0.0), "profit_u": rep.get("total_profit_u", 0.0)}
+
+    img = _create_backdrop(1200, 720)
+    _draw_brand_header(img, "CIERRE DEL DÍA • EFECTIVIDAD DE PRONÓSTICOS", f"{latest['date']}")
+    _glass_panel(img, (48, 102, 1152, 678), radius=28)
+
+    # Top hero metrics
+    _glass_panel(img, (84, 134, 650, 300), radius=22, fill=(124, 58, 237, 50), border=(167, 139, 250, 130))
+    _glass_panel(img, (676, 134, 1116, 300), radius=22, fill=(34, 197, 94, 34), border=(74, 222, 128, 115))
+    d = ImageDraw.Draw(img)
+    acc = float(latest.get("accuracy_pct") or 0.0)
+    d.text((116, 154), "EFECTIVIDAD DE LA JORNADA", font=_load_font(16, "bold"), fill=(221, 214, 254, 255))
+    d.text((116, 182), f"{latest['won']} de {latest['settled']} acertados  ({acc:.1f}%)", font=_load_font(34, "bold"), fill=(255, 255, 255, 255))
+    _draw_progress_bar(img, 116, 250, 500, 18, acc / 100.0, (74, 222, 128, 255) if acc >= 65 else (251, 191, 36, 255))
+
+    d = ImageDraw.Draw(img)
+    glob_acc = float(rep.get("accuracy_pct") or 0.0)
+    d.text((708, 154), "BALANCE ACUMULADO", font=_load_font(16, "bold"), fill=(187, 247, 208, 255))
+    d.text((708, 186), f"{rep.get('won', 0)}G / {rep.get('lost', 0)}P ({glob_acc:.1f}%)", font=_load_font(34, "bold"), fill=(255, 255, 255, 255))
+    d.text((708, 244), f"Rendimiento: {rep.get('total_profit_u', 0.0):+.2f}u  |  Pendientes: {rep.get('pending', 0)}", font=_load_font(17, "semi"), fill=(226, 232, 240, 255))
+
+    # Recent days list
+    d.text((88, 326), "HISTORIAL RECIENTE POR JORNADA", font=_load_font(16, "bold"), fill=(196, 181, 253, 255))
+    for i, day in enumerate(daily[:5]):
+        y0 = 362 + i * 56
+        _glass_panel(img, (84, y0, 1116, y0 + 46), radius=14, fill=(255, 255, 255, 16))
+        d = ImageDraw.Draw(img)
+        d.text((112, y0 + 12), str(day["date"]), font=_load_font(18, "bold"), fill=(255, 255, 255, 255))
+        if day["settled"] > 0:
+            pct = float(day["accuracy_pct"] or 0.0)
+            _draw_progress_bar(img, 300, y0 + 15, 420, 14, pct / 100.0, (74, 222, 128, 255) if pct >= 60 else (249, 115, 22, 255))
+            d = ImageDraw.Draw(img)
+            d.text((748, y0 + 11), f"{day['won']} de {day['settled']} ({pct:.1f}%)", font=_load_font(18, "bold"), fill=(241, 245, 249, 255))
+            pcol = (74, 222, 128, 255) if day["profit_u"] >= 0 else (248, 113, 113, 255)
+            d.text((970, y0 + 11), f"{day['profit_u']:+.2f}u", font=_load_font(18, "bold"), fill=pcol)
+        else:
+            d.text((300, y0 + 12), f"{day['pending']} pronósticos en seguimiento (por jugar)", font=_load_font(17, "reg"), fill=(148, 163, 184, 255))
+
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def render_settled_card(settled_items: list[dict], rep: dict) -> bytes:
+    """Render a crisp PNG card showing newly settled match results."""
+    shown = settled_items[:5]
+    h = 280 + max(1, len(shown)) * 102
+    img = _create_backdrop(1200, h)
+    _draw_brand_header(img, "RESULTADOS LIQUIDADOS • CAZA CUOTAS", f"Acumulado: {rep.get('won',0)}/{rep.get('settled',0)} ({rep.get('accuracy_pct',0):.1f}%)")
+    _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
+
+    for idx, tr in enumerate(shown):
+        y0 = 132 + idx * 100
+        won = tr["status"] == "WON"
+        fill_c = (34, 197, 94, 30) if won else (239, 68, 68, 30)
+        brd_c = (74, 222, 128, 110) if won else (248, 113, 113, 110)
+        _glass_panel(img, (84, y0, 1116, y0 + 84), radius=18, fill=fill_c, border=brd_c)
+        d = ImageDraw.Draw(img)
+        badge = "GANADA" if won else "PERDIDA"
+        bcol = (74, 222, 128, 255) if won else (248, 113, 113, 255)
+        d.text((112, y0 + 14), badge, font=_load_font(17, "bold"), fill=bcol)
+        d.text((228, y0 + 12), str(tr["title"])[:52], font=_load_font(20, "bold"), fill=(255, 255, 255, 255))
+        raw_note = str(tr.get("result_note") or "")
+        # Clean internal market keys (e.g. "BB_H_1X_O05:2-1(W)") into clean final scores
+        scores = [part.split(":")[-1].replace("(W)", " ✓").replace("(L)", " ✗").strip() for part in raw_note.split("|") if part.strip()]
+        clean_note = "Marcador: " + " | ".join(scores) if scores else "Resultado confirmado"
+        d.text((112, y0 + 46), f"Cuota @{float(tr['odds']):.2f}   •   {clean_note[:54]}", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
+        ptxt = f"{float(tr['profit_u']):+.2f}u"
+        pw = d.textlength(ptxt, font=_load_font(26, "bold"))
+        d.text((1086 - pw, y0 + 24), ptxt, font=_load_font(26, "bold"), fill=bcol)
+
+    _glass_panel(img, (84, h - 126, 1116, h - 62), radius=16, fill=(124, 58, 237, 50))
+    d = ImageDraw.Draw(img)
+    d.text((116, h - 106), f"Efectividad global: {rep.get('won',0)} de {rep.get('settled',0)} acertados ({rep.get('accuracy_pct',0):.1f}%)   |   Neto: {rep.get('total_profit_u',0):+.2f}u", font=_load_font(20, "bold"), fill=(255, 255, 255, 255))
+
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def render_serial_ladder_card(ladder: list[dict]) -> bytes:
+    """Render a chronological 1-by-1 turn schedule card with no internal strategy jargon."""
+    shown = ladder[:5]
+    h = 250 + max(1, len(shown)) * 112
+    img = _create_backdrop(1200, h)
+    _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", "Horarios Colombia (UTC-5)")
+    _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
+
+    d = ImageDraw.Draw(img)
+    d.text((88, 126), "Secuencia cronológica: termina un partido y conoces el resultado antes de jugar el siguiente.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
+
+    for idx, s in enumerate(shown):
+        y0 = 164 + idx * 110
+        _glass_panel(img, (84, y0, 1116, y0 + 94), radius=18, fill=(255, 255, 255, 18))
+        d = ImageDraw.Draw(img)
+        lg_txt = "" if s["league_label"] in ("group-stage", "regular-season", "league-stage") else f" • {s['league_label']}"
+        d.text((112, y0 + 14), f"TURNO #{s['step']}  •  {s['kickoff_col']} COL  ({s['gap_label']}){lg_txt}", font=_load_font(14, "bold"), fill=(253, 186, 116, 255))
+        d.text((112, y0 + 38), str(s["title"])[:54], font=_load_font(21, "bold"), fill=(255, 255, 255, 255))
+        m_name = s["market_name"]
+        if " vs " in s["title"]:
+            hm, aw = [x.strip() for x in s["title"].split(" vs ", 1)]
+            m_name = literal_market_text(m_name, hm, aw)
+        d.text((112, y0 + 66), m_name[:64], font=_load_font(15, "semi"), fill=(196, 181, 253, 255))
+
+        odd_txt = f"@{float(s['odds']):.2f}"
+        prob_txt = f"Prob. {s['prob']}%"
+        ow = d.textlength(odd_txt, font=_load_font(28, "bold"))
+        prw = d.textlength(prob_txt, font=_load_font(15, "semi"))
+        d.text((1086 - ow, y0 + 18), odd_txt, font=_load_font(28, "bold"), fill=(255, 255, 255, 255))
+        d.text((1086 - prw, y0 + 56), prob_txt, font=_load_font(15, "semi"), fill=(74, 222, 128, 255))
 
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)
@@ -297,8 +418,128 @@ def render_parlay_card(parlay: dict) -> bytes:
     d = ImageDraw.Draw(img)
 
     ev_col = (74, 222, 128, 255) if parlay["ev_pct"] > 0 else (251, 191, 36, 255)
-    d.text((870, 488), f"EV {parlay['ev_pct']:+.1f}%", font=_load_font(32, "bold"), fill=ev_col)
-    d.text((870, 536), "Con ventaja" if parlay["ev_pct"] > 0 else "Margen de la casa", font=_load_font(16, "reg"), fill=ev_col)
+    d.text((865, 488), f"Prob. {parlay['prob_est']}%", font=_load_font(30, "bold"), fill=ev_col)
+    d.text((865, 536), "Cuota con valor" if parlay["ev_pct"] > 0 else "Cuota ajustada", font=_load_font(16, "reg"), fill=ev_col)
+
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def render_daily_summary_card(rep: dict) -> bytes:
+    """Render a crisp 1200x720 PNG card for the daily closing accuracy report."""
+    daily = rep.get("daily_stats") or []
+    settled_days = [d for d in daily if d["settled"] > 0]
+    latest = settled_days[0] if settled_days else {"date": "Hoy", "won": rep.get("won", 0), "settled": rep.get("settled", 0), "accuracy_pct": rep.get("accuracy_pct", 0.0), "profit_u": rep.get("total_profit_u", 0.0)}
+
+    img = _create_backdrop(1200, 720)
+    _draw_brand_header(img, "CIERRE DEL DÍA • EFECTIVIDAD DE PRONÓSTICOS", f"{latest['date']}")
+    _glass_panel(img, (48, 102, 1152, 678), radius=28)
+
+    # Top hero metrics
+    _glass_panel(img, (84, 134, 650, 300), radius=22, fill=(124, 58, 237, 50), border=(167, 139, 250, 130))
+    _glass_panel(img, (676, 134, 1116, 300), radius=22, fill=(34, 197, 94, 34), border=(74, 222, 128, 115))
+    d = ImageDraw.Draw(img)
+    acc = float(latest.get("accuracy_pct") or 0.0)
+    d.text((116, 154), "EFECTIVIDAD DE LA JORNADA", font=_load_font(16, "bold"), fill=(221, 214, 254, 255))
+    d.text((116, 182), f"{latest['won']} de {latest['settled']} acertados  ({acc:.1f}%)", font=_load_font(34, "bold"), fill=(255, 255, 255, 255))
+    _draw_progress_bar(img, 116, 250, 500, 18, acc / 100.0, (74, 222, 128, 255) if acc >= 65 else (251, 191, 36, 255))
+
+    d = ImageDraw.Draw(img)
+    glob_acc = float(rep.get("accuracy_pct") or 0.0)
+    d.text((708, 154), "BALANCE ACUMULADO", font=_load_font(16, "bold"), fill=(187, 247, 208, 255))
+    d.text((708, 186), f"{rep.get('won', 0)}G / {rep.get('lost', 0)}P ({glob_acc:.1f}%)", font=_load_font(34, "bold"), fill=(255, 255, 255, 255))
+    d.text((708, 244), f"Rendimiento: {rep.get('total_profit_u', 0.0):+.2f}u  |  Pendientes: {rep.get('pending', 0)}", font=_load_font(17, "semi"), fill=(226, 232, 240, 255))
+
+    # Recent days list
+    d.text((88, 326), "HISTORIAL RECIENTE POR JORNADA", font=_load_font(16, "bold"), fill=(196, 181, 253, 255))
+    for i, day in enumerate(daily[:5]):
+        y0 = 362 + i * 56
+        _glass_panel(img, (84, y0, 1116, y0 + 46), radius=14, fill=(255, 255, 255, 16))
+        d = ImageDraw.Draw(img)
+        d.text((112, y0 + 12), str(day["date"]), font=_load_font(18, "bold"), fill=(255, 255, 255, 255))
+        if day["settled"] > 0:
+            pct = float(day["accuracy_pct"] or 0.0)
+            _draw_progress_bar(img, 300, y0 + 15, 420, 14, pct / 100.0, (74, 222, 128, 255) if pct >= 60 else (249, 115, 22, 255))
+            d = ImageDraw.Draw(img)
+            d.text((748, y0 + 11), f"{day['won']} de {day['settled']} ({pct:.1f}%)", font=_load_font(18, "bold"), fill=(241, 245, 249, 255))
+            pcol = (74, 222, 128, 255) if day["profit_u"] >= 0 else (248, 113, 113, 255)
+            d.text((970, y0 + 11), f"{day['profit_u']:+.2f}u", font=_load_font(18, "bold"), fill=pcol)
+        else:
+            d.text((300, y0 + 12), f"{day['pending']} pronósticos en seguimiento (por jugar)", font=_load_font(17, "reg"), fill=(148, 163, 184, 255))
+
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def render_settled_card(settled_items: list[dict], rep: dict) -> bytes:
+    """Render a crisp PNG card showing newly settled match results."""
+    shown = settled_items[:5]
+    h = 280 + max(1, len(shown)) * 102
+    img = _create_backdrop(1200, h)
+    _draw_brand_header(img, "RESULTADOS LIQUIDADOS • CAZA CUOTAS", f"Acumulado: {rep.get('won',0)}/{rep.get('settled',0)} ({rep.get('accuracy_pct',0):.1f}%)")
+    _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
+
+    for idx, tr in enumerate(shown):
+        y0 = 132 + idx * 100
+        won = tr["status"] == "WON"
+        fill_c = (34, 197, 94, 30) if won else (239, 68, 68, 30)
+        brd_c = (74, 222, 128, 110) if won else (248, 113, 113, 110)
+        _glass_panel(img, (84, y0, 1116, y0 + 84), radius=18, fill=fill_c, border=brd_c)
+        d = ImageDraw.Draw(img)
+        badge = "GANADA" if won else "PERDIDA"
+        bcol = (74, 222, 128, 255) if won else (248, 113, 113, 255)
+        d.text((112, y0 + 14), badge, font=_load_font(17, "bold"), fill=bcol)
+        d.text((228, y0 + 12), str(tr["title"])[:52], font=_load_font(20, "bold"), fill=(255, 255, 255, 255))
+        raw_note = str(tr.get("result_note") or "")
+        # Clean internal market keys (e.g. "BB_H_1X_O05:2-1(W)") into clean final scores
+        scores = [part.split(":")[-1].replace("(W)", " ✓").replace("(L)", " ✗").strip() for part in raw_note.split("|") if part.strip()]
+        clean_note = "Marcador: " + " | ".join(scores) if scores else "Resultado confirmado"
+        d.text((112, y0 + 46), f"Cuota @{float(tr['odds']):.2f}   •   {clean_note[:54]}", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
+        ptxt = f"{float(tr['profit_u']):+.2f}u"
+        pw = d.textlength(ptxt, font=_load_font(26, "bold"))
+        d.text((1086 - pw, y0 + 24), ptxt, font=_load_font(26, "bold"), fill=bcol)
+
+    _glass_panel(img, (84, h - 126, 1116, h - 62), radius=16, fill=(124, 58, 237, 50))
+    d = ImageDraw.Draw(img)
+    d.text((116, h - 106), f"Efectividad global: {rep.get('won',0)} de {rep.get('settled',0)} acertados ({rep.get('accuracy_pct',0):.1f}%)   |   Neto: {rep.get('total_profit_u',0):+.2f}u", font=_load_font(20, "bold"), fill=(255, 255, 255, 255))
+
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def render_serial_ladder_card(ladder: list[dict]) -> bytes:
+    """Render a chronological 1-by-1 turn schedule card with no internal strategy jargon."""
+    shown = ladder[:5]
+    h = 250 + max(1, len(shown)) * 112
+    img = _create_backdrop(1200, h)
+    _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", "Horarios Colombia (UTC-5)")
+    _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
+
+    d = ImageDraw.Draw(img)
+    d.text((88, 126), "Secuencia cronológica: termina un partido y conoces el resultado antes de jugar el siguiente.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
+
+    for idx, s in enumerate(shown):
+        y0 = 164 + idx * 110
+        _glass_panel(img, (84, y0, 1116, y0 + 94), radius=18, fill=(255, 255, 255, 18))
+        d = ImageDraw.Draw(img)
+        lg_txt = "" if s["league_label"] in ("group-stage", "regular-season", "league-stage") else f" • {s['league_label']}"
+        d.text((112, y0 + 14), f"TURNO #{s['step']}  •  {s['kickoff_col']} COL  ({s['gap_label']}){lg_txt}", font=_load_font(14, "bold"), fill=(253, 186, 116, 255))
+        d.text((112, y0 + 38), str(s["title"])[:54], font=_load_font(21, "bold"), fill=(255, 255, 255, 255))
+        m_name = s["market_name"]
+        if " vs " in s["title"]:
+            hm, aw = [x.strip() for x in s["title"].split(" vs ", 1)]
+            m_name = literal_market_text(m_name, hm, aw)
+        d.text((112, y0 + 66), m_name[:64], font=_load_font(15, "semi"), fill=(196, 181, 253, 255))
+
+        odd_txt = f"@{float(s['odds']):.2f}"
+        prob_txt = f"Prob. {s['prob']}%"
+        ow = d.textlength(odd_txt, font=_load_font(28, "bold"))
+        prw = d.textlength(prob_txt, font=_load_font(15, "semi"))
+        d.text((1086 - ow, y0 + 18), odd_txt, font=_load_font(28, "bold"), fill=(255, 255, 255, 255))
+        d.text((1086 - prw, y0 + 56), prob_txt, font=_load_font(15, "semi"), fill=(74, 222, 128, 255))
 
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)
