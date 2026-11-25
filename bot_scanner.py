@@ -316,7 +316,7 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 continue
             m2 = legs_a[j]["match"]
             d2 = dt.date.fromisoformat(m2.kickoff_col[:10])
-            if abs((d2 - d1).days) > 3:
+            if abs((d2 - d1).days) > 0:
                 continue
             k2, o2, p2 = legs_a[j]["best_opt_a"]
             combo = round(o1 * o2, 3)
@@ -329,6 +329,8 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 parlays_a.append(
                     {
                         "kickoff_col": m1.kickoff_col,
+                        "leg1_kickoff": m1.kickoff_col,
+                        "leg2_kickoff": m2.kickoff_col,
                         "title": f"{m1.home} vs {m1.away} + {m2.home} vs {m2.away}",
                         "leg1": f"({m1.league}) {m1.home} vs {m1.away}: {MARKET_NAMES[k1]} @{o1:.2f}",
                         "leg2": f"({m2.league}) {m2.home} vs {m2.away}: {MARKET_NAMES[k2]} @{o2:.2f}",
@@ -338,8 +340,8 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                         "prob_impl": round(imp * 100.0, 1),
                         "ev_pct": round(ev_est, 1),
                         "legs": [
-                            {"event_id": m1.event_id, "league": m1.league, "match_date": m1.match_date, "market": k1},
-                            {"event_id": m2.event_id, "league": m2.league, "match_date": m2.match_date, "market": k2},
+                            {"event_id": m1.event_id, "league": m1.league, "match_date": m1.match_date, "kickoff_col": m1.kickoff_col, "market": k1},
+                            {"event_id": m2.event_id, "league": m2.league, "match_date": m2.match_date, "kickoff_col": m2.kickoff_col, "market": k2},
                         ],
                     }
                 )
@@ -477,6 +479,9 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
             }
         )
 
+    next_global = fetch_next_global_matches(limit=10)
+    serial_ladder = build_serial_ladder(matches_detail, next_global)
+
     return {
         "apifootball_active": bool(api_key),
         "apifootball_note": api_note,
@@ -487,9 +492,94 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
         "parlays_a": parlays_a,
         "opt_b": opt_b,
         "matches": matches_detail,
-        "next_global": fetch_next_global_matches(limit=8),
+        "next_global": next_global,
+        "serial_ladder": serial_ladder,
         "calibration": calibration,
     }
+
+
+def build_serial_ladder(
+    matches_detail: list[dict],
+    next_global: list[dict],
+    min_gap_minutes: int = 150,
+    max_items: int = 10,
+) -> list[dict]:
+    """Order individual 1-match picks strictly in series (>=2h30m apart) so Fibonacci waits for each outcome."""
+    pool: dict[str, dict] = {}
+    for m in matches_detail:
+        pick = m.get("opt_b_pick") or m.get("opt_a_leg")
+        if not pick:
+            best_mk = max(
+                (mk for mk in (m.get("all_markets") or []) if 1.22 <= mk["odds"] <= 1.90),
+                key=lambda x: x["prob"] - (100.0 / x["odds"]) * 0.35,
+                default=None,
+            )
+            if not best_mk:
+                continue
+            pick = best_mk
+        pool[m["event_id"]] = {
+            "event_id": m["event_id"],
+            "league": m["league"],
+            "league_label": m["league_label"],
+            "kickoff_col": m["kickoff_col"],
+            "title": f"{m['home']} vs {m['away']}",
+            "market": pick.get("key", "1X"),
+            "market_name": pick["market_name"] if "market_name" in pick else pick.get("name", ""),
+            "odds": round(float(pick["odds"]), 2),
+            "prob": float(pick["prob"]),
+            "ev_pct": float(pick["ev_pct"]),
+        }
+
+    for g in next_global:
+        eid = str(g["event_id"])
+        if eid in pool:
+            continue
+        lh, la = calibrate_market_lambdas(g["o1"], g["ox"], g["o2"], g.get("ou_line"), None, None)
+        qp = poisson_probs(lh, la)
+        p1, px, p2 = devig_3(g["o1"], g["ox"], g["o2"])
+        fav_k, fav_odd, fav_prob = ("1", g["o1"], qp["1"]) if p1 >= p2 else ("2", g["o2"], qp["2"])
+        if not (1.20 <= fav_odd <= 2.10):
+            # Fallback to favored team +0.5 or 1X/X2 estimate
+            fav_k = "H_O05" if p1 >= p2 else "A_O05"
+            fav_prob = qp[fav_k]
+            fav_odd = round(max(1.18, 1.0 / max(fav_prob * 1.04, 0.2)), 2)
+        ev_pct = round((fav_prob * fav_odd - 1.0) * 100.0, 1)
+        pool[eid] = {
+            "event_id": eid,
+            "league": "global",
+            "league_label": g["league_label"],
+            "kickoff_col": g["kickoff_col"],
+            "title": f"{g['home']} vs {g['away']}",
+            "market": fav_k,
+            "market_name": MARKET_NAMES.get(fav_k, fav_k),
+            "odds": round(float(fav_odd), 2),
+            "prob": round(fav_prob * 100.0, 1),
+            "ev_pct": ev_pct,
+        }
+
+    def _parse_dt(s: str) -> dt.datetime:
+        return dt.datetime.strptime(s[:16], "%Y-%m-%d %H:%M")
+
+    ordered = sorted(pool.values(), key=lambda x: x["kickoff_col"])
+    ladder: list[dict] = []
+    last_dt: dt.datetime | None = None
+    for item in ordered:
+        try:
+            cur_dt = _parse_dt(item["kickoff_col"])
+        except Exception:
+            continue
+        if last_dt is not None:
+            gap_min = int((cur_dt - last_dt).total_seconds() // 60)
+            if gap_min < min_gap_minutes:
+                continue
+            gap_txt = f"+{gap_min // 60}h {gap_min % 60:02d}m después"
+        else:
+            gap_txt = "Primer turno disponible"
+        last_dt = cur_dt
+        ladder.append({**item, "step": len(ladder) + 1, "gap_label": gap_txt})
+        if len(ladder) >= max_items:
+            break
+    return ladder
 
 
 def run_settle_pipeline() -> dict:

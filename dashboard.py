@@ -345,7 +345,7 @@ HTML_PAGE = """<!DOCTYPE html>
             <button class="seg-btn" id="scopeAll" onclick="setScope('all')">Todas</button>
             <button class="seg-btn" id="scopeCol" onclick="setScope('col.1')">Colombia</button>
           </div>
-          <button class="btn" id="btnHourRadar" onclick="toggleHourRadar()">⏱ Por Hora</button>
+          <button class="btn" id="btnHourRadar" onclick="toggleHourRadar()">⏱ En Serie / Hora</button>
           <button class="btn" id="btnFavFilter" onclick="toggleFavOnly()">★ Favoritos</button>
           <button class="btn btn-primary" id="btnScan" onclick="runScan()">Actualizar</button>
           <button class="btn" id="btnSettle" onclick="runSettle()">Liquidar</button>
@@ -722,25 +722,55 @@ HTML_PAGE = """<!DOCTYPE html>
     function renderHourRadar() {
       const box = document.getElementById('hourRadarWrap');
       if (!showHourRadar) { box.style.display = 'none'; return; }
+      const ladder = lastScan.serial_ladder || [];
       const gList = lastScan.next_global || [];
       box.style.display = 'block';
-      if (!gList.length) {
-        box.innerHTML = '<div class="glass" style="padding:16px;font-size:12.5px;color:var(--muted);">No hay partidos próximos inmediatos en el radar global en este instante.</div>';
+      if (!ladder.length && !gList.length) {
+        box.innerHTML = '<div class="glass" style="padding:16px;font-size:12.5px;color:var(--muted);">No hay partidos próximos inmediatos en el radar en este instante.</div>';
         return;
       }
-      box.innerHTML = `
+      const serialHtml = ladder.length ? `
+        <section class="glass league-section" style="margin-bottom:12px;">
+          <div class="league-header">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="league-emblem" style="background:linear-gradient(135deg,#7C3AED,#F97316);">🪜</div>
+              <div>
+                <h2 style="margin:0;font-size:15.5px;font-weight:700;">Ruta en Serie (Fibonacci Paso a Paso)</h2>
+                <div style="font-size:11.5px;color:var(--muted);">1 partido por turno (≥2h30m entre inicios). Termina uno, miras si ganaste o subes escalón, y pasas al siguiente.</div>
+              </div>
+            </div>
+            <span class="badge b-pos">${ladder.length} turnos</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;">
+            ${ladder.map(s => `
+              <div class="mini-box" style="padding:12px;border-radius:14px;">
+                <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+                  <span style="font-weight:700;color:var(--violet);">Turno #${s.step} • ${s.gap_label}</span>
+                  <span class="num" style="color:var(--muted);">${s.kickoff_col} COL</span>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">${s.league_label}</div>
+                <div style="font-size:13px;font-weight:700;margin-bottom:6px;">${s.title}</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+                  <span style="font-size:11.5px;font-weight:600;">${s.market_name} <strong class="num">@${Number(s.odds).toFixed(2)}</strong> (${s.prob}%)</span>
+                  <button class="btn btn-primary" style="padding:4px 9px;font-size:11px;" onclick="addLegToSlip('${s.event_id}','${s.league}','${s.kickoff_col.slice(0,10)}','${s.title.replace(/'/g,'')}','${s.market}','${s.market_name.replace(/'/g,'')}',${s.odds},${(s.prob/100).toFixed(3)})">+ Cupón</button>
+                </div>
+              </div>`).join('')}
+          </div>
+        </section>` : '';
+
+      const globalHtml = gList.length ? `
         <section class="glass league-section">
           <div class="league-header">
             <div style="display:flex;align-items:center;gap:10px;">
               <div class="league-emblem" style="background:linear-gradient(135deg,#0EA5E9,#7C3AED);">⏱</div>
               <div>
-                <h2 style="margin:0;font-size:15.5px;font-weight:700;">Próximos Partidos por Hora (Radar Global)</h2>
-                <div style="font-size:11.5px;color:var(--muted);">Ordenados cronológicamente (incluye torneos asiáticos/globales en curso de la jornada)</div>
+                <h2 style="margin:0;font-size:15.5px;font-weight:700;">Todos los Próximos por Hora (Radar Global)</h2>
+                <div style="font-size:11.5px;color:var(--muted);">Cartelera mundial ordenada minuto a minuto (incluye Asia/Tailandia cuando juegan de madrugada)</div>
               </div>
             </div>
             <span class="badge b-pend">${gList.length} próximos</span>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;">
             ${gList.map(m => `
               <div class="mini-box" style="padding:12px;border-radius:14px;">
                 <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--violet);font-weight:600;margin-bottom:4px;">
@@ -751,7 +781,9 @@ HTML_PAGE = """<!DOCTYPE html>
                 <div class="num" style="font-size:11px;color:var(--sub);">1: @${m.o1.toFixed(2)} • X: @${m.ox.toFixed(2)} • 2: @${m.o2.toFixed(2)}</div>
               </div>`).join('')}
           </div>
-        </section>`;
+        </section>` : '';
+
+      box.innerHTML = serialHtml + globalHtml;
     }
 
     function switchTab(id, btn) {
@@ -803,7 +835,7 @@ HTML_PAGE = """<!DOCTYPE html>
           botReport = data.report_json || null;
         }
         const filtered = filterScanByScope(rawCloudScan, currentScope);
-        lastScan = { ...rawCloudScan, ...filtered, next_global: rawCloudScan.next_global || [], total_matches: filtered.matches.length };
+        lastScan = { ...rawCloudScan, ...filtered, next_global: rawCloudScan.next_global || [], serial_ladder: rawCloudScan.serial_ladder || [], total_matches: filtered.matches.length };
         setStatus(false, `${lastScan.total_matches} partidos próximos • Act: ${rawCloudGen} COL`);
         populateAnalyzerSelects();
         renderHourRadar();

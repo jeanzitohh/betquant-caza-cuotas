@@ -28,7 +28,7 @@ MAIN_MENU_MARKUP = {
             {"text": "🇪🇺 Europa Top", "callback_data": "/europa"},
         ],
         [
-            {"text": "🎯 Posibles Apuestas", "callback_data": "/apuestas"},
+            {"text": "🪜 En Serie (Fibonacci)", "callback_data": "/serie"},
             {"text": "⏱ Próximo por Hora", "callback_data": "/proximo"},
         ],
         [
@@ -132,9 +132,9 @@ def format_picks_block(scan: dict) -> str:
         for p in scan["parlays_a"][:6]:
             tag = "✅ +EV" if p["ev_pct"] > 0 else "⚠️ EV negativo por margen"
             lines.append(
-                f"• <code>{p['kickoff_col']}</code> | Cuota <b>@{p['combo_odds']:.2f}</b> ({tag})\n"
-                f"  1) {html.escape(p['leg1'])}\n"
-                f"  2) {html.escape(p['leg2'])}\n"
+                f"• Cuota <b>@{p['combo_odds']:.2f}</b> ({tag})\n"
+                f"  1) 🕒 <code>{p.get('leg1_kickoff', p['kickoff_col'])} COL</code> • {html.escape(p['leg1'])}\n"
+                f"  2) 🕒 <code>{p.get('leg2_kickoff', p['kickoff_col'])} COL</code> • {html.escape(p['leg2'])}\n"
                 f"  Est: {p['prob_est']}% vs Impl: {p['prob_impl']}% (EV {p['ev_pct']:+.1f}%)"
             )
 
@@ -143,7 +143,7 @@ def format_picks_block(scan: dict) -> str:
         for b in scan["opt_b"][:6]:
             tag = "✅ +EV" if b["ev_pct"] > 0 else "⚠️ EV negativo por margen"
             lines.append(
-                f"• <b>{html.escape(b['title'])}</b> ({html.escape(b['league'])})\n"
+                f"• 🕒 <code>{b['kickoff_col']} COL</code> • <b>{html.escape(b['title'])}</b> ({html.escape(b['league'])})\n"
                 f"  {html.escape(b['market_name'])} @~<code>{b['odds']:.2f}</code> ({tag})\n"
                 f"  Est: {b['prob_est']}% vs Impl: {b['prob_impl']}% (EV {b['ev_pct']:+.1f}%)"
             )
@@ -208,6 +208,23 @@ def format_next_by_hour_block(scan: dict) -> str:
         )
     if not g_list:
         lines.append("\n<i>Sin partidos próximos encontrados en este instante.</i>")
+    return "\n".join(lines)
+
+
+def format_serial_ladder_block(scan: dict) -> str:
+    lines = [
+        "<b>🪜 RUTA EN SERIE • FIBONACCI PASO A PASO</b>",
+        "<i>1 partido por turno (≥2h30 entre inicios). Termina uno, miras si ganaste (vuelves a 1) o perdiste (subes escalón) antes del siguiente.</i>",
+    ]
+    ladder = scan.get("serial_ladder") or []
+    for s in ladder[:8]:
+        lines.append(
+            f"\n<b>Turno #{s['step']}</b> • 🕒 <code>{s['kickoff_col']} COL</code> <i>({s['gap_label']})</i>\n"
+            f"⚽ <b>{html.escape(s['title'])}</b> ({html.escape(s['league_label'])})\n"
+            f"👉 <b>{html.escape(s['market_name'])}</b> @<code>{s['odds']:.2f}</code> | Prob: <b>{s['prob']}%</b> (EV {s['ev_pct']:+.1f}%)"
+        )
+    if not ladder:
+        lines.append("\n<i>Sin partidos disponibles para armar la escalera en serie.</i>")
     return "\n".join(lines)
 
 
@@ -289,9 +306,9 @@ def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_
         if HAS_CARDS:
             png = render_parlay_card(p)
             cap = (
-                f"🎯 <b>CAZA CUOTAS • COMBINADA DE 2 (@{p['combo_odds']:.2f})</b>\n"
-                f"1️⃣ {html.escape(p['leg1'])}\n"
-                f"2️⃣ {html.escape(p['leg2'])}\n"
+                f"🎯 <b>CAZA CUOTAS • COMBINADA DEL MISMO DÍA (@{p['combo_odds']:.2f})</b>\n"
+                f"1️⃣ 🕒 <code>{p.get('leg1_kickoff', p['kickoff_col'])} COL</code> • {html.escape(p['leg1'])}\n"
+                f"2️⃣ 🕒 <code>{p.get('leg2_kickoff', p['kickoff_col'])} COL</code> • {html.escape(p['leg2'])}\n"
                 f"📊 Probabilidad real conjunta: <b>{p['prob_est']}%</b> (EV {p['ev_pct']:+.1f}%)"
             )
             if send_photo_bytes(token, channel_id, png, cap):
@@ -329,6 +346,15 @@ def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_
                     db.mark_alert_sent(eff_key)
                     sent_count += 1
 
+    # 4. Daily Serial Fibonacci Ladder (1 pick every ~2h30-3h so users bet in series)
+    ladder = scan.get("serial_ladder") or []
+    if ladder:
+        l_key = f"serial_ladder_v1:{ladder[0]['kickoff_col'][:10]}:{ladder[0]['event_id']}"
+        if not db.was_alert_sent(l_key):
+            if send_html(token, channel_id, format_serial_ladder_block(scan)):
+                db.mark_alert_sent(l_key)
+                sent_count += 1
+
     return sent_count
 
 
@@ -342,7 +368,8 @@ def handle_command(text: str, chat_id: str = "") -> str:
             "Usa los botones de abajo o escribe un comando:\n"
             "• /colombia — Liga BetPlay (rachas y cuotas)\n"
             "• /europa — Top 5 Europa + Champions\n"
-            "• /apuestas — Combinadas Opción A y Bet Builder\n"
+            "• /serie — Ruta en serie cada ~3h para Fibonacci (1 por vez)\n"
+            "• /apuestas — Combinadas del mismo día y Bet Builder\n"
             "• /proximo — Próximos partidos por hora (radar mundial)\n"
             "• /efectividad — Efectividad diaria (X de Y) y auto-calibración\n"
             "• /historial — Rendimiento Paper Trading\n"
@@ -356,6 +383,9 @@ def handle_command(text: str, chat_id: str = "") -> str:
         eu = [l for l in DEFAULT_LEAGUES if l != "col.1"]
         scan = run_scan_pipeline(leagues=eu, days=3, save=False)
         return format_match_stats_block(scan["matches"], "🇪🇺 CAZA CUOTAS • EUROPA")
+    if cmd == "/serie":
+        scan = run_scan_pipeline(leagues=DEFAULT_LEAGUES, days=3, save=False)
+        return format_serial_ladder_block(scan)
     if cmd == "/apuestas":
         scan = run_scan_pipeline(leagues=DEFAULT_LEAGUES, days=4, save=False)
         return format_picks_block(scan)

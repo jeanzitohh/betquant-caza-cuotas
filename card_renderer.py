@@ -268,6 +268,10 @@ def render_parlay_card(parlay: dict) -> bytes:
     f_leg = _load_font(23, "bold")
     f_sub = _load_font(18, "reg")
 
+    leg_times = [
+        parlay.get("leg1_kickoff") or ((parlay.get("legs") or [{}])[0].get("kickoff_col") if parlay.get("legs") else "") or parlay.get("kickoff_col", ""),
+        parlay.get("leg2_kickoff") or ((parlay.get("legs") or [{}, {}])[1].get("kickoff_col") if len(parlay.get("legs") or []) > 1 else "") or parlay.get("kickoff_col", ""),
+    ]
     for idx, leg_txt in enumerate([parlay["leg1"], parlay["leg2"]]):
         y0 = 138 + idx * 144
         _glass_panel(img, (88, y0, 1112, y0 + 118), radius=20, fill=(255, 255, 255, 18))
@@ -280,7 +284,7 @@ def render_parlay_card(parlay: dict) -> bytes:
         if " vs " in clean_match:
             hm, aw = [x.strip() for x in clean_match.split(" vs ", 1)]
             pick_part = literal_market_text(pick_part, hm, aw)
-        d.text((118, y0 + 18), f"APUESTA {idx + 1} • {match_part}", font=f_sub, fill=(196, 181, 253, 255))
+        d.text((118, y0 + 16), f"APUESTA {idx + 1} • {leg_times[idx]} COL • {match_part}", font=f_sub, fill=(196, 181, 253, 255))
         d.text((118, y0 + 52), pick_part, font=f_leg, fill=(255, 255, 255, 255))
 
     _glass_panel(img, (88, 448, 1112, 598), radius=22, fill=(249, 115, 22, 42), border=(251, 146, 60, 130))
