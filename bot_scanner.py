@@ -181,41 +181,42 @@ def evaluate_match(
     opt_a_valid = []
     for k in opt_a_cands:
         cp, blk = _cal_prob(k)
-        if not blk and 1.08 <= mkt_odds[k] <= 1.70:
+        if not blk and 1.12 <= mkt_odds[k] <= 1.65 and cp >= 0.62:
             opt_a_valid.append((k, mkt_odds[k], cp))
-    best_opt_a = min(opt_a_valid, key=lambda x: abs(x[1] - 1.30)) if opt_a_valid else None
+    best_opt_a = max(opt_a_valid, key=lambda x: (x[2], -abs(x[1] - 1.32))) if opt_a_valid else None
 
+    # Exclude bookmaker-blocked Bet Builders (1/1X/2/X2 + same team +0.5 goals);
+    # use universally enabled 2-leg same-match combos (+1.5 match goals or +1.5 team goals).
     bb_cands = []
     if h_stat["n"] >= 5 and a_stat["n"] >= 5:
-        if h_stat["unbeaten_pct"] >= 0.70 and h_stat["o05_pct"] >= 0.75 and h_stat["gf_avg"] >= 1.2:
-            bb_cands.append("BB_H_1X_O05")
-        if h_stat["win_pct"] >= 0.55 and h_stat["o05_pct"] >= 0.80 and h_stat["gf_avg"] >= 1.4:
-            bb_cands.append("BB_H_1_O05")
-        if h_stat["unbeaten_pct"] >= 0.75 and h_stat["o15_pct"] >= 0.50 and h_stat["gf_avg"] >= 1.5 and a_stat["ga_avg"] >= 1.2:
-            bb_cands.append("BB_H_1X_O15")
         if h_stat["unbeaten_pct"] >= 0.70 and h_stat["tot_o15_pct"] >= 0.70 and (h_stat["gf_avg"] + a_stat["gf_avg"]) >= 2.2:
             bb_cands.append("BB_H_1X_T15")
         if h_stat["win_pct"] >= 0.55 and h_stat["tot_o15_pct"] >= 0.75 and h_stat["gf_avg"] >= 1.3:
             bb_cands.append("BB_H_1_T15")
-        if a_stat["unbeaten_pct"] >= 0.70 and a_stat["o05_pct"] >= 0.75 and a_stat["gf_avg"] >= 1.2:
-            bb_cands.append("BB_A_X2_O05")
-        if a_stat["win_pct"] >= 0.55 and a_stat["o05_pct"] >= 0.80 and a_stat["gf_avg"] >= 1.4:
-            bb_cands.append("BB_A_2_O05")
+        if h_stat["unbeaten_pct"] >= 0.70 and h_stat["o15_pct"] >= 0.45 and h_stat["gf_avg"] >= 1.4 and a_stat["ga_avg"] >= 1.1:
+            bb_cands.append("BB_H_1X_O15")
+        if h_stat["win_pct"] >= 0.55 and h_stat["o15_pct"] >= 0.50 and h_stat["gf_avg"] >= 1.5 and a_stat["ga_avg"] >= 1.1:
+            bb_cands.append("BB_H_1_O15")
         if a_stat["unbeaten_pct"] >= 0.70 and a_stat["tot_o15_pct"] >= 0.70 and (h_stat["gf_avg"] + a_stat["gf_avg"]) >= 2.2:
             bb_cands.append("BB_A_X2_T15")
         if a_stat["win_pct"] >= 0.55 and a_stat["tot_o15_pct"] >= 0.75 and a_stat["gf_avg"] >= 1.3:
             bb_cands.append("BB_A_2_T15")
+        if a_stat["unbeaten_pct"] >= 0.70 and a_stat["o15_pct"] >= 0.45 and a_stat["gf_avg"] >= 1.4 and h_stat["ga_avg"] >= 1.1:
+            bb_cands.append("BB_A_X2_O15")
+        if a_stat["win_pct"] >= 0.55 and a_stat["o15_pct"] >= 0.50 and a_stat["gf_avg"] >= 1.5 and h_stat["ga_avg"] >= 1.1:
+            bb_cands.append("BB_A_2_O15")
     bb_valid = []
     for k in bb_cands:
         cp, blk = _cal_prob(k)
-        if not blk and 1.20 <= mkt_odds[k] <= 1.90 and cp >= 0.62:
+        if not blk and 1.25 <= mkt_odds[k] <= 1.95 and cp >= 0.60:
             bb_valid.append((k, mkt_odds[k], cp))
-    best_opt_b = max(bb_valid, key=lambda x: (x[2], -abs(x[1] - 1.45))) if bb_valid else None
+    best_opt_b = max(bb_valid, key=lambda x: (x[1] >= 1.50 and x[2] >= 0.62, x[2], -abs(x[1] - 1.62))) if bb_valid else None
 
     # Best individual pick for daily accuracy tracking ("BOT_DIARIO")
+    blocked_bb = {"BB_H_1_O05", "BB_H_1X_O05", "BB_A_2_O05", "BB_A_X2_O05"}
     safe_pool = []
     for k, odd in mkt_odds.items():
-        if not (1.20 <= odd <= 1.75):
+        if k in blocked_bb or not (1.20 <= odd <= 1.75):
             continue
         cp, blk = _cal_prob(k)
         if not blk and cp >= 0.70:
@@ -322,70 +323,88 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                     )
                 )
 
-    legs_a = [e for e in evals if e["best_opt_a"] is not None]
-    parlays_a = []
-    used: set[int] = set()
-    for i in range(len(legs_a)):
-        if i in used:
-            continue
-        m1 = legs_a[i]["match"]
-        k1, o1, p1 = legs_a[i]["best_opt_a"]
+    # Build 2-match same-day combinadas strictly targeting >= 1.50 (1.50–1.95) sorted by highest probability
+    leg_pool: list[tuple[int, str, float, float]] = []
+    for idx, e in enumerate(evals):
+        seen_k: set[str] = set()
+        for k, o, p in e.get("opt_a_all") or []:
+            if k not in seen_k and 1.12 <= o <= 1.65 and p >= 0.62:
+                leg_pool.append((idx, k, o, p))
+                seen_k.add(k)
+        if e.get("best_opt_b"):
+            kb, ob, pb = e["best_opt_b"]
+            if kb not in seen_k and 1.25 <= ob < 1.55 and pb >= 0.62:
+                leg_pool.append((idx, kb, ob, pb))
+
+    cand_pairs = []
+    for a_i in range(len(leg_pool)):
+        i, k1, o1, p1 = leg_pool[a_i]
+        m1 = evals[i]["match"]
         d1 = dt.date.fromisoformat(m1.kickoff_col[:10])
-        for j in range(i + 1, len(legs_a)):
-            if j in used:
+        for b_j in range(a_i + 1, len(leg_pool)):
+            j, k2, o2, p2 = leg_pool[b_j]
+            if i == j:
                 continue
-            m2 = legs_a[j]["match"]
+            m2 = evals[j]["match"]
             d2 = dt.date.fromisoformat(m2.kickoff_col[:10])
             if abs((d2 - d1).days) > 0:
                 continue
-            k2, o2, p2 = legs_a[j]["best_opt_a"]
             combo = round(o1 * o2, 3)
-            if 1.20 <= combo <= 1.90:
-                used.add(i)
-                used.add(j)
-                p_combo = p1 * p2
-                imp = 1.0 / combo
-                ev_est = (p_combo * combo - 1.0) * 100.0
-                parlays_a.append(
-                    {
-                        "kickoff_col": m1.kickoff_col,
-                        "leg1_kickoff": m1.kickoff_col,
-                        "leg2_kickoff": m2.kickoff_col,
-                        "title": f"{m1.home} vs {m1.away} + {m2.home} vs {m2.away}",
-                        "leg1": f"({m1.league}) {m1.home} vs {m1.away}: {MARKET_NAMES[k1]} @{o1:.2f}",
-                        "leg2": f"({m2.league}) {m2.home} vs {m2.away}: {MARKET_NAMES[k2]} @{o2:.2f}",
-                        "market_key": f"{k1}+{k2}",
-                        "combo_odds": combo,
-                        "prob_est": round(p_combo * 100.0, 1),
-                        "prob_impl": round(imp * 100.0, 1),
-                        "ev_pct": round(ev_est, 1),
-                        "legs": [
-                            {"event_id": m1.event_id, "league": m1.league, "match_date": m1.match_date, "kickoff_col": m1.kickoff_col, "market": k1},
-                            {"event_id": m2.event_id, "league": m2.league, "match_date": m2.match_date, "kickoff_col": m2.kickoff_col, "market": k2},
-                        ],
-                    }
+            p_combo = p1 * p2
+            if 1.50 <= combo <= 1.95 and p_combo >= 0.45:
+                cand_pairs.append((p_combo >= 0.50, round(p_combo, 4), -abs(combo - 1.65), i, k1, o1, p1, j, k2, o2, p2, combo, p_combo))
+
+    cand_pairs.sort(reverse=True)
+    parlays_a = []
+    used: set[int] = set()
+    for _, _, _, i, k1, o1, p1, j, k2, o2, p2, combo, p_combo in cand_pairs:
+        if i in used or j in used:
+            continue
+        used.add(i)
+        used.add(j)
+        m1 = evals[i]["match"]
+        m2 = evals[j]["match"]
+        imp = 1.0 / combo
+        ev_est = (p_combo * combo - 1.0) * 100.0
+        parlays_a.append(
+            {
+                "kickoff_col": min(m1.kickoff_col, m2.kickoff_col),
+                "leg1_kickoff": m1.kickoff_col,
+                "leg2_kickoff": m2.kickoff_col,
+                "title": f"{m1.home} vs {m1.away} + {m2.home} vs {m2.away}",
+                "leg1": f"({m1.league}) {m1.home} vs {m1.away}: {MARKET_NAMES[k1]} @{o1:.2f}",
+                "leg2": f"({m2.league}) {m2.home} vs {m2.away}: {MARKET_NAMES[k2]} @{o2:.2f}",
+                "market_key": f"{k1}+{k2}",
+                "combo_odds": combo,
+                "prob_est": round(p_combo * 100.0, 1),
+                "prob_impl": round(imp * 100.0, 1),
+                "ev_pct": round(ev_est, 1),
+                "legs": [
+                    {"event_id": m1.event_id, "league": m1.league, "match_date": m1.match_date, "kickoff_col": m1.kickoff_col, "market": k1},
+                    {"event_id": m2.event_id, "league": m2.league, "match_date": m2.match_date, "kickoff_col": m2.kickoff_col, "market": k2},
+                ],
+            }
+        )
+        if db:
+            saved_count += int(
+                db.record_trade(
+                    match_date=max(m1.kickoff_col[:10], m2.kickoff_col[:10]),
+                    league=f"{m1.league}+{m2.league}",
+                    match_key=f"{m1.event_id}+{m2.event_id}",
+                    title=f"{m1.home} vs {m1.away} + {m2.home} vs {m2.away}",
+                    strategy="FORMULA_OPT_A",
+                    market=f"{k1}+{k2}",
+                    odds=combo,
+                    model_prob=p_combo,
+                    implied_prob=imp,
+                    ev_pct=ev_est,
+                    stake_u=2.0,
+                    legs=[
+                        {"event_id": m1.event_id, "league": m1.league, "match_date": m1.match_date, "market": k1},
+                        {"event_id": m2.event_id, "league": m2.league, "match_date": m2.match_date, "market": k2},
+                    ],
                 )
-                if db:
-                    saved_count += int(
-                        db.record_trade(
-                            match_date=max(m1.kickoff_col[:10], m2.kickoff_col[:10]),
-                            league=f"{m1.league}+{m2.league}",
-                            match_key=f"{m1.event_id}+{m2.event_id}",
-                            title=f"{m1.home} vs {m1.away} + {m2.home} vs {m2.away}",
-                            strategy="FORMULA_OPT_A",
-                            market=f"{k1}+{k2}",
-                            odds=combo,
-                            model_prob=p_combo,
-                            implied_prob=imp,
-                            ev_pct=ev_est,
-                            stake_u=2.0,
-                            legs=[
-                                {"event_id": m1.event_id, "league": m1.league, "match_date": m1.match_date, "market": k1},
-                                {"event_id": m2.event_id, "league": m2.league, "match_date": m2.match_date, "market": k2},
-                            ],
-                        )
-                    )
-                break
+            )
 
     opt_b = []
     for e in evals:
@@ -499,6 +518,42 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
             }
         )
 
+    # Attach same-day partner pairing hint for any match whose primary pick is < 1.50
+    for md in matches_detail:
+        pk = md.get("opt_b_pick") or md.get("opt_a_leg")
+        if not pk or float(pk["odds"]) >= 1.50:
+            continue
+        o1 = float(pk["odds"])
+        p1 = float(pk["prob"]) / 100.0
+        d1 = md["kickoff_col"][:10]
+        best_partner = None
+        for other in matches_detail:
+            if other["event_id"] == md["event_id"] or other["kickoff_col"][:10] != d1:
+                continue
+            opk = other.get("opt_a_leg") or other.get("opt_b_pick")
+            if not opk:
+                continue
+            o2 = float(opk["odds"])
+            p2 = float(opk["prob"]) / 100.0
+            c_odd = round(o1 * o2, 2)
+            if 1.50 <= c_odd <= 1.98:
+                cand = (
+                    p1 * p2,
+                    -abs(c_odd - 1.65),
+                    {
+                        "partner_event_id": other["event_id"],
+                        "partner_title": f"{other['home']} vs {other['away']}",
+                        "partner_pick": opk["market_name"],
+                        "partner_odds": round(o2, 2),
+                        "combo_odds": c_odd,
+                        "combo_prob": round(p1 * p2 * 100.0, 1),
+                    },
+                )
+                if best_partner is None or (cand[0], cand[1]) > (best_partner[0], best_partner[1]):
+                    best_partner = cand
+        if best_partner:
+            md["pair_hint"] = best_partner[2]
+
     next_global = fetch_next_global_matches(limit=12)
     serial_ladder, serial_ladder_2 = build_dual_serial_ladders(matches_detail, next_global)
 
@@ -539,16 +594,12 @@ def build_dual_serial_ladders(
     """Build 2 independent chronological ladders (>=2h15m apart) using 2-leg same-match combos."""
     del next_global  # Unvetted global matches never enter official Series
     pool: dict[str, dict] = {}
-    # Every match in Serie 1 & Serie 2 combines (1/1X/2/X2) + (team goals or total match goals)
+    # Every match in Serie 1 & Serie 2 uses bookmaker-valid 2-leg combos (excluding blocked +0.5 team goals)
     same_match_combo_keys = {
-        "BB_H_1X_O05",
-        "BB_H_1_O05",
         "BB_H_1X_O15",
         "BB_H_1_O15",
         "BB_H_1X_T15",
         "BB_H_1_T15",
-        "BB_A_X2_O05",
-        "BB_A_2_O05",
         "BB_A_X2_O15",
         "BB_A_2_O15",
         "BB_A_X2_T15",
@@ -569,7 +620,7 @@ def build_dual_serial_ladders(
             return False
 
         pick = m.get("opt_b_pick")
-        if pick and float(pick.get("prob", 0.0)) < 62.0:
+        if pick and (float(pick.get("prob", 0.0)) < 60.0 or float(pick.get("odds", 0.0)) < 1.25):
             pick = None
 
         if not pick:
@@ -578,14 +629,14 @@ def build_dual_serial_ladders(
                 for mk in (m.get("all_markets") or [])
                 if mk["key"] in same_match_combo_keys
                 and _side_ok(mk["key"])
-                and 1.20 <= mk["odds"] <= 1.90
-                and mk["prob"] >= 64.0
+                and 1.30 <= mk["odds"] <= 1.95
+                and mk["prob"] >= 60.0
             ]
             if not combo_cands:
                 continue
-            pick = max(combo_cands, key=lambda x: (x["prob"], x["ev_pct"] > 0))
+            pick = max(combo_cands, key=lambda x: (x["odds"] >= 1.50 and x["prob"] >= 62.0, x["prob"], x["ev_pct"] > 0))
 
-        pk_key = pick.get("key") or next((k for k, v in MARKET_NAMES.items() if v == pick.get("market_name")), "BB_H_1X_O05")
+        pk_key = pick.get("key") or next((k for k, v in MARKET_NAMES.items() if v == pick.get("market_name")), "BB_H_1X_T15")
         alt_mk = max(
             (
                 mk
@@ -593,13 +644,20 @@ def build_dual_serial_ladders(
                 if mk["key"] in same_match_combo_keys
                 and mk["key"] != pk_key
                 and _side_ok(mk["key"])
-                and 1.20 <= mk["odds"] <= 1.90
-                and mk["prob"] >= 62.0
+                and 1.30 <= mk["odds"] <= 1.95
+                and mk["prob"] >= 60.0
             ),
-            key=lambda x: x["prob"],
+            key=lambda x: (x["odds"] >= 1.50, x["prob"]),
             default=None,
         ) or max(
-            (mk for mk in (m.get("all_markets") or []) if mk["key"] != pk_key and 1.18 <= mk["odds"] <= 1.90 and mk["prob"] >= 68.0),
+            (
+                mk
+                for mk in (m.get("all_markets") or [])
+                if mk["key"] != pk_key
+                and mk["key"] not in {"BB_H_1_O05", "BB_H_1X_O05", "BB_A_2_O05", "BB_A_X2_O05"}
+                and 1.25 <= mk["odds"] <= 1.95
+                and mk["prob"] >= 66.0
+            ),
             key=lambda x: x["prob"],
             default=None,
         )
@@ -617,6 +675,7 @@ def build_dual_serial_ladders(
             "alt_market_name": alt_mk["name"] if alt_mk else None,
             "alt_odds": round(float(alt_mk["odds"]), 2) if alt_mk else None,
             "alt_prob": float(alt_mk["prob"]) if alt_mk else None,
+            "pair_hint": m.get("pair_hint"),
             "o1": m["o1"],
             "ox": m["ox"],
             "o2": m["o2"],
@@ -729,7 +788,7 @@ def cmd_scan(args) -> None:
             print(f"  [{sp['kickoff_col']}] ({sp['league']}) {sp['title']}: {sp['market_name']} @{sp['odds']} ({sp['bookmaker']}) | Prob={sp['prob']}% | EV={sp['ev_pct']:+.2f}%")
             tg_lines.append(f"- {sp['title']}: {sp['market_name']} @{sp['odds']} (EV {sp['ev_pct']:+.1f}%)")
 
-    print(f"\n=== 2. FÓRMULA OPCIÓN A (Combinadas de 2 partidos, 1.20-1.90) [{len(res['parlays_a'])} encontradas] ===")
+    print(f"\n=== 2. FÓRMULA OPCIÓN A (Combinadas de 2 partidos, 1.50-1.95) [{len(res['parlays_a'])} encontradas] ===")
     for p in res["parlays_a"]:
         tag = "[+EV]" if p["ev_pct"] > 0 else "[OJO: EV<=0 por margen]"
         print(

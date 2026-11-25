@@ -227,9 +227,13 @@ def format_serial_ladder_block(scan: dict, items: list[dict] | None = None, head
             alt_lit = literal_market_text(s["alt_market_name"], hm, aw)
             alt_part = f"\n   <i>Alt:</i> {html.escape(alt_lit)} @<code>{s['alt_odds']:.2f}</code> ({s['alt_prob']}%)"
         det = f" | Goles: ~{s.get('lam_h',1.4):.1f}v{s.get('lam_a',1.0):.1f} (+1.5: {ps.get('o15',0):.0f}%)" if ps else ""
+        pair_txt = ""
+        if float(s.get("odds", 0)) < 1.50 and s.get("pair_hint"):
+            ph = s["pair_hint"]
+            pair_txt = f"\n   <i>Para 1.50+:</i> combinar con {html.escape(ph['partner_title'])} (@<code>{ph['combo_odds']:.2f}</code>)"
         lines.append(
             f"\n<b>#{s['step']}</b> <code>{s['kickoff_col'][5:]} COL</code> • <b>{html.escape(s['title'])}</b>{det}\n"
-            f"👉 <b>{html.escape(lit)}</b> @<code>{s['odds']:.2f}</code> ({s['prob']}%){alt_part}"
+            f"👉 <b>{html.escape(lit)}</b> @<code>{s['odds']:.2f}</code> ({s['prob']}%){alt_part}{pair_txt}"
         )
     if not ladder:
         lines.append("\n<i>Sin partidos disponibles para armar la ruta en serie.</i>")
@@ -253,14 +257,25 @@ def _build_detailed_match_caption(m: dict) -> str:
         fav_txt = f"Partido parejo (ligero fav. {html.escape(m['home'] if p1 >= p2 else m['away'])} {max(p1, p2):.0f}%)"
 
     pick_line = "<i>Ver cartelera y mercados completos en Caza Cuotas.</i>"
+    pick_odds = None
     if m.get("opt_b_pick"):
         pb = m["opt_b_pick"]
+        pick_odds = float(pb["odds"])
         lit = literal_market_text(pb["market_name"], m["home"], m["away"])
         pick_line = f"👉 <b>{html.escape(lit)}</b> @~<code>{pb['odds']:.2f}</code> (Probabilidad: <b>{pb['prob']}%</b>)"
     elif m.get("opt_a_leg"):
         pa = m["opt_a_leg"]
+        pick_odds = float(pa["odds"])
         lit = literal_market_text(pa["market_name"], m["home"], m["away"])
         pick_line = f"👉 <b>{html.escape(lit)}</b> @<code>{pa['odds']:.2f}</code> (Probabilidad: <b>{pa['prob']}%</b>)"
+
+    pair_line = ""
+    ph = m.get("pair_hint")
+    if ph and (pick_odds is None or pick_odds < 1.50):
+        pair_line = (
+            f"\n🔗 <b>Para cuota 1.50+:</b> combina con <i>{html.escape(ph['partner_title'])}</i> "
+            f"({html.escape(ph['partner_pick'])} @<code>{ph['partner_odds']:.2f}</code>) → Total @<b>{ph['combo_odds']:.2f}</b>"
+        )
 
     return (
         f"⚽ <b>{html.escape(m['home'])} vs {html.escape(m['away'])}</b>\n"
@@ -272,7 +287,7 @@ def _build_detailed_match_caption(m: dict) -> str:
         f"• {html.escape(m['home'])} anota +0.5: <b>{ps.get('h_o05', hs['o05_pct']*100):.0f}%</b> (+1.5: <b>{ps.get('h_o15', hs['o15_pct']*100):.0f}%</b>)\n"
         f"• {html.escape(m['away'])} anota +0.5: <b>{ps.get('a_o05', as_['o05_pct']*100):.0f}%</b> (+1.5: <b>{ps.get('a_o15', as_['o15_pct']*100):.0f}%</b>)\n"
         f"• Partido +1.5 goles: <b>{ps.get('o15', 70):.0f}%</b> | +2.5: <b>{ps.get('o25', 45):.0f}%</b> | Ambos marcan: <b>{ps.get('btts', 45):.0f}%</b>\n\n"
-        f"🎯 <b>APUESTA LITERAL:</b>\n{pick_line}"
+        f"🎯 <b>APUESTA LITERAL:</b>\n{pick_line}{pair_line}"
     )
 
 

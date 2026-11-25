@@ -222,14 +222,17 @@ def render_match_card(m: dict) -> bytes:
     )
 
     # Bottom Literal Bet Box
+    pick_odds = None
     if m.get("opt_b_pick"):
         pb = m["opt_b_pick"]
+        pick_odds = float(pb["odds"])
         lit = literal_market_text(pb["market_name"], m["home"], m["away"])
         pick_txt = f"PRONÓSTICO SUGERIDO: {lit}  @~{pb['odds']:.2f}"
         ev_txt = f"Prob. {pb['prob']}% • {'Cuota con valor' if pb['ev_pct'] > 0 else 'Cuota estándar'}"
         ev_col = (74, 222, 128, 255) if pb["ev_pct"] > 0 else (251, 191, 36, 255)
     elif m.get("opt_a_leg"):
         pa = m["opt_a_leg"]
+        pick_odds = float(pa["odds"])
         lit = literal_market_text(pa["market_name"], m["home"], m["away"])
         pick_txt = f"SELECCIÓN SUGERIDA: {lit}  @{pa['odds']:.2f}"
         ev_txt = f"Prob. {pa['prob']}% • {'Cuota con valor' if pa['ev_pct'] > 0 else 'Cuota estándar'}"
@@ -254,7 +257,11 @@ def render_match_card(m: dict) -> bytes:
         f_pk = cand_f
     d.text((108, 648), pick_txt, font=f_pk, fill=(255, 255, 255, 255))
     d.text((1092 - ew, 648), ev_txt, font=f_ev, fill=ev_col)
-    d.text((108, 684), "Caza Cuotas • Pronóstico Deportivo", font=_load_font(14, "reg"), fill=(226, 232, 240, 255))
+    sub_footer = "Caza Cuotas • Pronóstico Deportivo"
+    ph = m.get("pair_hint")
+    if ph and (pick_odds is None or pick_odds < 1.50):
+        sub_footer = f"Para cuota 1.50+: combinar con {ph['partner_title'][:32]} ({ph['partner_pick'][:30]}) -> @{ph['combo_odds']:.2f}"
+    d.text((108, 684), sub_footer[:98], font=_load_font(14, "reg"), fill=(226, 232, 240, 255))
 
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)
@@ -397,7 +404,7 @@ def render_serial_ladder_card(ladder: list[dict], chunk_label: str = "") -> byte
 def render_parlay_card(parlay: dict) -> bytes:
     """Render an explicit 1200x675 PNG ticket card for a 2-match parlay."""
     img = _create_backdrop(1200, 675)
-    _draw_brand_header(img, "COMBINADA DE 2 SELECCIONES • CUOTA 1.20–1.90", f"{parlay['kickoff_col']} COL")
+    _draw_brand_header(img, "COMBINADA DE 2 SELECCIONES • CUOTA 1.50–1.95", f"{parlay['kickoff_col']} COL")
     _glass_panel(img, (48, 102, 1152, 636), radius=28)
 
     d = ImageDraw.Draw(img)
