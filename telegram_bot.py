@@ -215,7 +215,7 @@ def format_next_by_hour_block(scan: dict) -> str:
 
 
 def format_serial_ladder_block(scan: dict, items: list[dict] | None = None, header_note: str = "") -> str:
-    hdr = f"<b>🪜 PRONÓSTICOS EN SERIE{(' • ' + header_note) if header_note else ' (POR TURNOS)'}</b>"
+    hdr = f"<b>⏱ EN SERIE • FILA POR HORA{(' • ' + header_note) if header_note else ''}</b>"
     lines = [hdr]
     ladder = items if items is not None else (scan.get("serial_ladder") or [])
     for s in ladder:

@@ -288,21 +288,19 @@ def publish_supabase_channel(
         new_rows.append({"post_key": pkey, "kind": "combo", "title": p["title"], "body_html": cap, "image_data": img_url})
         push_headline = push_headline or (f"Combinada @{p['combo_odds']:.2f}", p["title"])
 
-    # 3. Serial Turn-by-Turn Ladders (Serie 1 & Serie 2, chunked 3 per card so image matches text 1:1)
-    for serie_idx, l_key_name in ((1, "serial_ladder"), (2, "serial_ladder_2")):
-        ladder = scan_res.get(l_key_name) or []
-        if not ladder:
-            continue
+    # 3. Single Unified Chronological Queue (En Serie por hora, chunked 3 per card so image matches text 1:1)
+    ladder = scan_res.get("serial_ladder") or []
+    if ladder:
         chunks = [ladder[i : i + 3] for i in range(0, len(ladder), 3)]
         for c_idx, ch in enumerate(chunks, 1):
-            pkey = f"sb_serie{serie_idx}:{ch[0]['kickoff_col'][:10]}:p{c_idx}:{ch[0]['event_id']}"
+            pkey = f"sb_serie_all:{ch[0]['kickoff_col'][:10]}:p{c_idx}:{ch[0]['event_id']}"
             if pkey in existing_keys:
                 continue
-            lbl = f"Serie {serie_idx} ({c_idx}/{len(chunks)})" if len(chunks) > 1 else f"Serie {serie_idx}"
+            lbl = f"Por Hora ({c_idx}/{len(chunks)})" if len(chunks) > 1 else "Fila por Hora"
             cap = format_serial_ladder_block(scan_res, items=ch, header_note=lbl)
             img_url = png_to_webp_data_url(render_serial_ladder_card(ch, chunk_label=lbl))
-            new_rows.append({"post_key": pkey, "kind": "serie", "title": f"Turnos en Serie {serie_idx}", "body_html": cap, "image_data": img_url})
-            push_headline = push_headline or (f"Turnos en Serie {serie_idx}", f"{ch[0]['title']} • {ch[0]['kickoff_col']} COL")
+            new_rows.append({"post_key": pkey, "kind": "serie", "title": "En Serie • Fila por Hora", "body_html": cap, "image_data": img_url})
+            push_headline = push_headline or ("En Serie • Por Hora", f"{ch[0]['title']} • {ch[0]['kickoff_col']} COL")
 
     # 4. Newly settled picks (deduped cleanly in SQLite so batches never repeat)
     recent_settled = db.get_recent_settled(limit=12)

@@ -372,8 +372,8 @@ HTML_PAGE = """<!DOCTYPE html>
 
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
           <div class="seg">
-            <button class="seg-btn active" id="scopeEu" onclick="setScope('eu')">Europa</button>
-            <button class="seg-btn" id="scopeAll" onclick="setScope('all')">Todas</button>
+            <button class="seg-btn" id="scopeEu" onclick="setScope('eu')">Europa</button>
+            <button class="seg-btn active" id="scopeAll" onclick="setScope('all')">Todas</button>
             <button class="seg-btn" id="scopeCol" onclick="setScope('col.1')">Colombia</button>
           </div>
           <button class="btn" id="btnHourRadar" onclick="toggleHourRadar()">⏱ En Serie</button>
@@ -397,7 +397,7 @@ HTML_PAGE = """<!DOCTYPE html>
 
         <div class="tabs-row">
           <div style="display:flex;flex-wrap:wrap;gap:7px;">
-            <button class="tab-btn active" onclick="switchTab('tabRadar', this)">Partidos por Liga <span class="pill-cnt" id="cntRadar">0</span></button>
+            <button class="tab-btn active" onclick="switchTab('tabRadar', this)">Partidos <span class="pill-cnt" id="cntRadar">0</span></button>
             <button class="tab-btn" id="btnTabChannel" onclick="switchTab('tabChannel', this); markChannelRead()">📢 Canal En Vivo <span class="pill-cnt" id="cntChannel">0</span></button>
             <button class="tab-btn" onclick="switchTab('tabAnalyzer', this)">Analizar Mi Cuota</button>
             <button class="tab-btn" onclick="switchTab('tabCombos', this)">Pronósticos y Combinadas <span class="pill-cnt" id="cntCombos">0</span></button>
@@ -406,8 +406,19 @@ HTML_PAGE = """<!DOCTYPE html>
           <input type="search" id="searchInput" class="search-input" placeholder="Buscar equipo o liga..." oninput="renderMatches()" />
         </div>
 
-        <!-- TAB 1: Leagues & Matches -->
+        <!-- TAB 1: Matches (Chronological by Hour or Grouped by League) -->
         <section id="tabRadar" class="tab-panel active">
+          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">
+            <div class="seg">
+              <button class="seg-btn active" id="dateAll" onclick="setDateFilter('all')">Todos los días</button>
+              <button class="seg-btn" id="dateToday" onclick="setDateFilter('today')">Solo Hoy</button>
+              <button class="seg-btn" id="dateTomorrow" onclick="setDateFilter('tomorrow')">Mañana</button>
+            </div>
+            <div class="seg">
+              <button class="seg-btn active" id="viewChrono" onclick="setViewMode('chrono')">⏱ Por Hora</button>
+              <button class="seg-btn" id="viewLeague" onclick="setViewMode('league')">🏆 Por Liga</button>
+            </div>
+          </div>
           <div id="hourRadarWrap" style="display:none;margin-bottom:14px;"></div>
           <div class="leagues-stack" id="leaguesContainer"></div>
         </section>
@@ -569,7 +580,9 @@ HTML_PAGE = """<!DOCTYPE html>
     const LEAGUE_ORDER = ['uefa.champions', 'ger.1', 'ita.1', 'eng.1', 'esp.1', 'fra.1', 'col.1'];
     const LEAGUE_SHORT = { 'col.1': 'COL', 'uefa.champions': 'UCL', 'eng.1': 'ENG', 'esp.1': 'ESP', 'ita.1': 'ITA', 'ger.1': 'GER', 'fra.1': 'FRA' };
 
-    let currentScope = 'eu';
+    let currentScope = 'all';
+    let dateFilter = 'all';
+    let viewMode = 'chrono';
     let favOnly = false;
     let showHourRadar = false;
     let authMode = 'login';
@@ -909,46 +922,83 @@ HTML_PAGE = """<!DOCTYPE html>
       renderHourRadar();
     }
 
+    function colDateOffset(daysOffset = 0) {
+      return new Date(Date.now() + (-5 * 3600000) + daysOffset * 86400000).toISOString().slice(0, 10);
+    }
+
+    function matchesDateFilter(kickoffCol) {
+      if (dateFilter === 'all') return true;
+      const target = dateFilter === 'today' ? colDateOffset(0) : colDateOffset(1);
+      return String(kickoffCol || '').slice(0, 10) === target;
+    }
+
+    function setDateFilter(mode) {
+      dateFilter = mode;
+      document.getElementById('dateAll').classList.toggle('active', mode === 'all');
+      document.getElementById('dateToday').classList.toggle('active', mode === 'today');
+      document.getElementById('dateTomorrow').classList.toggle('active', mode === 'tomorrow');
+      renderHourRadar();
+      renderMatches();
+    }
+
+    function setViewMode(mode) {
+      viewMode = mode;
+      document.getElementById('viewChrono').classList.toggle('active', mode === 'chrono');
+      document.getElementById('viewLeague').classList.toggle('active', mode === 'league');
+      renderMatches();
+    }
+
     function renderHourRadar() {
       const box = document.getElementById('hourRadarWrap');
       if (!showHourRadar) { box.style.display = 'none'; return; }
-      const ladder1 = lastScan.serial_ladder || [];
-      const ladder2 = lastScan.serial_ladder_2 || [];
-      const gList = lastScan.next_global || [];
+      const keepLeague = lg => currentScope === 'all' ? true : (currentScope === 'col.1' ? lg === 'col.1' : lg !== 'col.1');
+      const seenIds = new Set();
+      const unified = [...(lastScan.serial_ladder || []), ...(lastScan.serial_ladder_2 || [])]
+        .filter(s => {
+          if (!s || seenIds.has(s.event_id) || !keepLeague(s.league) || !matchesDateFilter(s.kickoff_col)) return false;
+          seenIds.add(s.event_id);
+          return true;
+        })
+        .sort((a, b) => String(a.kickoff_col).localeCompare(String(b.kickoff_col)));
+      const gList = (lastScan.next_global || [])
+        .filter(m => matchesDateFilter(m.kickoff_col))
+        .sort((a, b) => String(a.kickoff_col).localeCompare(String(b.kickoff_col)));
+
       box.style.display = 'block';
-      if (!ladder1.length && !ladder2.length && !gList.length) {
-        box.innerHTML = '<div class="glass" style="padding:16px;font-size:12.5px;color:var(--muted);">No hay partidos próximos inmediatos en el radar en este instante.</div>';
+      if (!unified.length && !gList.length) {
+        box.innerHTML = '<div class="glass" style="padding:16px;font-size:12.5px;color:var(--muted);">No hay partidos próximos en este filtro de fecha/liga.</div>';
         return;
       }
-      const renderLadderSection = (items, title, subtitle, emblemGrad) => items.length ? `
+      const serialHtml = unified.length ? `
         <section class="glass league-section" style="margin-bottom:12px;">
           <div class="league-header">
             <div style="display:flex;align-items:center;gap:10px;">
-              <div class="league-emblem" style="background:${emblemGrad};">🪜</div>
+              <div class="league-emblem" style="background:linear-gradient(135deg,#7C3AED,#F97316);">⏱</div>
               <div>
-                <h2 style="margin:0;font-size:15.5px;font-weight:700;">${title}</h2>
-                <div style="font-size:11.5px;color:var(--muted);">${subtitle}</div>
+                <h2 style="margin:0;font-size:15.5px;font-weight:700;">En Serie • Fila Cronológica por Hora</h2>
+                <div style="font-size:11.5px;color:var(--muted);">Una sola lista ordenada por hora de inicio para que decidas cuáles jugar viendo el siguiente en camino.</div>
               </div>
             </div>
-            <span class="badge b-pos">${items.length} turnos</span>
+            <span class="badge b-pos">${unified.length} partidos</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;">
-            ${items.map(s => {
+            ${unified.map((s, idx) => {
               const ps = s.probs_summary || {};
               const mainLit = literalTeamMarket(s.market_name, s.title);
               const altLit = s.alt_market_name ? literalTeamMarket(s.alt_market_name, s.title) : '';
               const meta = ps.o15 !== undefined ? `<div style="font-size:11px;color:var(--sub);margin-bottom:5px;">1X2: ${Math.round(ps.p1)}%/${Math.round(ps.px)}%/${Math.round(ps.p2)}% • Goles est: ${s.lam_h} vs ${s.lam_a} • +1.5: ${Math.round(ps.o15)}%</div>` : '';
               const mainBox = `<div style="background:#F5F3FF;border:1px solid rgba(124,58,237,0.18);border-radius:10px;padding:7px 9px;margin-bottom:5px;"><div style="font-size:10px;font-weight:700;color:var(--violet);text-transform:uppercase;">👉 Jugada principal</div><div style="font-size:12px;font-weight:700;color:var(--text);">${mainLit} <strong class="num">@${Number(s.odds).toFixed(2)}</strong> (${s.prob}%)</div></div>`;
-              const alt = altLit ? `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;"><strong>Alternativa segura:</strong> ${altLit} @${Number(s.alt_odds).toFixed(2)} (${s.alt_prob}%)</div>` : '<div style="margin-bottom:4px;"></div>';
+              const alt = altLit ? `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;"><strong>Alternativa:</strong> ${altLit} @${Number(s.alt_odds).toFixed(2)} (${s.alt_prob}%)</div>` : '<div style="margin-bottom:4px;"></div>';
+              const pairNote = (Number(s.odds) < 1.50 && s.pair_hint) ? `<div style="font-size:11px;color:var(--orange);font-weight:600;margin-bottom:6px;">🔗 Para 1.50+: + ${s.pair_hint.partner_title} → @${Number(s.pair_hint.combo_odds).toFixed(2)}</div>` : '';
               return `
               <div class="mini-box" style="padding:12px;border-radius:14px;">
                 <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
-                  <span style="font-weight:700;color:var(--violet);">Turno #${s.step} • ${s.gap_label}</span>
+                  <span style="font-weight:700;color:var(--violet);">#${idx + 1} • ${s.gap_label || ''}</span>
                   <span class="num" style="color:var(--muted);">${s.kickoff_col} COL</span>
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">${s.league_label}</div>
                 <div style="font-size:13.5px;font-weight:700;margin-bottom:4px;">${s.title}</div>
-                ${meta}${mainBox}${alt}
+                ${meta}${mainBox}${alt}${pairNote}
                 <div style="display:flex;justify-content:flex-end;">
                   <button class="btn btn-primary" style="padding:5px 11px;font-size:11px;" onclick="addLegToSlip('${s.event_id}','${s.league}','${s.kickoff_col.slice(0,10)}','${s.title.replace(/'/g,'')}','${s.market}','${mainLit.replace(/'/g,'')}',${s.odds},${(s.prob/100).toFixed(3)})">+ Agregar al Cupón</button>
                 </div>
@@ -956,10 +1006,6 @@ HTML_PAGE = """<!DOCTYPE html>
             }).join('')}
           </div>
         </section>` : '';
-
-      const serialHtml =
-        renderLadderSection(ladder1, 'Serie 1 • Línea Principal (Por Turnos)', '1 partido por turno (≥2h15m entre inicios) para conocer el resultado antes de jugar el siguiente.', 'linear-gradient(135deg,#7C3AED,#F97316)') +
-        renderLadderSection(ladder2, 'Serie 2 • Línea Paralela Independiente', 'Segunda cadena cronológica (≥2h15m entre sus propios turnos) para llevarla por separado sin cruzar montos.', 'linear-gradient(135deg,#10B981,#0EA5E9)');
 
       const globalHtml = gList.length ? `
         <section class="glass league-section">
@@ -1107,14 +1153,98 @@ HTML_PAGE = """<!DOCTYPE html>
 
     function renderMatches() {
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
-      const list = (lastScan.matches || []).filter(m => {
-        if (favOnly && !favorites.has(m.event_id)) return false;
-        return !q || m.home.toLowerCase().includes(q) || m.away.toLowerCase().includes(q) || m.league_label.toLowerCase().includes(q);
-      });
+      const list = (lastScan.matches || [])
+        .filter(m => {
+          if (favOnly && !favorites.has(m.event_id)) return false;
+          if (!matchesDateFilter(m.kickoff_col)) return false;
+          return !q || m.home.toLowerCase().includes(q) || m.away.toLowerCase().includes(q) || m.league_label.toLowerCase().includes(q);
+        })
+        .sort((a, b) => String(a.kickoff_col).localeCompare(String(b.kickoff_col)));
       document.getElementById('cntRadar').textContent = list.length;
 
       if (!list.length) {
-        document.getElementById('leaguesContainer').innerHTML = `<div class="glass" style="padding:36px;text-align:center;color:var(--muted);">${favOnly ? 'No tienes partidos favoritos en este filtro. Toca ★ en cualquier partido.' : 'No hay partidos disponibles.'}</div>`;
+        const emptyMsg = favOnly
+          ? 'No tienes partidos favoritos en este filtro. Toca ★ en cualquier partido.'
+          : (dateFilter === 'today' ? 'No hay partidos programados para hoy en este filtro.' : 'No hay partidos disponibles.');
+        document.getElementById('leaguesContainer').innerHTML = `<div class="glass" style="padding:36px;text-align:center;color:var(--muted);">${emptyMsg}</div>`;
+        return;
+      }
+
+      const renderMatchCardHtml = (m, origIdx, showLeagueTag = false) => {
+        const sInv = 1 / m.o1 + 1 / m.ox + 1 / m.o2;
+        const p1 = ((1 / m.o1) / sInv * 100), px = ((1 / m.ox) / sInv * 100), p2 = ((1 / m.o2) / sInv * 100);
+        const hs = m.h_stat, as_ = m.a_stat;
+        const isFav = favorites.has(m.event_id);
+        const bestPick = m.opt_b_pick || m.opt_a_leg;
+        const code = LEAGUE_SHORT[m.league] || m.league.toUpperCase().slice(0, 3);
+        const lgPill = showLeagueTag ? `<span class="badge b-pend" style="font-size:10px;padding:2px 7px;">${code}</span> ` : '';
+        const pairHintHtml = (bestPick && Number(bestPick.odds) < 1.50 && m.pair_hint)
+          ? `<div style="font-size:11px;color:var(--orange);font-weight:600;margin-top:2px;">🔗 Para 1.50+: + ${m.pair_hint.partner_title} → @${Number(m.pair_hint.combo_odds).toFixed(2)}</div>`
+          : '';
+        return `<article class="match-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+            <span class="num" style="font-size:11.5px;color:var(--muted);">${lgPill}${m.kickoff_col} COL ${m.ou_line ? '• O/U ' + m.ou_line : ''}</span>
+            <button class="fav-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite('${m.event_id}')" title="Marcar favorito">★</button>
+          </div>
+          <div style="font-size:15px;font-weight:700;text-align:center;">${m.home} <span style="color:var(--orange);">vs</span> ${m.away}</div>
+          <div>
+            <div class="prob-stack"><div class="ps-1" style="width:${p1.toFixed(1)}%"></div><div class="ps-x" style="width:${px.toFixed(1)}%"></div><div class="ps-2" style="width:${p2.toFixed(1)}%"></div></div>
+            <div class="num" style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;">
+              <span>1: ${p1.toFixed(0)}% (@${m.o1.toFixed(2)})</span>
+              <span>X: ${px.toFixed(0)}% (@${m.ox.toFixed(2)})</span>
+              <span>2: ${p2.toFixed(0)}% (@${m.o2.toFixed(2)})</span>
+            </div>
+          </div>
+          <div class="split-bars">
+            <div class="mini-box">
+              <div style="font-size:11.5px;font-weight:600;">${m.home}</div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;"><span>Gana</span><span class="num">${(hs.win_pct*100).toFixed(0)}%</span></div>
+              <div class="track"><div class="fill-v" style="width:${hs.win_pct*100}%"></div></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:5px;"><span>No pierde</span><span class="num">${(hs.unbeaten_pct*100).toFixed(0)}%</span></div>
+              <div class="track"><div class="fill-g" style="width:${hs.unbeaten_pct*100}%"></div></div>
+              <div class="dots">${formDots(m.h_recent_scores)}</div>
+            </div>
+            <div class="mini-box">
+              <div style="font-size:11.5px;font-weight:600;">${m.away}</div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;"><span>Gana</span><span class="num">${(as_.win_pct*100).toFixed(0)}%</span></div>
+              <div class="track"><div class="fill-o" style="width:${as_.win_pct*100}%"></div></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:5px;"><span>No pierde</span><span class="num">${(as_.unbeaten_pct*100).toFixed(0)}%</span></div>
+              <div class="track"><div class="fill-g" style="width:${as_.unbeaten_pct*100}%"></div></div>
+              <div class="dots">${formDots(m.a_recent_scores)}</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid var(--border);">
+            <div style="font-size:11.5px;font-weight:600;">${bestPick ? `${evBadge(bestPick.ev_pct)} @${bestPick.odds.toFixed(2)}` : '<span style="color:var(--muted);">Ver mercados</span>'}${pairHintHtml}</div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="openInAnalyzer(${origIdx})">Analizar Cuota</button>
+              <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="openDrawer(${origIdx})">+ Cupón</button>
+            </div>
+          </div>
+        </article>`;
+      };
+
+      if (viewMode === 'chrono') {
+        const byDay = {};
+        list.forEach(m => {
+          const dayKey = String(m.kickoff_col || '').slice(0, 10) || 'Próximos';
+          if (!byDay[dayKey]) byDay[dayKey] = [];
+          byDay[dayKey].push({ m, origIdx: lastScan.matches.indexOf(m) });
+        });
+        const todayStr = colDateOffset(0), tomorrowStr = colDateOffset(1);
+        document.getElementById('leaguesContainer').innerHTML = Object.keys(byDay).sort().map(dayKey => {
+          const tag = dayKey === todayStr ? `Hoy • ${dayKey}` : (dayKey === tomorrowStr ? `Mañana • ${dayKey}` : dayKey);
+          const cards = byDay[dayKey].map(({ m, origIdx }) => renderMatchCardHtml(m, origIdx, true)).join('');
+          return `<section class="glass league-section">
+            <div class="league-header">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div class="league-emblem" style="background:linear-gradient(135deg,#7C3AED,#0EA5E9);">⏱</div>
+                <h2 style="margin:0;font-size:16px;font-weight:700;">${tag}</h2>
+              </div>
+              <span class="badge b-pend">${byDay[dayKey].length} ${byDay[dayKey].length===1?'partido':'partidos'}</span>
+            </div>
+            <div class="matches-grid">${cards}</div>
+          </section>`;
+        }).join('');
         return;
       }
 
@@ -1132,54 +1262,7 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('leaguesContainer').innerHTML = orderedKeys.map(lg => {
         const g = grouped[lg];
         const code = LEAGUE_SHORT[lg] || lg.toUpperCase().slice(0, 3);
-        const cards = g.items.map(({ m, origIdx }) => {
-          const sInv = 1 / m.o1 + 1 / m.ox + 1 / m.o2;
-          const p1 = ((1 / m.o1) / sInv * 100), px = ((1 / m.ox) / sInv * 100), p2 = ((1 / m.o2) / sInv * 100);
-          const hs = m.h_stat, as_ = m.a_stat;
-          const isFav = favorites.has(m.event_id);
-          const bestPick = m.opt_b_pick || m.opt_a_leg;
-          return `<article class="match-card">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span class="num" style="font-size:11.5px;color:var(--muted);">${m.kickoff_col} COL ${m.ou_line ? '• O/U ' + m.ou_line : ''}</span>
-              <button class="fav-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite('${m.event_id}')" title="Marcar favorito">★</button>
-            </div>
-            <div style="font-size:15px;font-weight:700;text-align:center;">${m.home} <span style="color:var(--orange);">vs</span> ${m.away}</div>
-            <div>
-              <div class="prob-stack"><div class="ps-1" style="width:${p1.toFixed(1)}%"></div><div class="ps-x" style="width:${px.toFixed(1)}%"></div><div class="ps-2" style="width:${p2.toFixed(1)}%"></div></div>
-              <div class="num" style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;">
-                <span>1: ${p1.toFixed(0)}% (@${m.o1.toFixed(2)})</span>
-                <span>X: ${px.toFixed(0)}% (@${m.ox.toFixed(2)})</span>
-                <span>2: ${p2.toFixed(0)}% (@${m.o2.toFixed(2)})</span>
-              </div>
-            </div>
-            <div class="split-bars">
-              <div class="mini-box">
-                <div style="font-size:11.5px;font-weight:600;">${m.home}</div>
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;"><span>Gana</span><span class="num">${(hs.win_pct*100).toFixed(0)}%</span></div>
-                <div class="track"><div class="fill-v" style="width:${hs.win_pct*100}%"></div></div>
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:5px;"><span>No pierde</span><span class="num">${(hs.unbeaten_pct*100).toFixed(0)}%</span></div>
-                <div class="track"><div class="fill-g" style="width:${hs.unbeaten_pct*100}%"></div></div>
-                <div class="dots">${formDots(m.h_recent_scores)}</div>
-              </div>
-              <div class="mini-box">
-                <div style="font-size:11.5px;font-weight:600;">${m.away}</div>
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px;"><span>Gana</span><span class="num">${(as_.win_pct*100).toFixed(0)}%</span></div>
-                <div class="track"><div class="fill-o" style="width:${as_.win_pct*100}%"></div></div>
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:5px;"><span>No pierde</span><span class="num">${(as_.unbeaten_pct*100).toFixed(0)}%</span></div>
-                <div class="track"><div class="fill-g" style="width:${as_.unbeaten_pct*100}%"></div></div>
-                <div class="dots">${formDots(m.a_recent_scores)}</div>
-              </div>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid var(--border);">
-              <div style="font-size:11.5px;font-weight:600;">${bestPick ? `${evBadge(bestPick.ev_pct)} @${bestPick.odds.toFixed(2)}` : '<span style="color:var(--muted);">Ver mercados</span>'}</div>
-              <div style="display:flex;gap:6px;">
-                <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="openInAnalyzer(${origIdx})">Analizar Cuota</button>
-                <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="openDrawer(${origIdx})">+ Cupón</button>
-              </div>
-            </div>
-          </article>`;
-        }).join('');
-
+        const cards = g.items.map(({ m, origIdx }) => renderMatchCardHtml(m, origIdx, false)).join('');
         return `<section class="glass league-section">
           <div class="league-header">
             <div style="display:flex;align-items:center;gap:10px;">

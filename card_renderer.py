@@ -359,11 +359,11 @@ def render_serial_ladder_card(ladder: list[dict], chunk_label: str = "") -> byte
     h = 260 + max(1, len(shown)) * 136
     img = _create_backdrop(1200, h)
     hdr_sub = "Horarios Colombia (UTC-5)" if not chunk_label else f"{chunk_label} • Hora Colombia"
-    _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", hdr_sub)
+    _draw_brand_header(img, "EN SERIE • FILA CRONOLÓGICA POR HORA", hdr_sub)
     _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
 
     d = ImageDraw.Draw(img)
-    d.text((88, 126), "Secuencia cronológica: termina un partido y conoces el resultado antes de jugar el siguiente.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
+    d.text((88, 126), "Una sola fila por hora de inicio: elige tus jugadas viendo los próximos partidos en camino.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
 
     for idx, s in enumerate(shown):
         y0 = 164 + idx * 132
@@ -539,11 +539,11 @@ def render_serial_ladder_card(ladder: list[dict], chunk_label: str = "") -> byte
     h = 260 + max(1, len(shown)) * 136
     img = _create_backdrop(1200, h)
     hdr_sub = "Horarios Colombia (UTC-5)" if not chunk_label else f"{chunk_label} • Hora Colombia"
-    _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", hdr_sub)
+    _draw_brand_header(img, "EN SERIE • FILA CRONOLÓGICA POR HORA", hdr_sub)
     _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
 
     d = ImageDraw.Draw(img)
-    d.text((88, 126), "Secuencia cronológica: termina un partido y conoces el resultado antes de jugar el siguiente.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
+    d.text((88, 126), "Una sola fila por hora de inicio: elige tus jugadas viendo los próximos partidos en camino.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
 
     for idx, s in enumerate(shown):
         y0 = 164 + idx * 132

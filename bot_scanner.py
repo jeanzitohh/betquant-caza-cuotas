@@ -518,6 +518,9 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
             }
         )
 
+    # Keep all matches sorted strictly chronologically (YYYY-MM-DD HH:MM COL)
+    matches_detail.sort(key=lambda item: item["kickoff_col"])
+
     # Attach same-day partner pairing hint for any match whose primary pick is < 1.50
     for md in matches_detail:
         pk = md.get("opt_b_pick") or md.get("opt_a_leg")
@@ -577,10 +580,10 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
 def build_serial_ladder(
     matches_detail: list[dict],
     next_global: list[dict],
-    min_gap_minutes: int = 135,
-    max_items: int = 10,
+    min_gap_minutes: int = 0,
+    max_items: int = 40,
 ) -> list[dict]:
-    """Return primary chronological 1-by-1 serial schedule."""
+    """Return single unified chronological queue ordered by kickoff time."""
     primary, _ = build_dual_serial_ladders(matches_detail, next_global, min_gap_minutes=min_gap_minutes, max_items=max_items)
     return primary
 
@@ -588,10 +591,10 @@ def build_serial_ladder(
 def build_dual_serial_ladders(
     matches_detail: list[dict],
     next_global: list[dict],
-    min_gap_minutes: int = 135,
-    max_items: int = 10,
+    min_gap_minutes: int = 0,
+    max_items: int = 40,
 ) -> tuple[list[dict], list[dict]]:
-    """Build 2 independent chronological ladders (>=2h15m apart) using 2-leg same-match combos."""
+    """Build one unified chronological queue ordered by kickoff time (no split groups)."""
     del next_global  # Unvetted global matches never enter official Series
     pool: dict[str, dict] = {}
     # Every match in Serie 1 & Serie 2 uses bookmaker-valid 2-leg combos (excluding blocked +0.5 team goals)
@@ -697,11 +700,16 @@ def build_dual_serial_ladders(
                 continue
             if last_dt is not None:
                 gap_min = int((cur_dt - last_dt).total_seconds() // 60)
-                if gap_min < min_gap_minutes:
+                if min_gap_minutes > 0 and gap_min < min_gap_minutes:
                     continue
-                gap_txt = f"+{gap_min // 60}h {gap_min % 60:02d}m después"
+                if gap_min <= 0:
+                    gap_txt = "Misma hora"
+                elif gap_min < 60:
+                    gap_txt = f"+{gap_min}m después"
+                else:
+                    gap_txt = f"+{gap_min // 60}h {gap_min % 60:02d}m después"
             else:
-                gap_txt = "Primer turno disponible"
+                gap_txt = "Primer partido"
             last_dt = cur_dt
             chain.append({**item, "step": len(chain) + 1, "gap_label": gap_txt})
             if len(chain) >= max_items:
@@ -710,9 +718,7 @@ def build_dual_serial_ladders(
 
     ordered = sorted(pool.values(), key=lambda x: (x["kickoff_col"], -x["prob"]))
     serie_1 = _pick_chain(ordered)
-    used_ids = {s["event_id"] for s in serie_1}
-    serie_2 = _pick_chain([item for item in ordered if item["event_id"] not in used_ids])
-    return serie_1, serie_2
+    return serie_1, []
 
 
 def run_settle_pipeline() -> dict:
