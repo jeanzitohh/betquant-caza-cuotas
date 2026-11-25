@@ -119,3 +119,61 @@ begin
 exception when duplicate_object then
   null;
 end $$;
+
+-- v3: Admin RPC to list registered users & activity safely (accessible ONLY when is_admin = true)
+create or replace function public.admin_list_users()
+returns table (
+  user_id uuid,
+  email text,
+  display_name text,
+  is_admin boolean,
+  stake_mode text,
+  bankroll_base numeric,
+  created_at timestamptz,
+  last_sign_in_at timestamptz,
+  total_bets bigint,
+  pending_bets bigint,
+  net_profit_u numeric
+)
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  if not exists (
+    select 1 from public.user_profiles p
+    where p.user_id = auth.uid() and p.is_admin = true
+  ) then
+    raise exception 'Forbidden: admin access required';
+  end if;
+
+  return query
+  select
+    u.id as user_id,
+    u.email::text,
+    coalesce(p.display_name, split_part(u.email::text, '@', 1)) as display_name,
+    coalesce(p.is_admin, false) as is_admin,
+    coalesce(p.stake_mode, 'flat') as stake_mode,
+    coalesce(p.bankroll_base, 100.0) as bankroll_base,
+    u.created_at,
+    u.last_sign_in_at,
+    coalesce(b.total_bets, 0) as total_bets,
+    coalesce(b.pending_bets, 0) as pending_bets,
+    coalesce(b.net_profit_u, 0.0) as net_profit_u
+  from auth.users u
+  left join public.user_profiles p on p.user_id = u.id
+  left join (
+    select
+      ub.user_id,
+      count(*)::bigint as total_bets,
+      count(*) filter (where ub.status = 'PENDING')::bigint as pending_bets,
+      coalesce(sum(ub.profit_u) filter (where ub.status in ('WON', 'LOST')), 0.0) as net_profit_u
+    from public.user_bets ub
+    group by ub.user_id
+  ) b on b.user_id = u.id
+  order by u.created_at desc;
+end;
+$$;
+
+revoke all on function public.admin_list_users() from public;
+grant execute on function public.admin_list_users() to authenticated;

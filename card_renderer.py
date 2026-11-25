@@ -581,14 +581,14 @@ def render_serial_ladder_card(ladder: list[dict], chunk_label: str = "") -> byte
     return buf.getvalue()
 
 
-def png_to_webp_data_url(png_bytes: bytes, max_w: int = 900) -> str:
-    """Compress a PNG card into a compact base64 WebP data URL (~45-65 KB) for Supabase Realtime feed."""
+def png_to_webp_data_url(png_bytes: bytes, max_w: int = 1120) -> str:
+    """Compress a PNG card into a crisp high-quality WebP data URL for Supabase Realtime feed."""
     img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
     if img.width > max_w:
         new_h = int(img.height * (max_w / img.width))
         img = img.resize((max_w, new_h), Image.Resampling.LANCZOS)
     out = io.BytesIO()
-    img.save(out, format="WEBP", quality=82, method=4)
+    img.save(out, format="WEBP", quality=92, method=5)
     return "data:image/webp;base64," + base64.b64encode(out.getvalue()).decode("ascii")
 
 

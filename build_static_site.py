@@ -95,6 +95,16 @@ def export_static_site(scan_res: dict, report_res: dict) -> str:
     with open(os.path.join(DOCS_DIR, "data.json"), "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False)
 
+    # Copy local league logos into docs/logos/
+    src_logos = os.path.join(BASE_DIR, "logos")
+    dst_logos = os.path.join(DOCS_DIR, "logos")
+    if os.path.isdir(src_logos):
+        os.makedirs(dst_logos, exist_ok=True)
+        for fn in os.listdir(src_logos):
+            if fn.lower().endswith((".png", ".webp", ".svg")):
+                with open(os.path.join(src_logos, fn), "rb") as rf, open(os.path.join(dst_logos, fn), "wb") as wf:
+                    wf.write(rf.read())
+
     # PWA Icons & Manifest & Service Worker
     for sz in (192, 512):
         with open(os.path.join(DOCS_DIR, f"icon-{sz}.png"), "wb") as f:

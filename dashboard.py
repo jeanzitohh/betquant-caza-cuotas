@@ -1,6 +1,7 @@
 import argparse
 import http.cookies
 import json
+import os
 import threading
 import urllib.parse
 import webbrowser
@@ -134,11 +135,11 @@ HTML_PAGE = """<!DOCTYPE html>
 
     /* APP SHELL (Shown ONLY after real login) */
     #appShell { display: none; position: relative; z-index: 10; }
-    .topbar { position: sticky; top: 12px; z-index: 30; max-width: 1340px; margin: 12px auto 0; padding: 0 18px; }
+    .topbar { position: sticky; top: 12px; z-index: 40; max-width: 1420px; margin: 12px auto 0; padding: 0 18px; }
     .nav-pill {
-      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
       padding: 10px 18px; border-radius: 999px;
-      background: rgba(255, 255, 255, 0.80);
+      background: rgba(255, 255, 255, 0.84);
       backdrop-filter: blur(28px) saturate(190%);
       -webkit-backdrop-filter: blur(28px) saturate(190%);
       border: 1px solid var(--border);
@@ -146,12 +147,43 @@ HTML_PAGE = """<!DOCTYPE html>
     }
 
     .main-wrap {
-      max-width: 1340px; margin: 18px auto 60px; padding: 0 18px;
-      display: grid; grid-template-columns: minmax(0, 1fr) 355px; gap: 18px; align-items: start;
+      max-width: 1420px; margin: 18px auto 60px; padding: 0 18px;
+      display: grid; grid-template-columns: 224px minmax(0, 1fr) 345px; gap: 18px; align-items: start;
+      transition: grid-template-columns 0.2s ease;
+    }
+    .main-wrap.side-collapsed { grid-template-columns: minmax(0, 1fr) 345px; }
+    .main-wrap.side-collapsed .side-nav { display: none; }
+    .main-wrap.no-slip { grid-template-columns: 224px minmax(0, 1fr); }
+    .main-wrap.no-slip .slip-panel { display: none; }
+    .main-wrap.side-collapsed.no-slip { grid-template-columns: minmax(0, 1fr); }
+
+    /* Left Collapsible Side Navigation */
+    .side-nav {
+      position: sticky; top: 82px; padding: 14px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .side-section-lbl {
+      font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.06em; padding: 4px 10px 2px;
+    }
+    .side-btn {
+      width: 100%; border: 1px solid transparent; background: transparent; color: var(--sub);
+      padding: 9px 12px; border-radius: 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; transition: all 0.15s;
+      text-align: left;
+    }
+    .side-btn:hover { background: rgba(255,255,255,0.75); color: var(--text); border-color: var(--border); }
+    .side-btn.active {
+      background: #FFFFFF; color: var(--violet); border-color: rgba(124,58,237,0.24);
+      box-shadow: 0 4px 14px rgba(124,58,237,0.10);
+    }
+    .bank-box {
+      margin-top: 8px; padding: 11px 12px; border-radius: 16px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.07), rgba(249,115,22,0.07));
+      border: 1px solid rgba(124,58,237,0.14);
     }
 
     /* Tabs */
-    .tabs-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+    .tabs-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
     .tab-btn {
       border: 1px solid var(--border); background: rgba(255,255,255,0.60); color: var(--sub);
       padding: 8px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer;
@@ -161,6 +193,34 @@ HTML_PAGE = """<!DOCTYPE html>
     .pill-cnt { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(124,58,237,0.10); color: var(--violet); }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+
+    /* Interactive League Selector Cards */
+    .leagues-cards-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 14px;
+    }
+    .league-tile {
+      background: rgba(255,255,255,0.86); border: 1px solid var(--border); border-radius: 20px;
+      padding: 18px; display: flex; flex-direction: column; gap: 12px; cursor: pointer;
+      transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
+      box-shadow: var(--highlight), 0 6px 18px rgba(15,23,42,0.04);
+    }
+    .league-tile:hover {
+      transform: translateY(-3px); border-color: rgba(124,58,237,0.32);
+      box-shadow: 0 14px 28px rgba(124,58,237,0.10);
+    }
+    .league-logo-wrap {
+      width: 54px; height: 54px; border-radius: 16px; background: #F8FAFC;
+      border: 1px solid var(--border); display: grid; place-items: center; padding: 6px; flex-shrink: 0;
+    }
+    .league-logo-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .league-logo-sm { width: 36px; height: 36px; border-radius: 10px; background: #F8FAFC; border: 1px solid var(--border); padding: 4px; object-fit: contain; }
+
+    /* Captcha Box */
+    .captcha-box {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px;
+      background: #F8FAFC; border: 1px solid var(--border-strong); margin-bottom: 10px;
+    }
+    .captcha-canvas { border-radius: 8px; border: 1px solid var(--border); background: #FFFFFF; flex-shrink: 0; }
 
     /* League Cards */
     .leagues-stack { display: flex; flex-direction: column; gap: 18px; }
@@ -245,17 +305,18 @@ HTML_PAGE = """<!DOCTYPE html>
     .drawer { width: min(560px, 100%); background: rgba(255,255,255,0.92); padding: 22px; overflow-y: auto; }
 
     /* Internal Telegram-style Live Channel */
-    .channel-shell { display: flex; flex-direction: column; gap: 12px; }
+    .channel-shell { display: flex; flex-direction: column; gap: 12px; max-width: 760px; margin: 0 auto; width: 100%; }
     .channel-feed {
       display: flex; flex-direction: column; gap: 14px;
-      max-height: 68vh; overflow-y: auto; padding: 6px 4px;
+      max-height: 74vh; overflow-y: auto; padding: 6px 4px;
     }
     .channel-msg {
-      background: rgba(255,255,255,0.88); border: 1px solid var(--border);
+      background: rgba(255,255,255,0.92); border: 1px solid var(--border);
       border-radius: 20px; padding: 14px 16px; box-shadow: 0 6px 18px rgba(15,23,42,0.04);
     }
     .channel-img {
-      width: 100%; border-radius: 14px; margin: 10px 0; cursor: zoom-in;
+      width: 100%; max-width: 540px; max-height: 360px; object-fit: contain; background: #0A0B18;
+      border-radius: 14px; margin: 10px 0; cursor: zoom-in;
       border: 1px solid var(--border); display: block;
     }
     .channel-body { font-size: 13px; line-height: 1.5; color: var(--text); white-space: pre-line; }
@@ -273,10 +334,12 @@ HTML_PAGE = """<!DOCTYPE html>
       z-index: 90; display: none; align-items: center; justify-content: center; padding: 18px; cursor: zoom-out;
     }
     .lightbox.open { display: flex; }
-    .lightbox img { max-width: min(1100px, 96vw); max-height: 92vh; border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
+    .lightbox img { max-width: min(1150px, 96vw); max-height: 92vh; border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
 
-    @media (max-width: 1020px) {
-      .main-wrap, .gate-grid { grid-template-columns: 1fr; }
+    @media (max-width: 1080px) {
+      .main-wrap, .main-wrap.no-slip, .gate-grid { grid-template-columns: 1fr; }
+      .side-nav { position: static; margin-bottom: 4px; }
+      .main-wrap:not(.mobile-nav-open) .side-nav { display: none; }
       .slip-panel { position: static; }
     }
     @media (max-width: 600px) {
@@ -325,15 +388,16 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
 
       <div class="glass gate-card">
-        <h2 style="margin:0 0 14px;font-size:20px;">Acceder a Caza Cuotas</h2>
+        <h2 style="margin:0 0 14px;font-size:20px;" id="authCardTitle">Acceder a Caza Cuotas</h2>
         <div id="staticAuthNotice" style="display:none;padding:10px 12px;border-radius:12px;background:var(--amber-bg);color:var(--amber);font-size:12px;margin-bottom:14px;">
           Esta URL estática no tiene servidor activo. Ejecuta <strong>abrir_bot.bat</strong> en tu PC para iniciar sesión local.
         </div>
-        <div class="seg" style="width:100%;margin-bottom:16px;">
+        <div class="seg" style="width:100%;margin-bottom:16px;" id="authModeSeg">
           <button class="seg-btn active" style="flex:1;" id="tabLoginMode" onclick="setAuthMode('login')">Iniciar Sesión</button>
           <button class="seg-btn" style="flex:1;" id="tabRegMode" onclick="setAuthMode('register')">Crear Cuenta</button>
+          <button class="seg-btn" style="flex:1;" id="tabResetMode" onclick="setAuthMode('reset')">Restaurar</button>
         </div>
-        <div class="field">
+        <div class="field" id="userWrap">
           <label id="authUserLabel">Usuario</label>
           <input type="text" id="authUser" placeholder="ej. juantovar" autocomplete="username" />
         </div>
@@ -341,13 +405,29 @@ HTML_PAGE = """<!DOCTYPE html>
           <label>Nombre completo</label>
           <input type="text" id="authDisplay" placeholder="ej. Juan Tovar" />
         </div>
-        <div class="field">
-          <label>Contraseña (mín. 6 caracteres)</label>
+        <div class="field" id="passWrap">
+          <label id="authPassLabel">Contraseña (mín. 6 caracteres)</label>
           <input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitAuth()" />
+        </div>
+        <div class="field" id="passConfirmWrap" style="display:none;">
+          <label>Confirmar nueva contraseña</label>
+          <input type="password" id="authPassConfirm" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter') submitAuth()" />
+        </div>
+        <div id="captchaWrap">
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--sub);margin-bottom:5px;">Verificación anti-bot (CAPTCHA)</label>
+          <div class="captcha-box">
+            <canvas id="captchaCanvas" class="captcha-canvas" width="128" height="38"></canvas>
+            <button type="button" class="btn" style="padding:6px 10px;font-size:12px;" onclick="refreshCaptcha()" title="Nuevo código">↻</button>
+            <input type="text" id="authCaptchaInput" placeholder="Código" maxlength="6" style="flex:1;min-width:80px;padding:7px 10px;border-radius:10px;border:1px solid var(--border-strong);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:2px;" onkeydown="if(event.key==='Enter') submitAuth()" />
+          </div>
+          <div id="turnstileMount"></div>
         </div>
         <div id="authErr" style="color:var(--red);font-size:12px;min-height:18px;margin-bottom:6px;"></div>
         <div id="authInfo" style="display:none;padding:9px 12px;border-radius:10px;background:var(--green-bg);color:var(--green);font-size:12px;margin-bottom:10px;"></div>
         <button class="btn btn-primary" style="width:100%;padding:11px;" id="authSubmitBtn" onclick="submitAuth()">Entrar</button>
+        <div style="text-align:center;margin-top:10px;" id="forgotLinkWrap">
+          <button type="button" onclick="setAuthMode('reset')" style="border:0;background:none;color:var(--violet);font-size:12px;font-weight:600;cursor:pointer;">¿Olvidaste tu contraseña? Restáurala aquí</button>
+        </div>
       </div>
     </div>
   </section>
@@ -356,7 +436,8 @@ HTML_PAGE = """<!DOCTYPE html>
   <div id="appShell">
     <header class="topbar">
       <div class="nav-pill">
-        <div style="display:flex;align-items:center;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="btn" style="padding:7px 11px;font-size:14px;" id="btnMenuToggle" onclick="toggleSideNav()" title="Mostrar / ocultar menú lateral">☰</button>
           <div class="brand-logo" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
               <path d="M5 10L9 5L13 9H19L23 5L27 10L25 22L16 27L7 22L5 10Z" fill="rgba(15,15,30,0.85)" stroke="white" stroke-width="1.6"/>
@@ -387,22 +468,28 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
     </header>
 
-    <div class="main-wrap">
-      <!-- Left Main Area -->
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px 10px;font-size:12px;color:var(--muted);">
-          <span id="statusText">Listo</span>
-          <span class="num" id="bankHeaderTag">Saldo: 100.00u</span>
-        </div>
+    <div class="main-wrap" id="mainWrap">
+      <!-- Collapsible Side / Dropdown Menu -->
+      <aside class="glass side-nav" id="sideNav">
+        <div class="side-section-lbl">Menú</div>
+        <button class="side-btn active" data-tab="tabRadar" onclick="switchTab('tabRadar', this)"><span>⚽ Partidos</span><span class="pill-cnt" id="cntRadar">0</span></button>
+        <button class="side-btn" id="btnTabChannel" data-tab="tabChannel" onclick="switchTab('tabChannel', this); markChannelRead()"><span>📢 Canal En Vivo</span><span class="pill-cnt" id="cntChannel">0</span></button>
+        <button class="side-btn" data-tab="tabAnalyzer" onclick="switchTab('tabAnalyzer', this)"><span>🎯 Analizar Cuota</span></button>
+        <button class="side-btn" data-tab="tabCombos" onclick="switchTab('tabCombos', this)"><span>🔗 Combinadas</span><span class="pill-cnt" id="cntCombos">0</span></button>
+        <button class="side-btn" data-tab="tabAccount" onclick="switchTab('tabAccount', this)"><span>📊 Mi Rendimiento</span><span class="pill-cnt" id="cntMyBets">0</span></button>
+        <button class="side-btn" id="navBtnAdmin" data-tab="tabAdmin" style="display:none;" onclick="switchTab('tabAdmin', this); loadAdminUsers()"><span>👥 Usuarios</span><span class="pill-cnt" id="cntAdminUsers">0</span></button>
 
-        <div class="tabs-row">
-          <div style="display:flex;flex-wrap:wrap;gap:7px;">
-            <button class="tab-btn active" onclick="switchTab('tabRadar', this)">Partidos <span class="pill-cnt" id="cntRadar">0</span></button>
-            <button class="tab-btn" id="btnTabChannel" onclick="switchTab('tabChannel', this); markChannelRead()">📢 Canal En Vivo <span class="pill-cnt" id="cntChannel">0</span></button>
-            <button class="tab-btn" onclick="switchTab('tabAnalyzer', this)">Analizar Mi Cuota</button>
-            <button class="tab-btn" onclick="switchTab('tabCombos', this)">Pronósticos y Combinadas <span class="pill-cnt" id="cntCombos">0</span></button>
-            <button class="tab-btn" onclick="switchTab('tabAccount', this)">Mi Rendimiento <span class="pill-cnt" id="cntMyBets">0</span></button>
-          </div>
+        <div class="bank-box" title="Saldo virtual en unidades (100u = banca inicial simulada para medir tu ROI sin arriesgar dinero real)">
+          <div style="font-size:10.5px;font-weight:700;color:var(--violet);text-transform:uppercase;">Banca Simulada</div>
+          <div class="num" style="font-size:17px;font-weight:800;margin-top:2px;" id="bankHeaderTag">100.00u</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:2px;">Unidades virtuales (100u = inicio) para medir tu rendimiento sin dinero real.</div>
+        </div>
+      </aside>
+
+      <!-- Center Main Area -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px 10px;font-size:12px;color:var(--muted);">
+          <span id="statusText">Listo</span>
           <input type="search" id="searchInput" class="search-input" placeholder="Buscar equipo o liga..." oninput="renderMatches()" />
         </div>
 
@@ -529,10 +616,30 @@ HTML_PAGE = """<!DOCTYPE html>
             </table>
           </div>
         </section>
+
+        <!-- TAB 5: Admin Registered Users Panel -->
+        <section id="tabAdmin" class="tab-panel">
+          <div class="glass" style="padding:18px;margin-bottom:14px;">
+            <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;">
+              <div>
+                <h2 style="margin:0;font-size:18px;">Usuarios Registrados</h2>
+                <div style="font-size:12px;color:var(--muted);">Panel exclusivo de administración • Cuentas activas, accesos y balance</div>
+              </div>
+              <button class="btn btn-primary" onclick="loadAdminUsers()">Actualizar lista</button>
+            </div>
+            <div class="charts-row" id="adminKpis" style="margin-bottom:0;"></div>
+          </div>
+          <div class="glass table-card">
+            <table>
+              <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Registro</th><th>Último acceso</th><th>Modo</th><th>Jugadas</th><th>Neto</th></tr></thead>
+              <tbody id="adminUsersBody"><tr><td colspan="8" style="text-align:center;color:var(--muted);">Cargando usuarios...</td></tr></tbody>
+            </table>
+          </div>
+        </section>
       </div>
 
       <!-- Sticky Right Sidebar: Interactive Bet Slip & Live Parlay Analyzer -->
-      <aside class="glass slip-panel">
+      <aside class="glass slip-panel" id="slipPanel">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div>
             <h3 style="margin:0;font-size:16px;">Mi Cupón</h3>
@@ -583,9 +690,11 @@ HTML_PAGE = """<!DOCTYPE html>
     let currentScope = 'all';
     let dateFilter = 'all';
     let viewMode = 'chrono';
+    let selectedLeague = null;
     let favOnly = false;
     let showHourRadar = false;
     let authMode = 'login';
+    let captchaCode = '';
     let currentUser = null;
     let userSummary = null;
     let botReport = null;
@@ -718,14 +827,73 @@ HTML_PAGE = """<!DOCTYPE html>
       uIn.autocomplete = 'email';
     }
 
+    function refreshCaptcha() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      captchaCode = code;
+      const cv = document.getElementById('captchaCanvas');
+      const inp = document.getElementById('authCaptchaInput');
+      if (inp) inp.value = '';
+      if (!cv || !cv.getContext) return;
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      for (let i = 0; i < 5; i++) {
+        ctx.strokeStyle = i % 2 === 0 ? 'rgba(124,58,237,0.28)' : 'rgba(234,88,12,0.28)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(Math.random() * 25, Math.random() * 38);
+        ctx.lineTo(100 + Math.random() * 28, Math.random() * 38);
+        ctx.stroke();
+      }
+      ctx.font = 'bold 21px Poppins, sans-serif';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < code.length; i++) {
+        ctx.save();
+        ctx.translate(16 + i * 22, 20 + (Math.random() * 4 - 2));
+        ctx.rotate((Math.random() - 0.5) * 0.36);
+        ctx.fillStyle = i % 2 === 0 ? '#5B21B6' : '#C2410C';
+        ctx.fillText(code[i], 0, 0);
+        ctx.restore();
+      }
+    }
+
     function setAuthMode(mode) {
       authMode = mode;
-      document.getElementById('tabLoginMode').classList.toggle('active', mode === 'login');
-      document.getElementById('tabRegMode').classList.toggle('active', mode === 'register');
-      document.getElementById('displayWrap').style.display = mode === 'register' ? 'block' : 'none';
+      const isLogin = mode === 'login', isReg = mode === 'register', isReset = mode === 'reset', isUpd = mode === 'update_password';
+      document.getElementById('tabLoginMode').classList.toggle('active', isLogin);
+      document.getElementById('tabRegMode').classList.toggle('active', isReg);
+      document.getElementById('tabResetMode').classList.toggle('active', isReset);
+      document.getElementById('authModeSeg').style.display = isUpd ? 'none' : 'inline-flex';
+      document.getElementById('userWrap').style.display = isUpd ? 'none' : 'block';
+      document.getElementById('displayWrap').style.display = isReg ? 'block' : 'none';
+      document.getElementById('passWrap').style.display = isReset ? 'none' : 'block';
+      document.getElementById('passConfirmWrap').style.display = isUpd ? 'block' : 'none';
+      document.getElementById('captchaWrap').style.display = isUpd ? 'none' : 'block';
+      document.getElementById('forgotLinkWrap').style.display = isLogin ? 'block' : 'none';
+      document.getElementById('authPassLabel').textContent = isUpd ? 'Nueva contraseña (mín. 6 caracteres)' : 'Contraseña (mín. 6 caracteres)';
+      document.getElementById('authCardTitle').textContent = isUpd ? 'Establecer nueva contraseña' : (isReset ? 'Restaurar contraseña' : 'Acceder a Caza Cuotas');
+      document.getElementById('authSubmitBtn').textContent = isUpd ? 'Guardar nueva contraseña' : (isReset ? 'Enviar enlace de recuperación' : (isReg ? 'Crear cuenta' : 'Entrar'));
       document.getElementById('authErr').textContent = '';
       document.getElementById('authInfo').style.display = 'none';
+      if (!isUpd) refreshCaptcha();
     }
+
+    if (SUPABASE_ENABLED && sbClient) {
+      sbClient.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          document.getElementById('authGate').style.display = 'flex';
+          document.getElementById('appShell').style.display = 'none';
+          setAuthMode('update_password');
+          const infoBox = document.getElementById('authInfo');
+          infoBox.textContent = 'Enlace verificado. Escribe tu nueva contraseña para continuar.';
+          infoBox.style.display = 'block';
+        }
+      });
+    }
+    refreshCaptcha();
 
     function buildUserSummaryFromRows(profile, rows, favSet) {
       const base = Number((profile && profile.bankroll_base) || 100.0);
@@ -804,10 +972,13 @@ HTML_PAGE = """<!DOCTYPE html>
         document.getElementById('authGate').style.display = 'none';
         document.getElementById('appShell').style.display = 'block';
         document.getElementById('adminComposer').style.display = currentUser.is_admin ? 'flex' : 'none';
+        const admBtn = document.getElementById('navBtnAdmin');
+        if (admBtn) admBtn.style.display = currentUser.is_admin ? 'flex' : 'none';
         renderUserUI();
         if (!lastScan.matches.length) await runScan(false);
         await loadChannelPosts();
         subscribeChannelRealtime();
+        if (currentUser.is_admin) loadAdminUsers();
         return;
       }
       if (STATIC_MODE) {
@@ -836,12 +1007,55 @@ HTML_PAGE = """<!DOCTYPE html>
       const infoBox = document.getElementById('authInfo');
       errBox.textContent = '';
       infoBox.style.display = 'none';
+
+      if (authMode !== 'update_password') {
+        const typedCap = (document.getElementById('authCaptchaInput').value || '').trim().toUpperCase();
+        if (!typedCap || typedCap !== captchaCode) {
+          errBox.textContent = 'Código CAPTCHA incorrecto. Intenta de nuevo.';
+          refreshCaptcha();
+          return;
+        }
+      }
+
       if (SUPABASE_ENABLED) {
+        if (authMode === 'update_password') {
+          const p1 = document.getElementById('authPass').value;
+          const p2 = document.getElementById('authPassConfirm').value;
+          if (p1.length < 6) { errBox.textContent = 'La nueva contraseña debe tener al menos 6 caracteres.'; return; }
+          if (p1 !== p2) { errBox.textContent = 'Las contraseñas no coinciden.'; return; }
+          const btn = document.getElementById('authSubmitBtn');
+          btn.disabled = true;
+          try {
+            const { error } = await sbClient.auth.updateUser({ password: p1 });
+            if (error) { errBox.textContent = error.message; return; }
+            infoBox.textContent = 'Contraseña actualizada correctamente.';
+            infoBox.style.display = 'block';
+            setAuthMode('login');
+            await checkAuth();
+          } finally { btn.disabled = false; }
+          return;
+        }
+
         const email = document.getElementById('authUser').value.trim();
         const display_name = document.getElementById('authDisplay').value.trim();
         const password = document.getElementById('authPass').value;
-        if (!email || !email.includes('@')) { errBox.textContent = 'Ingresa un correo electrónico válido.'; return; }
-        if (password.length < 6) { errBox.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+        if (!email || !email.includes('@')) { errBox.textContent = 'Ingresa un correo electrónico válido.'; refreshCaptcha(); return; }
+
+        if (authMode === 'reset') {
+          const btn = document.getElementById('authSubmitBtn');
+          btn.disabled = true;
+          try {
+            const redirectTo = window.location.origin + window.location.pathname;
+            const { error } = await sbClient.auth.resetPasswordForEmail(email, { redirectTo });
+            if (error) { errBox.textContent = error.message; refreshCaptcha(); return; }
+            infoBox.textContent = 'Enviamos un enlace de recuperación a tu correo. Revisa tu bandeja o spam.';
+            infoBox.style.display = 'block';
+            refreshCaptcha();
+          } finally { btn.disabled = false; }
+          return;
+        }
+
+        if (password.length < 6) { errBox.textContent = 'La contraseña debe tener al menos 6 caracteres.'; refreshCaptcha(); return; }
         const btn = document.getElementById('authSubmitBtn');
         btn.disabled = true;
         try {
@@ -853,6 +1067,7 @@ HTML_PAGE = """<!DOCTYPE html>
             });
             if (error) {
               errBox.textContent = error.message.includes('already registered') ? 'Este correo ya está registrado. Inicia sesión.' : error.message;
+              refreshCaptcha();
               return;
             }
             if (!data.session) {
@@ -865,6 +1080,7 @@ HTML_PAGE = """<!DOCTYPE html>
             const { error } = await sbClient.auth.signInWithPassword({ email, password });
             if (error) {
               errBox.textContent = error.message.includes('Invalid login') ? 'Correo o contraseña incorrectos.' : error.message;
+              refreshCaptcha();
               return;
             }
           }
@@ -878,13 +1094,17 @@ HTML_PAGE = """<!DOCTYPE html>
         errBox.textContent = 'Ejecuta abrir_bot.bat en tu PC para iniciar sesión local.';
         return;
       }
+      if (authMode === 'reset' || authMode === 'update_password') {
+        errBox.textContent = 'La recuperación por correo solo está disponible en la versión en línea.';
+        return;
+      }
       const username = document.getElementById('authUser').value;
       const display_name = document.getElementById('authDisplay').value;
       const password = document.getElementById('authPass').value;
       const ep = authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
       const r = await fetch(ep, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username, display_name, password}) });
       const d = await r.json();
-      if (!r.ok) { errBox.textContent = d.error || 'Error de acceso'; return; }
+      if (!r.ok) { errBox.textContent = d.error || 'Error de acceso'; refreshCaptcha(); return; }
       await checkAuth();
     }
 
@@ -943,9 +1163,25 @@ HTML_PAGE = """<!DOCTYPE html>
 
     function setViewMode(mode) {
       viewMode = mode;
+      selectedLeague = null;
       document.getElementById('viewChrono').classList.toggle('active', mode === 'chrono');
       document.getElementById('viewLeague').classList.toggle('active', mode === 'league');
       renderMatches();
+    }
+
+    function selectLeague(lg) {
+      selectedLeague = lg;
+      renderMatches();
+    }
+
+    function toggleSideNav() {
+      const wrap = document.getElementById('mainWrap');
+      if (!wrap) return;
+      if (window.innerWidth <= 1080) {
+        wrap.classList.toggle('mobile-nav-open');
+      } else {
+        wrap.classList.toggle('side-collapsed');
+      }
     }
 
     function renderHourRadar() {
@@ -1037,9 +1273,15 @@ HTML_PAGE = """<!DOCTYPE html>
 
     function switchTab(id, btn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(id).classList.add('active');
-      btn.classList.add('active');
+      if (btn) btn.classList.add('active');
+      const wrap = document.getElementById('mainWrap');
+      if (wrap) {
+        const hideSlip = (id === 'tabChannel' || id === 'tabAccount' || id === 'tabAdmin');
+        wrap.classList.toggle('no-slip', hideSlip);
+        wrap.classList.remove('mobile-nav-open');
+      }
     }
 
     function setStatus(loading, msg) {
@@ -1259,21 +1501,52 @@ HTML_PAGE = """<!DOCTYPE html>
         return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
       });
 
-      document.getElementById('leaguesContainer').innerHTML = orderedKeys.map(lg => {
-        const g = grouped[lg];
-        const code = LEAGUE_SHORT[lg] || lg.toUpperCase().slice(0, 3);
+      if (selectedLeague && grouped[selectedLeague]) {
+        const g = grouped[selectedLeague];
+        const code = LEAGUE_SHORT[selectedLeague] || selectedLeague.toUpperCase().slice(0, 3);
         const cards = g.items.map(({ m, origIdx }) => renderMatchCardHtml(m, origIdx, false)).join('');
-        return `<section class="glass league-section">
-          <div class="league-header">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <div class="league-emblem">${code}</div>
-              <h2 style="margin:0;font-size:16px;font-weight:700;">${g.label}</h2>
+        document.getElementById('leaguesContainer').innerHTML = `
+          <section class="glass league-section">
+            <div class="league-header" style="flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <button class="btn" onclick="selectLeague(null)" style="padding:6px 12px;">← Ligas</button>
+                <img class="league-logo-sm" src="./logos/${selectedLeague}.png" alt="${g.label}" onerror="this.style.display='none'" />
+                <div>
+                  <h2 style="margin:0;font-size:16.5px;font-weight:700;">${g.label}</h2>
+                  <div style="font-size:11.5px;color:var(--muted);">Ordenados cronológicamente por fecha y hora</div>
+                </div>
+              </div>
+              <span class="badge b-pend">${g.items.length} ${g.items.length===1?'partido':'partidos'}</span>
             </div>
-            <span class="badge b-pend">${g.items.length} ${g.items.length===1?'partido':'partidos'}</span>
-          </div>
-          <div class="matches-grid">${cards}</div>
-        </section>`;
-      }).join('');
+            <div class="matches-grid">${cards}</div>
+          </section>`;
+        return;
+      }
+
+      document.getElementById('leaguesContainer').innerHTML = `
+        <div class="leagues-cards-grid">
+          ${orderedKeys.map(lg => {
+            const g = grouped[lg];
+            const nextKick = g.items[0] ? g.items[0].m.kickoff_col : '';
+            const code = LEAGUE_SHORT[lg] || lg.toUpperCase().slice(0, 3);
+            return `
+            <article class="league-tile" onclick="selectLeague('${lg}')">
+              <div style="display:flex;align-items:center;gap:14px;">
+                <div class="league-logo-wrap">
+                  <img class="league-logo-img" src="./logos/${lg}.png" alt="${g.label}" onerror="this.outerHTML='<span style=&quot;font-weight:800;font-size:13px;color:var(--violet);&quot;>${code}</span>'" />
+                </div>
+                <div style="min-width:0;flex:1;">
+                  <div style="font-size:14.5px;font-weight:700;line-height:1.25;">${g.label}</div>
+                  <div class="num" style="font-size:11.5px;color:var(--muted);margin-top:3px;">Próximo: ${nextKick} COL</div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border);">
+                <span class="badge b-pend">${g.items.length} ${g.items.length===1?'partido':'partidos'}</span>
+                <span style="font-size:12px;font-weight:600;color:var(--violet);">Ver partidos →</span>
+              </div>
+            </article>`;
+          }).join('')}
+        </div>`;
     }
 
     function populateAnalyzerSelects() {
@@ -1292,7 +1565,7 @@ HTML_PAGE = """<!DOCTYPE html>
       if (m && m.all_markets && m.all_markets.length) {
         document.getElementById('azOdds').value = m.all_markets[0].odds.toFixed(2);
       }
-      const btn = document.querySelectorAll('.tab-btn')[1];
+      const btn = document.querySelector('.side-btn[data-tab="tabAnalyzer"]');
       switchTab('tabAnalyzer', btn);
       analyzeCustomOdds();
     }
@@ -1559,7 +1832,7 @@ HTML_PAGE = """<!DOCTYPE html>
     function renderUserUI() {
       const u = currentUser, d = userSummary;
       document.getElementById('welcomeUser').textContent = `${u.display_name} (@${u.username})`;
-      document.getElementById('bankHeaderTag').textContent = `Saldo: ${d.bankroll_u.toFixed(2)}u`;
+      document.getElementById('bankHeaderTag').textContent = `${d.bankroll_u.toFixed(2)}u`;
       document.getElementById('myBankVal').textContent = `${d.bankroll_u.toFixed(2)}u`;
       document.getElementById('myRoiBadge').innerHTML = `<span class="badge ${d.roi_pct>=0?'b-pos':'b-lost'}">ROI ${d.roi_pct>=0?'+':''}${d.roi_pct}%</span>`;
       document.getElementById('prefMode').value = u.stake_mode;
@@ -1756,18 +2029,59 @@ HTML_PAGE = """<!DOCTYPE html>
       reader.onload = ev => {
         const img = new Image();
         img.onload = () => {
-          const maxW = 900;
+          const maxW = 1120;
           const scale = Math.min(1, maxW / img.width);
           const canvas = document.createElement('canvas');
           canvas.width = Math.round(img.width * scale);
           canvas.height = Math.round(img.height * scale);
           canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-          adminImgDataUrl = canvas.toDataURL('image/webp', 0.82);
+          adminImgDataUrl = canvas.toDataURL('image/webp', 0.90);
           document.getElementById('adminImgName').textContent = file.name + ' ✓';
         };
         img.src = ev.target.result;
       };
       reader.readAsDataURL(file);
+    }
+
+    async function loadAdminUsers() {
+      const body = document.getElementById('adminUsersBody');
+      const kpis = document.getElementById('adminKpis');
+      if (!body || !SUPABASE_ENABLED || !currentUser || !currentUser.is_admin) return;
+      body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);">Consultando usuarios...</td></tr>';
+      const { data, error } = await sbClient.rpc('admin_list_users');
+      if (error) {
+        body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--amber);">Ejecuta la migración v3 en Supabase SQL Editor para habilitar admin_list_users (${error.message}).</td></tr>`;
+        return;
+      }
+      const rows = data || [];
+      const cntEl = document.getElementById('cntAdminUsers');
+      if (cntEl) cntEl.textContent = String(rows.length);
+      const admins = rows.filter(r => r.is_admin).length;
+      const totalBets = rows.reduce((s, r) => s + Number(r.total_bets || 0), 0);
+      const active7d = rows.filter(r => r.last_sign_in_at && (Date.now() - new Date(r.last_sign_in_at).getTime()) <= 7 * 86400000).length;
+      if (kpis) {
+        kpis.innerHTML = `
+          <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Total Usuarios</div><div class="num" style="font-size:22px;font-weight:800;">${rows.length}</div></div>
+          <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Activos (7 días)</div><div class="num" style="font-size:22px;font-weight:800;color:var(--green);">${active7d}</div></div>
+          <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Administradores</div><div class="num" style="font-size:22px;font-weight:800;color:var(--violet);">${admins}</div></div>
+          <div class="mini-box"><div style="font-size:11px;color:var(--muted);">Jugadas Usuarios</div><div class="num" style="font-size:22px;font-weight:800;">${totalBets}</div></div>`;
+      }
+      body.innerHTML = rows.map(r => {
+        const net = Number(r.net_profit_u || 0);
+        const netCol = net >= 0 ? 'var(--green)' : 'var(--red)';
+        const reg = r.created_at ? formatColTime(r.created_at) : '—';
+        const last = r.last_sign_in_at ? formatColTime(r.last_sign_in_at) : 'Sin acceso';
+        return `<tr>
+          <td><strong>${r.display_name || '—'}</strong></td>
+          <td class="num">${r.email || '—'}</td>
+          <td><span class="badge ${r.is_admin ? 'b-pos' : 'b-pend'}">${r.is_admin ? 'Admin' : 'Miembro'}</span></td>
+          <td class="num">${reg}</td>
+          <td class="num">${last}</td>
+          <td>${r.stake_mode || 'flat'}</td>
+          <td class="num">${r.total_bets || 0} (${r.pending_bets || 0} pend.)</td>
+          <td class="num" style="font-weight:700;color:${netCol};">${net >= 0 ? '+' : ''}${net.toFixed(2)}u</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);">No hay usuarios registrados.</td></tr>';
     }
 
     async function sendAdminPost() {
@@ -1863,6 +2177,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif parsed.path.startswith("/logos/"):
+            fname = os.path.basename(parsed.path)
+            logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logos", fname)
+            if fname and os.path.isfile(logo_path):
+                with open(logo_path, "rb") as lf:
+                    data = lf.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                self._send_json({"error": "Logo not found"}, code=404)
         elif parsed.path == "/api/auth/me":
             user = db.get_user_by_session(self._get_session_token())
             summary = db.get_user_summary(user["id"]) if user else None
