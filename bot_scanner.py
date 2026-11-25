@@ -463,6 +463,9 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 )
             )
 
+    # Sort parlays strictly chronologically so today's games are sent/listed first
+    parlays_a.sort(key=lambda p: (p["kickoff_col"], -p["prob_est"]))
+
     opt_b = []
     for e in evals:
         if e["best_opt_b"] is None:
