@@ -4,7 +4,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-FIB_SEQ = (1, 1, 2, 3, 5, 8, 13, 21)
+FIB_SEQ = (1, 2, 3, 5, 8)
 
 
 def _sb_request(
@@ -142,9 +142,11 @@ def settle_supabase_bets(
 
         uid = bet["user_id"]
         prof = prof_map.get(uid)
-        if prof and prof.get("stake_mode") == "fibonacci":
+        mode = (prof or {}).get("stake_mode", "flat")
+        if prof and mode in ("fibonacci", "fibonacci_3"):
+            max_idx = 2 if mode == "fibonacci_3" else len(FIB_SEQ) - 1
             cur_step = int(prof.get("fib_step", 0))
-            next_step = 0 if won else min(cur_step + 1, len(FIB_SEQ) - 1)
+            next_step = 0 if won else min(cur_step + 1, max_idx)
             prof["fib_step"] = next_step
             _sb_request(
                 supabase_url,

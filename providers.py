@@ -250,6 +250,67 @@ def fetch_recent_history(leagues: list[str], months_back: int = 4) -> tuple[dict
     return team_all, team_home, team_away, lg_hg, lg_ag
 
 
+def fetch_next_global_matches(limit: int = 8) -> list[dict]:
+    """Fetch the next upcoming soccer matches worldwide from ESPN ordered strictly by kickoff time."""
+    now_utc = dt.datetime.now(dt.timezone.utc)
+    dates = [now_utc.strftime("%Y%m%d"), (now_utc + dt.timedelta(days=1)).strftime("%Y%m%d")]
+    seen: set[str] = set()
+    rows: list[tuple[dt.datetime, dict]] = []
+
+    for ds in dates:
+        data = fetch_json(f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={ds}")
+        if not data:
+            continue
+        lg_map = {str(lobj.get("id")): lobj.get("name", "") for lobj in data.get("leagues", []) if isinstance(lobj, dict)}
+        for ev in data.get("events", []):
+            eid = str(ev.get("id"))
+            if eid in seen:
+                continue
+            seen.add(eid)
+            comp = (ev.get("competitions") or [{}])[0]
+            if comp.get("status", {}).get("type", {}).get("state") != "pre":
+                continue
+            k_str = ev.get("date", "")
+            try:
+                k_dt = dt.datetime.fromisoformat(k_str.replace("Z", "+00:00"))
+            except Exception:
+                continue
+            if k_dt < now_utc - dt.timedelta(minutes=5):
+                continue
+            odds = _extract_scoreboard_odds(comp)
+            if not odds:
+                continue
+            comps = comp.get("competitors") or []
+            home = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "home"), None)
+            away = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "away"), None)
+            if not home or not away:
+                continue
+            o1, ox, o2, ou_line, _, _, prov = odds
+            lg_id = str((ev.get("league") or {}).get("id", ""))
+            lg_label = lg_map.get(lg_id) or (ev.get("season") or {}).get("slug") or "Fútbol Internacional"
+            rows.append(
+                (
+                    k_dt,
+                    {
+                        "event_id": eid,
+                        "kickoff_utc": k_str,
+                        "kickoff_col": utc_to_colombia_str(k_str),
+                        "league_label": lg_label,
+                        "home": home,
+                        "away": away,
+                        "o1": round(o1, 2),
+                        "ox": round(ox, 2),
+                        "o2": round(o2, 2),
+                        "ou_line": ou_line,
+                        "provider": prov,
+                    },
+                )
+            )
+
+    rows.sort(key=lambda x: x[0])
+    return [r[1] for r in rows[:limit]]
+
+
 def fetch_espn_match_result(league: str, match_date: str, event_id: str) -> tuple[bool, int, int] | None:
     """Return (completed, hg, ag) for a given ESPN event, checking +/-1 day around match_date."""
     base_d = dt.date.fromisoformat(match_date[:10])

@@ -29,6 +29,10 @@ MAIN_MENU_MARKUP = {
         ],
         [
             {"text": "🎯 Posibles Apuestas", "callback_data": "/apuestas"},
+            {"text": "⏱ Próximo por Hora", "callback_data": "/proximo"},
+        ],
+        [
+            {"text": "📊 Efectividad Diaria", "callback_data": "/efectividad"},
             {"text": "📈 Historial ROI", "callback_data": "/historial"},
         ],
     ]
@@ -150,12 +154,61 @@ def format_picks_block(scan: dict) -> str:
 
 
 def format_history_block(rep: dict) -> str:
+    acc = rep.get("accuracy_pct", 0.0)
     return (
         "<b>📈 CAZA CUOTAS • PAPER TRADING</b>\n"
+        f"• Efectividad global: <b>{rep['won']} de {rep['settled']} ({acc:.1f}%)</b>\n"
         f"• Bankroll: <b>{rep['bankroll_u']:.2f}u</b> (Base 100u)\n"
         f"• ROI acumulado: <b>{rep['roi_pct']:+.2f}%</b> ({rep['total_profit_u']:+.2f}u)\n"
-        f"• Historial: <b>{rep['won']}G / {rep['lost']}P</b> ({rep['pending']} pendientes)"
+        f"• Pendientes: <b>{rep['pending']}</b>"
     )
+
+
+def format_daily_effectiveness_block(rep: dict) -> str:
+    lines = ["<b>📊 CAZA CUOTAS • EFECTIVIDAD DIARIA Y AUTO-MEJORA</b>"]
+    daily = rep.get("daily_stats") or []
+    settled_days = [d for d in daily if d["settled"] > 0]
+    if settled_days:
+        latest = settled_days[0]
+        lines.append(
+            f"\n🎯 <b>Último día medido ({latest['date']}):</b> "
+            f"<b>{latest['won']} de {latest['settled']} efectivos ({latest['accuracy_pct']}%)</b> "
+            f"| Neto: <b>{latest['profit_u']:+.2f}u</b>"
+        )
+        lines.append("\n<b>Desglose reciente por día:</b>")
+        for d in daily[:7]:
+            if d["settled"] > 0:
+                lines.append(
+                    f"• <code>{d['date']}</code>: <b>{d['won']}/{d['settled']}</b> ({d['accuracy_pct']}%) "
+                    f"| {d['profit_u']:+.2f}u ({d['pending']} pend.)"
+                )
+            else:
+                lines.append(f"• <code>{d['date']}</code>: {d['pending']} pendientes por jugar")
+    else:
+        lines.append(
+            f"\n<i>Aún no hay partidos liquidados hoy. Hay {rep['pending']} pronósticos pendientes en seguimiento.</i>"
+        )
+
+    cal = rep.get("calibration") or {}
+    if cal:
+        lines.append("\n<b>🧠 Auto-Calibración por Mercado:</b>")
+        ranked = sorted(cal.items(), key=lambda x: (x[1]["settled"], x[1]["win_rate_pct"]), reverse=True)[:5]
+        for mk, info in ranked:
+            lines.append(f"• <code>{mk}</code>: {info['won']}/{info['settled']} ({info['win_rate_pct']}%) — {info['status']}")
+    return "\n".join(lines)
+
+
+def format_next_by_hour_block(scan: dict) -> str:
+    lines = ["<b>⏱ PRÓXIMOS PARTIDOS POR HORA (RADAR GLOBAL)</b>"]
+    g_list = scan.get("next_global") or []
+    for m in g_list[:8]:
+        lines.append(
+            f"\n🕒 <code>{m['kickoff_col']} COL</code> • <b>{html.escape(m['home'])} vs {html.escape(m['away'])}</b>\n"
+            f"🏆 {html.escape(m['league_label'])} | 1X2: <code>{m['o1']:.2f} / {m['ox']:.2f} / {m['o2']:.2f}</code>"
+        )
+    if not g_list:
+        lines.append("\n<i>Sin partidos próximos encontrados en este instante.</i>")
+    return "\n".join(lines)
 
 
 def _build_detailed_match_caption(m: dict) -> str:
@@ -262,9 +315,19 @@ def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_
             db.mark_alert_sent(key)
     if settled_msgs:
         rep = db.get_summary()
-        body = "<b>🏁 CAZA CUOTAS • RESULTADOS LIQUIDADOS</b>\n\n" + "\n\n".join(settled_msgs) + "\n\n" + format_history_block(rep)
+        body = "<b>🏁 CAZA CUOTAS • RESULTADOS LIQUIDADOS</b>\n\n" + "\n\n".join(settled_msgs) + "\n\n" + format_daily_effectiveness_block(rep)
         if send_html(token, channel_id, body):
             sent_count += 1
+    else:
+        rep = db.get_summary()
+        settled_days = [d for d in (rep.get("daily_stats") or []) if d["settled"] > 0]
+        if settled_days:
+            d0 = settled_days[0]
+            eff_key = f"daily_eff_v1:{d0['date']}:{d0['won']}/{d0['settled']}"
+            if not db.was_alert_sent(eff_key):
+                if send_html(token, channel_id, format_daily_effectiveness_block(rep)):
+                    db.mark_alert_sent(eff_key)
+                    sent_count += 1
 
     return sent_count
 
@@ -280,6 +343,8 @@ def handle_command(text: str, chat_id: str = "") -> str:
             "• /colombia — Liga BetPlay (rachas y cuotas)\n"
             "• /europa — Top 5 Europa + Champions\n"
             "• /apuestas — Combinadas Opción A y Bet Builder\n"
+            "• /proximo — Próximos partidos por hora (radar mundial)\n"
+            "• /efectividad — Efectividad diaria (X de Y) y auto-calibración\n"
             "• /historial — Rendimiento Paper Trading\n"
             "• /liquidar — Actualizar marcadores finales\n\n"
             "<i>Modo simulación estadística (sin dinero real).</i>"
@@ -294,12 +359,17 @@ def handle_command(text: str, chat_id: str = "") -> str:
     if cmd == "/apuestas":
         scan = run_scan_pipeline(leagues=DEFAULT_LEAGUES, days=4, save=False)
         return format_picks_block(scan)
+    if cmd == "/proximo":
+        scan = run_scan_pipeline(leagues=DEFAULT_LEAGUES, days=2, save=False)
+        return format_next_by_hour_block(scan)
+    if cmd == "/efectividad":
+        return format_daily_effectiveness_block(PaperTradingDB().get_summary())
     if cmd == "/historial":
         return format_history_block(PaperTradingDB().get_summary())
     if cmd == "/liquidar":
         st = run_settle_pipeline()
         rep = PaperTradingDB().get_summary()
-        return f"Liquidación ejecutada: <b>{st['settled_now']}</b> actualizadas, {st['still_pending']} pendientes.\n\n{format_history_block(rep)}"
+        return f"Liquidación ejecutada: <b>{st['settled_now']}</b> actualizadas, {st['still_pending']} pendientes.\n\n{format_daily_effectiveness_block(rep)}"
     return "Comando no reconocido. Toca un botón o usa /ayuda."
 
 

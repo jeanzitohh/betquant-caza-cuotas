@@ -345,6 +345,7 @@ HTML_PAGE = """<!DOCTYPE html>
             <button class="seg-btn" id="scopeAll" onclick="setScope('all')">Todas</button>
             <button class="seg-btn" id="scopeCol" onclick="setScope('col.1')">Colombia</button>
           </div>
+          <button class="btn" id="btnHourRadar" onclick="toggleHourRadar()">⏱ Por Hora</button>
           <button class="btn" id="btnFavFilter" onclick="toggleFavOnly()">★ Favoritos</button>
           <button class="btn btn-primary" id="btnScan" onclick="runScan()">Actualizar</button>
           <button class="btn" id="btnSettle" onclick="runSettle()">Liquidar</button>
@@ -373,6 +374,7 @@ HTML_PAGE = """<!DOCTYPE html>
 
         <!-- TAB 1: Leagues & Matches -->
         <section id="tabRadar" class="tab-panel active">
+          <div id="hourRadarWrap" style="display:none;margin-bottom:14px;"></div>
           <div class="leagues-stack" id="leaguesContainer"></div>
         </section>
 
@@ -420,14 +422,16 @@ HTML_PAGE = """<!DOCTYPE html>
             </div>
             <div class="glass" style="padding:18px;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Simulador Fibonacci</span>
+                <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Fibonacci (1-2-3-5-8)</span>
                 <span class="badge b-warn">Base 2u</span>
               </div>
-              <div style="font-size:12px;color:var(--sub);margin-top:6px;">Pérdidas seguidas: <strong class="num" id="fibLossVal">5</strong></div>
-              <input type="range" min="1" max="8" value="5" id="fibSlider" oninput="renderFibSim()" style="width:100%;accent-color:#EA580C;margin:6px 0;" />
+              <div style="font-size:12px;color:var(--sub);margin-top:6px;">Pérdidas seguidas: <strong class="num" id="fibLossVal">3</strong></div>
+              <input type="range" min="1" max="5" value="3" id="fibSlider" oninput="renderFibSim()" style="width:100%;accent-color:#EA580C;margin:6px 0;" />
               <div id="fibChartWrap"></div>
             </div>
           </div>
+
+          <div class="glass" style="padding:18px;margin-bottom:14px;" id="botEffectivenessCard"></div>
 
           <div class="glass" style="padding:16px 18px;margin-bottom:14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
             <div>
@@ -437,7 +441,8 @@ HTML_PAGE = """<!DOCTYPE html>
             <div style="display:flex;gap:8px;align-items:center;">
               <select id="prefMode" style="padding:8px 12px;border-radius:10px;border:1px solid var(--border-strong);background:#FFFFFF;">
                 <option value="flat">Stake Fijo (2u)</option>
-                <option value="fibonacci">Progresión Fibonacci</option>
+                <option value="fibonacci_3">Fibonacci Poco Capital (1-2-3)</option>
+                <option value="fibonacci">Fibonacci Completo (1-2-3-5-8)</option>
               </select>
               <button class="btn btn-primary" onclick="savePrefs()">Guardar</button>
             </div>
@@ -490,20 +495,22 @@ HTML_PAGE = """<!DOCTYPE html>
     const SUPABASE_ANON_KEY = '';
     const SUPABASE_ENABLED = STATIC_MODE && Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
     const sbClient = SUPABASE_ENABLED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
-    const FIB_SEQ = [1, 1, 2, 3, 5, 8, 13, 21];
+    const FIB_SEQ = [1, 2, 3, 5, 8];
 
     const LEAGUE_ORDER = ['uefa.champions', 'ger.1', 'ita.1', 'eng.1', 'esp.1', 'fra.1', 'col.1'];
     const LEAGUE_SHORT = { 'col.1': 'COL', 'uefa.champions': 'UCL', 'eng.1': 'ENG', 'esp.1': 'ESP', 'ita.1': 'ITA', 'ger.1': 'GER', 'fra.1': 'FRA' };
 
     let currentScope = 'eu';
     let favOnly = false;
+    let showHourRadar = false;
     let authMode = 'login';
     let currentUser = null;
     let userSummary = null;
+    let botReport = null;
     let favorites = new Set();
     let rawCloudScan = null;
     let rawCloudGen = '';
-    let lastScan = { matches: [], parlays_a: [], opt_b: [] };
+    let lastScan = { matches: [], parlays_a: [], opt_b: [], next_global: [] };
     let slip = []; // [{event_id, league, match_date, title, market, market_name, odds, prob}]
 
     if (SUPABASE_ENABLED) {
@@ -539,8 +546,9 @@ HTML_PAGE = """<!DOCTYPE html>
         cur += Number(r.profit_u || 0);
         equityCurve.push(Number(cur.toFixed(2)));
       }
-      const fibStep = Math.min(Number((profile && profile.fib_step) || 0), FIB_SEQ.length - 1);
-      const nextFib = Number((2.0 * FIB_SEQ[fibStep]).toFixed(2));
+      const seq = (profile && profile.stake_mode === 'fibonacci_3') ? [1, 2, 3] : FIB_SEQ;
+      const fibStep = Math.min(Number((profile && profile.fib_step) || 0), seq.length - 1);
+      const nextFib = Number((2.0 * seq[fibStep]).toFixed(2));
       return {
         bankroll_u: bankrollU,
         settled: settled.length,
@@ -705,6 +713,47 @@ HTML_PAGE = """<!DOCTYPE html>
       renderMatches();
     }
 
+    function toggleHourRadar() {
+      showHourRadar = !showHourRadar;
+      document.getElementById('btnHourRadar').classList.toggle('btn-primary', showHourRadar);
+      renderHourRadar();
+    }
+
+    function renderHourRadar() {
+      const box = document.getElementById('hourRadarWrap');
+      if (!showHourRadar) { box.style.display = 'none'; return; }
+      const gList = lastScan.next_global || [];
+      box.style.display = 'block';
+      if (!gList.length) {
+        box.innerHTML = '<div class="glass" style="padding:16px;font-size:12.5px;color:var(--muted);">No hay partidos próximos inmediatos en el radar global en este instante.</div>';
+        return;
+      }
+      box.innerHTML = `
+        <section class="glass league-section">
+          <div class="league-header">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="league-emblem" style="background:linear-gradient(135deg,#0EA5E9,#7C3AED);">⏱</div>
+              <div>
+                <h2 style="margin:0;font-size:15.5px;font-weight:700;">Próximos Partidos por Hora (Radar Global)</h2>
+                <div style="font-size:11.5px;color:var(--muted);">Ordenados cronológicamente (incluye torneos asiáticos/globales en curso de la jornada)</div>
+              </div>
+            </div>
+            <span class="badge b-pend">${gList.length} próximos</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">
+            ${gList.map(m => `
+              <div class="mini-box" style="padding:12px;border-radius:14px;">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--violet);font-weight:600;margin-bottom:4px;">
+                  <span>${m.league_label}</span>
+                  <span class="num">${m.kickoff_col} COL</span>
+                </div>
+                <div style="font-size:13px;font-weight:700;margin-bottom:6px;">${m.home} <span style="color:var(--orange);">vs</span> ${m.away}</div>
+                <div class="num" style="font-size:11px;color:var(--sub);">1: @${m.o1.toFixed(2)} • X: @${m.ox.toFixed(2)} • 2: @${m.o2.toFixed(2)}</div>
+              </div>`).join('')}
+          </div>
+        </section>`;
+    }
+
     function switchTab(id, btn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -744,32 +793,41 @@ HTML_PAGE = """<!DOCTYPE html>
       if (SUPABASE_ENABLED) {
         setStatus(true, 'Consultando radar en la nube...');
         if (!rawCloudScan || forceRefresh) {
-          const { data, error } = await sbClient.from('radar_snapshots').select('generated_col,scan_json').eq('id', 1).maybeSingle();
+          const { data, error } = await sbClient.from('radar_snapshots').select('generated_col,scan_json,report_json').eq('id', 1).maybeSingle();
           if (error || !data || !data.scan_json) {
             setStatus(false, 'Radar pendiente de primera sincronización en servidor.');
             return;
           }
           rawCloudScan = data.scan_json;
           rawCloudGen = data.generated_col || '';
+          botReport = data.report_json || null;
         }
         const filtered = filterScanByScope(rawCloudScan, currentScope);
-        lastScan = { ...rawCloudScan, ...filtered, total_matches: filtered.matches.length };
+        lastScan = { ...rawCloudScan, ...filtered, next_global: rawCloudScan.next_global || [], total_matches: filtered.matches.length };
         setStatus(false, `${lastScan.total_matches} partidos próximos • Act: ${rawCloudGen} COL`);
         populateAnalyzerSelects();
+        renderHourRadar();
         renderMatches();
         renderCombos();
         renderSlip();
+        renderBotEffectiveness();
         return;
       }
       setStatus(true, 'Consultando partidos y estadísticas...');
-      const res = await fetch(`/api/scan?scope=${currentScope}&days=5`);
+      const [res, repRes] = await Promise.all([
+        fetch(`/api/scan?scope=${currentScope}&days=5`),
+        fetch('/api/report')
+      ]);
       if (res.status === 401) { await checkAuth(); return; }
       lastScan = await res.json();
+      if (repRes.ok) botReport = await repRes.json();
       setStatus(false, `${lastScan.total_matches} partidos próximos analizados.`);
       populateAnalyzerSelects();
+      renderHourRadar();
       renderMatches();
       renderCombos();
       renderSlip();
+      renderBotEffectiveness();
     }
 
     async function runSettle() {
@@ -1067,7 +1125,7 @@ HTML_PAGE = """<!DOCTYPE html>
       const totalProb = slip.reduce((acc, x) => acc * x.prob, 1.0);
       const impl = 1.0 / totalOdds;
       const ev = (totalProb * totalOdds - 1.0) * 100.0;
-      const defStake = (userSummary && currentUser && currentUser.stake_mode === 'fibonacci') ? userSummary.next_fib_stake : 2.0;
+      const defStake = (userSummary && currentUser && (currentUser.stake_mode === 'fibonacci' || currentUser.stake_mode === 'fibonacci_3')) ? userSummary.next_fib_stake : 2.0;
 
       sum.innerHTML = `
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span>Cuota Total (${slip.length})</span><strong class="num" style="font-size:18px;">@${totalOdds.toFixed(2)}</strong></div>
@@ -1146,7 +1204,12 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('myBankVal').textContent = `${d.bankroll_u.toFixed(2)}u`;
       document.getElementById('myRoiBadge').innerHTML = `<span class="badge ${d.roi_pct>=0?'b-pos':'b-lost'}">ROI ${d.roi_pct>=0?'+':''}${d.roi_pct}%</span>`;
       document.getElementById('prefMode').value = u.stake_mode;
-      document.getElementById('stakeModeDesc').textContent = u.stake_mode === 'fibonacci' ? `Modo actual: Fibonacci (Próximo stake: ${d.next_fib_stake}u)` : 'Modo actual: Stake Fijo (2.0u)';
+      const modeDesc = u.stake_mode === 'fibonacci_3'
+        ? `Modo actual: Fibonacci Poco Capital 1-2-3 (Próximo stake: ${d.next_fib_stake}u)`
+        : (u.stake_mode === 'fibonacci'
+          ? `Modo actual: Fibonacci Completo 1-2-3-5-8 (Próximo stake: ${d.next_fib_stake}u)`
+          : 'Modo actual: Stake Fijo (2.0u)');
+      document.getElementById('stakeModeDesc').textContent = modeDesc;
 
       const pts = d.equity_curve && d.equity_curve.length > 1 ? d.equity_curve : [100, 100];
       const W = 320, H = 74, pad = 6, minV = Math.min(...pts, 95), maxV = Math.max(...pts, 105), span = Math.max(1, maxV - minV);
@@ -1167,12 +1230,57 @@ HTML_PAGE = """<!DOCTYPE html>
         return `<tr><td class="num">#${t.id}</td><td class="num">${t.match_date}</td><td>${t.title}</td><td>${t.market_name}</td><td class="num">${t.odds.toFixed(2)}</td><td class="num">${t.stake_u}u</td><td><span class="badge ${cls}">${t.status}</span></td><td class="num">${t.profit_u>=0?'+':''}${t.profit_u.toFixed(2)}u</td></tr>`;
       }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);">Aún no has guardado jugadas.</td></tr>';
       renderFibSim();
+      renderBotEffectiveness();
+    }
+
+    function renderBotEffectiveness() {
+      const box = document.getElementById('botEffectivenessCard');
+      if (!box) return;
+      const rep = botReport;
+      if (!rep) {
+        box.innerHTML = '<div style="font-size:12.5px;color:var(--muted);">Cargando medición diaria del bot...</div>';
+        return;
+      }
+      const daily = rep.daily_stats || [];
+      const settledDays = daily.filter(d => d.settled > 0);
+      const latest = settledDays[0];
+      const headline = latest
+        ? `${latest.date}: <strong>${latest.won} de ${latest.settled} efectivos (${latest.accuracy_pct}%)</strong>`
+        : `Seguimiento activo: ${rep.pending || 0} pronósticos pendientes por finalizar`;
+      const calEntries = Object.entries(rep.calibration || {}).sort((a, b) => b[1].settled - a[1].settled).slice(0, 6);
+
+      box.innerHTML = `
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Efectividad Diaria del Bot &amp; Auto-Calibración</div>
+            <div style="font-size:14px;margin-top:2px;">${headline} • Global: <strong>${rep.won}/${rep.settled} (${rep.accuracy_pct || 0}%)</strong></div>
+          </div>
+          <span class="badge ${rep.roi_pct >= 0 ? 'b-pos' : 'b-warn'}">ROI Bot ${rep.roi_pct >= 0 ? '+' : ''}${rep.roi_pct}%</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
+          <div class="mini-box" style="padding:10px;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">ACIERTO POR DÍA</div>
+            ${daily.slice(0, 5).map(d => `
+              <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
+                <span class="num">${d.date}</span>
+                <span>${d.settled > 0 ? `<strong>${d.won}/${d.settled}</strong> (${d.accuracy_pct}%)` : `${d.pending} pend.`}</span>
+              </div>`).join('') || '<div style="font-size:12px;color:var(--muted);">Sin registros aún.</div>'}
+          </div>
+          <div class="mini-box" style="padding:10px;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">AUTO-MEJORA POR MERCADO</div>
+            ${calEntries.map(([mk, st]) => `
+              <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
+                <code>${mk}</code>
+                <span><strong>${st.won}/${st.settled}</strong> (${st.win_rate_pct}%) • ${st.status}</span>
+              </div>`).join('') || '<div style="font-size:12px;color:var(--muted);">Esperando primeros resultados liquidados para calibrar pesos.</div>'}
+          </div>
+        </div>`;
     }
 
     function renderFibSim() {
       const k = parseInt(document.getElementById('fibSlider').value, 10);
       document.getElementById('fibLossVal').textContent = k;
-      const seq = [1, 1, 2, 3, 5, 8, 13, 21];
+      const seq = [1, 2, 3, 5, 8];
       let fibSum = 0, flatSum = 0;
       const bars = [];
       for (let i = 0; i < k; i++) { fibSum += 2 * seq[i]; flatSum += 2; bars.push(2 * seq[i]); }
@@ -1181,7 +1289,7 @@ HTML_PAGE = """<!DOCTYPE html>
         <div style="display:flex;align-items:flex-end;gap:4px;height:52px;margin-top:4px;">
           ${bars.map(s => `<div style="flex:1;height:${Math.max(6, Math.round((s/maxS)*44))}px;border-radius:5px;background:linear-gradient(180deg,#F97316,#7C3AED);" title="${s}u"></div>`).join('')}
         </div>
-        <div style="font-size:11px;color:var(--sub);margin-top:6px;">Riesgo: <strong style="color:var(--red);">${fibSum}u</strong> (Fib) vs <strong style="color:var(--green);">${flatSum}u</strong> (Fijo)</div>`;
+        <div style="font-size:11px;color:var(--sub);margin-top:6px;">Secuencia 1-2-3-5-8: <strong style="color:var(--red);">${fibSum}u</strong> vs <strong style="color:var(--green);">${flatSum}u</strong> (Fijo)</div>`;
     }
 
     async function savePrefs() {

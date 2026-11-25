@@ -8,6 +8,7 @@ from providers import (
     enrich_with_apifootball,
     fetch_espn_match_result,
     fetch_espn_upcoming,
+    fetch_next_global_matches,
     fetch_recent_history,
     load_env,
     send_telegram_message,
@@ -96,7 +97,15 @@ def grade_market(market: str, hg: int, ag: int) -> bool:
     return checks[market]
 
 
-def evaluate_match(m: UpcomingMatch, team_all: dict, team_home: dict, team_away: dict, lg_hg: dict, lg_ag: dict) -> dict:
+def evaluate_match(
+    m: UpcomingMatch,
+    team_all: dict,
+    team_home: dict,
+    team_away: dict,
+    lg_hg: dict,
+    lg_ag: dict,
+    calibration: dict | None = None,
+) -> dict:
     """Evaluate Sharp Value (if available), Poisson stats, Formula Option A legs, and Option B Bet Builders."""
     mkt_odds = build_match_markets(m)
     h_recent = team_all.get(m.home, [])[-10:]
@@ -148,7 +157,20 @@ def evaluate_match(m: UpcomingMatch, team_all: dict, team_home: dict, team_away:
         if a_stat["o15_pct"] >= 0.45 and a_stat["gf_avg"] >= 1.5 and h_stat["ga_avg"] >= 1.2:
             opt_a_cands.append("A_O15")
 
-    opt_a_valid = [(k, mkt_odds[k], qprobs[k]) for k in opt_a_cands if 1.08 <= mkt_odds[k] <= 1.70]
+    cal = calibration or {}
+
+    def _cal_prob(mkt_key: str) -> tuple[float, bool]:
+        info = cal.get(mkt_key) or {}
+        if info.get("blocked"):
+            return 0.0, True
+        adj = qprobs[mkt_key] + float(info.get("bias", 0.0))
+        return max(0.05, min(0.95, adj)), False
+
+    opt_a_valid = []
+    for k in opt_a_cands:
+        cp, blk = _cal_prob(k)
+        if not blk and 1.08 <= mkt_odds[k] <= 1.70:
+            opt_a_valid.append((k, mkt_odds[k], cp))
     best_opt_a = min(opt_a_valid, key=lambda x: abs(x[1] - 1.30)) if opt_a_valid else None
 
     bb_cands = []
@@ -163,8 +185,22 @@ def evaluate_match(m: UpcomingMatch, team_all: dict, team_home: dict, team_away:
             bb_cands.append("BB_A_X2_O05")
         if a_stat["win_pct"] >= 0.55 and a_stat["o05_pct"] >= 0.80 and a_stat["gf_avg"] >= 1.4:
             bb_cands.append("BB_A_2_O05")
-    bb_valid = [(k, mkt_odds[k], qprobs[k]) for k in bb_cands if 1.20 <= mkt_odds[k] <= 1.90]
+    bb_valid = []
+    for k in bb_cands:
+        cp, blk = _cal_prob(k)
+        if not blk and 1.20 <= mkt_odds[k] <= 1.90:
+            bb_valid.append((k, mkt_odds[k], cp))
     best_opt_b = min(bb_valid, key=lambda x: abs(x[1] - 1.50)) if bb_valid else None
+
+    # Best individual pick for daily accuracy tracking ("BOT_DIARIO")
+    safe_pool = []
+    for k, odd in mkt_odds.items():
+        if not (1.20 <= odd <= 1.75):
+            continue
+        cp, blk = _cal_prob(k)
+        if not blk and cp >= 0.70:
+            safe_pool.append((k, odd, cp))
+    best_daily_safe = max(safe_pool, key=lambda x: (x[2], -abs(x[1] - 1.40))) if safe_pool else None
 
     return {
         "match": m,
@@ -180,6 +216,7 @@ def evaluate_match(m: UpcomingMatch, team_all: dict, team_home: dict, team_away:
         "opt_a_all": opt_a_valid,
         "best_opt_a": best_opt_a,
         "best_opt_b": best_opt_b,
+        "best_daily_safe": best_daily_safe,
     }
 
 
@@ -196,9 +233,39 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
     else:
         enriched_count, api_note = 0, None
 
-    evals = [evaluate_match(m, team_all, team_home, team_away, lg_hg, lg_ag) for m in upcoming]
-    db = PaperTradingDB() if save else None
+    db_read = PaperTradingDB()
+    calibration = db_read.get_market_calibration()
+    db_read.set_state("last_calibration", f"{len(calibration)} mercados medidos")
+
+    evals = [evaluate_match(m, team_all, team_home, team_away, lg_hg, lg_ag, calibration=calibration) for m in upcoming]
+    db = db_read if save else None
     saved_count = 0
+
+    if db:
+        for e in evals:
+            safe = e.get("best_daily_safe")
+            if not safe:
+                continue
+            m = e["match"]
+            ks, osafe, psafe = safe
+            imp_s = 1.0 / osafe
+            ev_s = (psafe * osafe - 1.0) * 100.0
+            saved_count += int(
+                db.record_trade(
+                    match_date=m.kickoff_col[:10],
+                    league=m.league,
+                    match_key=m.event_id,
+                    title=f"{m.home} vs {m.away}",
+                    strategy="BOT_DIARIO",
+                    market=ks,
+                    odds=osafe,
+                    model_prob=psafe,
+                    implied_prob=imp_s,
+                    ev_pct=ev_s,
+                    stake_u=2.0,
+                    legs=[{"event_id": m.event_id, "league": m.league, "match_date": m.match_date, "market": ks}],
+                )
+            )
 
     sharp_list = []
     for e in evals:
@@ -420,6 +487,8 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
         "parlays_a": parlays_a,
         "opt_b": opt_b,
         "matches": matches_detail,
+        "next_global": fetch_next_global_matches(limit=8),
+        "calibration": calibration,
     }
 
 

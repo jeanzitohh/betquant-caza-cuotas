@@ -270,6 +270,9 @@ class PaperTradingDB:
         total_staked = sum(r["stake_u"] for r in settled)
         total_profit = sum(r["profit_u"] for r in settled)
         roi = (total_profit / total_staked * 100.0) if total_staked > 0 else 0.0
+        won_cnt = sum(1 for r in settled if r["status"] == "WON")
+        lost_cnt = sum(1 for r in settled if r["status"] == "LOST")
+        bot_acc = round((won_cnt / len(settled)) * 100.0, 1) if settled else 0.0
 
         curve = [round(initial_bank, 2)]
         running = initial_bank
@@ -277,20 +280,99 @@ class PaperTradingDB:
             running += r["profit_u"]
             curve.append(round(running, 2))
 
+        daily_stats = self.get_daily_effectiveness(days=14)
+        calibration = self.get_market_calibration()
+
         return {
             "total_trades": len(rows),
             "pending": len(pending),
             "settled": len(settled),
-            "won": sum(1 for r in settled if r["status"] == "WON"),
-            "lost": sum(1 for r in settled if r["status"] == "LOST"),
+            "won": won_cnt,
+            "lost": lost_cnt,
+            "accuracy_pct": bot_acc,
             "total_staked_u": round(total_staked, 2),
             "total_profit_u": round(total_profit, 2),
             "roi_pct": round(roi, 2),
             "bankroll_u": round(initial_bank + total_profit, 2),
             "by_strategy": by_strategy,
+            "daily_stats": daily_stats,
+            "calibration": calibration,
             "equity_curve": curve,
             "recent": rows[-100:],
         }
+
+    def get_daily_effectiveness(self, days: int = 14) -> list[dict]:
+        """Measure daily prediction accuracy (e.g. 7 of 10 = 70%) by match_date."""
+        with self._connect() as conn:
+            rows = [dict(r) for r in conn.execute("SELECT * FROM trades ORDER BY match_date, id").fetchall()]
+
+        by_day: dict[str, dict] = {}
+        for r in rows:
+            d = str(r["match_date"])[:10]
+            if d not in by_day:
+                by_day[d] = {"date": d, "total": 0, "settled": 0, "won": 0, "lost": 0, "pending": 0, "staked_u": 0.0, "profit_u": 0.0}
+            st = by_day[d]
+            st["total"] += 1
+            if r["status"] == "PENDING":
+                st["pending"] += 1
+            elif r["status"] in ("WON", "LOST"):
+                st["settled"] += 1
+                st["staked_u"] += float(r["stake_u"])
+                st["profit_u"] += float(r["profit_u"])
+                if r["status"] == "WON":
+                    st["won"] += 1
+                else:
+                    st["lost"] += 1
+
+        out = []
+        for d in sorted(by_day.keys(), reverse=True)[:days]:
+            st = by_day[d]
+            st["accuracy_pct"] = round((st["won"] / st["settled"]) * 100.0, 1) if st["settled"] > 0 else None
+            st["roi_pct"] = round((st["profit_u"] / st["staked_u"]) * 100.0, 1) if st["staked_u"] > 0 else 0.0
+            st["staked_u"] = round(st["staked_u"], 2)
+            st["profit_u"] = round(st["profit_u"], 2)
+            out.append(st)
+        return out
+
+    def get_market_calibration(self) -> dict[str, dict]:
+        """Auto-calibrate each market type from settled paper-trade outcomes."""
+        with self._connect() as conn:
+            rows = [dict(r) for r in conn.execute("SELECT * FROM trades WHERE status IN ('WON', 'LOST') ORDER BY id").fetchall()]
+
+        stats: dict[str, dict] = {}
+        for r in rows:
+            legs = json.loads(r["legs_json"]) if r.get("legs_json") else [{"market": r["market"]}]
+            won = r["status"] == "WON"
+            for leg in legs:
+                mk = str(leg.get("market") or r["market"])
+                st = stats.setdefault(mk, {"settled": 0, "won": 0, "lost": 0, "prob_sum": 0.0, "profit_u": 0.0})
+                st["settled"] += 1
+                st["won"] += int(won)
+                st["lost"] += int(not won)
+                st["prob_sum"] += float(r["model_prob"])
+                st["profit_u"] += float(r["profit_u"])
+
+        calibration: dict[str, dict] = {}
+        for mk, st in stats.items():
+            n = st["settled"]
+            win_rate = st["won"] / n if n > 0 else 0.0
+            avg_prob = st["prob_sum"] / n if n > 0 else 0.5
+            # Empirical Bayes adjustment toward actual settled accuracy
+            shrunk = (st["won"] + 5.0 * avg_prob) / (n + 5.0)
+            bias = round(shrunk - avg_prob, 4)
+            blocked = n >= 5 and win_rate < 0.52 and st["profit_u"] < -3.0
+            label = "Bloqueado temporalmente" if blocked else ("Ajuste estricto" if bias < -0.04 else ("Rendimiento óptimo" if win_rate >= 0.68 and n >= 3 else "Calibrando"))
+            calibration[mk] = {
+                "settled": n,
+                "won": st["won"],
+                "lost": st["lost"],
+                "win_rate_pct": round(win_rate * 100.0, 1),
+                "bias": bias,
+                "blocked": blocked,
+                "profit_u": round(st["profit_u"], 2),
+                "status": label,
+            }
+        return calibration
 
     # --- Real Server-Side Auth & Per-User Paper Bets (No localStorage) ---
 
@@ -359,14 +441,14 @@ class PaperTradingDB:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
 
     def update_user_prefs(self, user_id: int, stake_mode: str, bankroll_base: float) -> None:
-        mode = "fibonacci" if stake_mode == "fibonacci" else "flat"
+        mode = stake_mode if stake_mode in ("flat", "fibonacci", "fibonacci_3") else "flat"
         base = max(10.0, min(100000.0, float(bankroll_base)))
         with self._connect() as conn:
             conn.execute("UPDATE users SET stake_mode = ?, bankroll_base = ? WHERE id = ?", (mode, base, user_id))
 
     @staticmethod
-    def fib_stake(step: int, unit: float = 2.0) -> float:
-        seq = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55]
+    def fib_stake(step: int, unit: float = 2.0, stake_mode: str = "fibonacci") -> float:
+        seq = (1, 2, 3) if stake_mode == "fibonacci_3" else (1, 2, 3, 5, 8)
         idx = max(0, min(step, len(seq) - 1))
         return round(unit * seq[idx], 2)
 
@@ -387,7 +469,11 @@ class PaperTradingDB:
             u = conn.execute("SELECT stake_mode, fib_step FROM users WHERE id = ?", (user_id,)).fetchone()
             mode = u["stake_mode"] if u else "flat"
             fib_step = u["fib_step"] if u else 0
-            stake = round(custom_stake, 2) if custom_stake and custom_stake > 0 else (self.fib_stake(fib_step) if mode == "fibonacci" else 2.0)
+            stake = (
+                round(custom_stake, 2)
+                if custom_stake and custom_stake > 0
+                else (self.fib_stake(fib_step, stake_mode=mode) if mode in ("fibonacci", "fibonacci_3") else 2.0)
+            )
             now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
             cur = conn.execute(
                 """
@@ -418,8 +504,9 @@ class PaperTradingDB:
                 (status, round(profit_u, 3), now, note, bet_id),
             )
             u = conn.execute("SELECT stake_mode, fib_step FROM users WHERE id = ?", (user_id,)).fetchone()
-            if u and u["stake_mode"] == "fibonacci":
-                next_step = max(0, u["fib_step"] - 2) if status == "WON" else min(9, u["fib_step"] + 1)
+            if u and u["stake_mode"] in ("fibonacci", "fibonacci_3"):
+                max_idx = 2 if u["stake_mode"] == "fibonacci_3" else 4
+                next_step = 0 if status == "WON" else min(max_idx, u["fib_step"] + 1)
                 conn.execute("UPDATE users SET fib_step = ? WHERE id = ?", (next_step, user_id))
 
     def get_favorites(self, user_id: int) -> list[str]:
@@ -468,7 +555,7 @@ class PaperTradingDB:
             "total_profit_u": round(total_profit, 2),
             "roi_pct": round(roi, 2),
             "bankroll_u": round(base + total_profit, 2),
-            "next_fib_stake": self.fib_stake(u["fib_step"]) if u else 2.0,
+            "next_fib_stake": self.fib_stake(u["fib_step"], stake_mode=u["stake_mode"]) if u else 2.0,
             "equity_curve": curve,
             "favorites": self.get_favorites(user_id),
             "recent": rows[-100:],
