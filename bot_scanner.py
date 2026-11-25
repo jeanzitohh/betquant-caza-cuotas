@@ -532,17 +532,26 @@ def build_serial_ladder(
             if not best_mk:
                 continue
             pick = best_mk
+        pk_key = pick.get("key") or next((k for k, v in MARKET_NAMES.items() if v == pick.get("market_name")), "1X")
+        alt_mk = max(
+            (mk for mk in (m.get("all_markets") or []) if mk["key"] != pk_key and 1.18 <= mk["odds"] <= 1.90 and mk["prob"] >= 62.0),
+            key=lambda x: x["prob"],
+            default=None,
+        )
         pool[m["event_id"]] = {
             "event_id": m["event_id"],
             "league": m["league"],
             "league_label": m["league_label"],
             "kickoff_col": m["kickoff_col"],
             "title": f"{m['home']} vs {m['away']}",
-            "market": pick.get("key", "1X"),
+            "market": pk_key,
             "market_name": pick["market_name"] if "market_name" in pick else pick.get("name", ""),
             "odds": round(float(pick["odds"]), 2),
             "prob": float(pick["prob"]),
             "ev_pct": float(pick["ev_pct"]),
+            "alt_market_name": alt_mk["name"] if alt_mk else None,
+            "alt_odds": round(float(alt_mk["odds"]), 2) if alt_mk else None,
+            "alt_prob": float(alt_mk["prob"]) if alt_mk else None,
             "o1": m["o1"],
             "ox": m["ox"],
             "o2": m["o2"],
@@ -592,6 +601,12 @@ def build_serial_ladder(
                 fav_odd = round(max(1.18, 1.0 / max(fav_prob * 1.04, 0.2)), 2)
 
         ev_pct = round((fav_prob * fav_odd - 1.0) * 100.0, 1)
+        alt_cands = [
+            (k, mkt_odds[k], qp[k])
+            for k in ("H_O05", "A_O05", "1X", "X2", "BB_H_1_O05", "BB_A_2_O05", "BB_H_1X_O05", "BB_A_X2_O05")
+            if k != fav_k and k in mkt_odds and 1.15 <= mkt_odds[k] <= 1.85 and qp[k] >= 0.65
+        ]
+        alt_pick = max(alt_cands, key=lambda x: x[2]) if alt_cands else None
         pool[eid] = {
             "event_id": eid,
             "league": "global",
@@ -603,6 +618,9 @@ def build_serial_ladder(
             "odds": round(float(fav_odd), 2),
             "prob": round(fav_prob * 100.0, 1),
             "ev_pct": ev_pct,
+            "alt_market_name": MARKET_NAMES.get(alt_pick[0], alt_pick[0]) if alt_pick else None,
+            "alt_odds": round(float(alt_pick[1]), 2) if alt_pick else None,
+            "alt_prob": round(alt_pick[2] * 100.0, 1) if alt_pick else None,
             "o1": g["o1"],
             "ox": g["ox"],
             "o2": g["o2"],

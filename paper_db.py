@@ -310,11 +310,13 @@ class PaperTradingDB:
         for r in rows:
             d = str(r["match_date"])[:10]
             if d not in by_day:
-                by_day[d] = {"date": d, "total": 0, "settled": 0, "won": 0, "lost": 0, "pending": 0, "staked_u": 0.0, "profit_u": 0.0}
+                by_day[d] = {"date": d, "total": 0, "settled": 0, "won": 0, "lost": 0, "pending": 0, "pending_eids": set(), "staked_u": 0.0, "profit_u": 0.0}
             st = by_day[d]
             st["total"] += 1
             if r["status"] == "PENDING":
                 st["pending"] += 1
+                for leg in json.loads(r["legs_json"] or "[]"):
+                    st["pending_eids"].add(str(leg.get("event_id") or r["match_key"]))
             elif r["status"] in ("WON", "LOST"):
                 st["settled"] += 1
                 st["staked_u"] += float(r["stake_u"])
@@ -327,6 +329,8 @@ class PaperTradingDB:
         out = []
         for d in sorted(by_day.keys(), reverse=True)[:days]:
             st = by_day[d]
+            eids = st.pop("pending_eids")
+            st["pending_matches"] = len(eids) if eids else st["pending"]
             st["accuracy_pct"] = round((st["won"] / st["settled"]) * 100.0, 1) if st["settled"] > 0 else None
             st["roi_pct"] = round((st["profit_u"] / st["staked_u"]) * 100.0, 1) if st["staked_u"] > 0 else 0.0
             st["staked_u"] = round(st["staked_u"], 2)
@@ -505,8 +509,13 @@ class PaperTradingDB:
             )
             u = conn.execute("SELECT stake_mode, fib_step FROM users WHERE id = ?", (user_id,)).fetchone()
             if u and u["stake_mode"] in ("fibonacci", "fibonacci_3"):
-                max_idx = 2 if u["stake_mode"] == "fibonacci_3" else 4
-                next_step = 0 if status == "WON" else min(max_idx, u["fib_step"] + 1)
+                cur_step = int(u["fib_step"])
+                if status == "WON":
+                    next_step = 0
+                elif u["stake_mode"] == "fibonacci_3":
+                    next_step = 0 if cur_step >= 2 else cur_step + 1
+                else:
+                    next_step = min(4, cur_step + 1)
                 conn.execute("UPDATE users SET fib_step = ? WHERE id = ?", (next_step, user_id))
 
     def get_favorites(self, user_id: int) -> list[str]:

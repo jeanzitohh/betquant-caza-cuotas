@@ -299,7 +299,8 @@ def render_daily_summary_card(rep: dict) -> bytes:
             pcol = (74, 222, 128, 255) if day["profit_u"] >= 0 else (248, 113, 113, 255)
             d.text((970, y0 + 11), f"{day['profit_u']:+.2f}u", font=_load_font(18, "bold"), fill=pcol)
         else:
-            d.text((300, y0 + 12), f"{day['pending']} pronósticos en seguimiento (por jugar)", font=_load_font(17, "reg"), fill=(148, 163, 184, 255))
+            pm = day.get("pending_matches") or day["pending"]
+            d.text((300, y0 + 12), f"{day['pending']} selecciones en {pm} partidos (por jugar)", font=_load_font(17, "reg"), fill=(148, 163, 184, 255))
 
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)
@@ -343,29 +344,32 @@ def render_settled_card(settled_items: list[dict], rep: dict) -> bytes:
     return buf.getvalue()
 
 
-def render_serial_ladder_card(ladder: list[dict]) -> bytes:
+def render_serial_ladder_card(ladder: list[dict], chunk_label: str = "") -> bytes:
     """Render a chronological 1-by-1 turn schedule card with goal breakdown and zero internal jargon."""
     shown = ladder[:5]
-    h = 260 + max(1, len(shown)) * 130
+    h = 260 + max(1, len(shown)) * 136
     img = _create_backdrop(1200, h)
-    _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", "Horarios Colombia (UTC-5)")
+    hdr_sub = "Horarios Colombia (UTC-5)" if not chunk_label else f"{chunk_label} • Hora Colombia"
+    _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", hdr_sub)
     _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
 
     d = ImageDraw.Draw(img)
     d.text((88, 126), "Secuencia cronológica: termina un partido y conoces el resultado antes de jugar el siguiente.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
 
     for idx, s in enumerate(shown):
-        y0 = 164 + idx * 126
-        _glass_panel(img, (84, y0, 1116, y0 + 112), radius=18, fill=(255, 255, 255, 18))
+        y0 = 164 + idx * 132
+        _glass_panel(img, (84, y0, 1116, y0 + 118), radius=18, fill=(255, 255, 255, 18))
         d = ImageDraw.Draw(img)
         lg_txt = "" if s["league_label"] in ("group-stage", "regular-season", "league-stage") else f" • {s['league_label']}"
         d.text((112, y0 + 12), f"TURNO #{s['step']}  •  {s['kickoff_col']} COL  ({s['gap_label']}){lg_txt}", font=_load_font(14, "bold"), fill=(253, 186, 116, 255))
         d.text((112, y0 + 34), str(s["title"])[:54], font=_load_font(20, "bold"), fill=(255, 255, 255, 255))
-        m_name = s["market_name"]
-        if " vs " in s["title"]:
-            hm, aw = [x.strip() for x in s["title"].split(" vs ", 1)]
-            m_name = literal_market_text(m_name, hm, aw)
-        d.text((112, y0 + 62), m_name[:66], font=_load_font(15, "bold"), fill=(196, 181, 253, 255))
+        hm, aw = ([x.strip() for x in s["title"].split(" vs ", 1)] if " vs " in s["title"] else (s["title"], "Visita"))
+        m_name = literal_market_text(s["market_name"], hm, aw)
+        alt_txt = ""
+        if s.get("alt_market_name"):
+            alt_lit = literal_market_text(s["alt_market_name"], hm, aw)
+            alt_txt = f"   |   Alt: {alt_lit[:32]} @{float(s['alt_odds']):.2f}"
+        d.text((112, y0 + 62), (m_name + alt_txt)[:86], font=_load_font(14, "bold"), fill=(196, 181, 253, 255))
 
         ps = s.get("probs_summary") or {}
         if ps:
@@ -374,7 +378,7 @@ def render_serial_ladder_card(ladder: list[dict]) -> bytes:
                 f"Goles est: {s.get('lam_h',1.4):.2f} vs {s.get('lam_a',1.0):.2f}   •   "
                 f"+1.5 Partido: {ps.get('o15',0):.0f}%   •   Ambos marcan: {ps.get('btts',0):.0f}%"
             )
-            d.text((112, y0 + 85), meta_txt, font=_load_font(13, "reg"), fill=(186, 230, 253, 255))
+            d.text((112, y0 + 88), meta_txt, font=_load_font(13, "reg"), fill=(186, 230, 253, 255))
 
         odd_txt = f"@{float(s['odds']):.2f}"
         prob_txt = f"Prob. {s['prob']}%"
@@ -475,7 +479,8 @@ def render_daily_summary_card(rep: dict) -> bytes:
             pcol = (74, 222, 128, 255) if day["profit_u"] >= 0 else (248, 113, 113, 255)
             d.text((970, y0 + 11), f"{day['profit_u']:+.2f}u", font=_load_font(18, "bold"), fill=pcol)
         else:
-            d.text((300, y0 + 12), f"{day['pending']} pronósticos en seguimiento (por jugar)", font=_load_font(17, "reg"), fill=(148, 163, 184, 255))
+            pm = day.get("pending_matches") or day["pending"]
+            d.text((300, y0 + 12), f"{day['pending']} selecciones en {pm} partidos (por jugar)", font=_load_font(17, "reg"), fill=(148, 163, 184, 255))
 
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)
@@ -519,29 +524,32 @@ def render_settled_card(settled_items: list[dict], rep: dict) -> bytes:
     return buf.getvalue()
 
 
-def render_serial_ladder_card(ladder: list[dict]) -> bytes:
+def render_serial_ladder_card(ladder: list[dict], chunk_label: str = "") -> bytes:
     """Render a chronological 1-by-1 turn schedule card with goal breakdown and zero internal jargon."""
     shown = ladder[:5]
-    h = 260 + max(1, len(shown)) * 130
+    h = 260 + max(1, len(shown)) * 136
     img = _create_backdrop(1200, h)
-    _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", "Horarios Colombia (UTC-5)")
+    hdr_sub = "Horarios Colombia (UTC-5)" if not chunk_label else f"{chunk_label} • Hora Colombia"
+    _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", hdr_sub)
     _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
 
     d = ImageDraw.Draw(img)
     d.text((88, 126), "Secuencia cronológica: termina un partido y conoces el resultado antes de jugar el siguiente.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
 
     for idx, s in enumerate(shown):
-        y0 = 164 + idx * 126
-        _glass_panel(img, (84, y0, 1116, y0 + 112), radius=18, fill=(255, 255, 255, 18))
+        y0 = 164 + idx * 132
+        _glass_panel(img, (84, y0, 1116, y0 + 118), radius=18, fill=(255, 255, 255, 18))
         d = ImageDraw.Draw(img)
         lg_txt = "" if s["league_label"] in ("group-stage", "regular-season", "league-stage") else f" • {s['league_label']}"
         d.text((112, y0 + 12), f"TURNO #{s['step']}  •  {s['kickoff_col']} COL  ({s['gap_label']}){lg_txt}", font=_load_font(14, "bold"), fill=(253, 186, 116, 255))
         d.text((112, y0 + 34), str(s["title"])[:54], font=_load_font(20, "bold"), fill=(255, 255, 255, 255))
-        m_name = s["market_name"]
-        if " vs " in s["title"]:
-            hm, aw = [x.strip() for x in s["title"].split(" vs ", 1)]
-            m_name = literal_market_text(m_name, hm, aw)
-        d.text((112, y0 + 62), m_name[:66], font=_load_font(15, "bold"), fill=(196, 181, 253, 255))
+        hm, aw = ([x.strip() for x in s["title"].split(" vs ", 1)] if " vs " in s["title"] else (s["title"], "Visita"))
+        m_name = literal_market_text(s["market_name"], hm, aw)
+        alt_txt = ""
+        if s.get("alt_market_name"):
+            alt_lit = literal_market_text(s["alt_market_name"], hm, aw)
+            alt_txt = f"   |   Alt: {alt_lit[:32]} @{float(s['alt_odds']):.2f}"
+        d.text((112, y0 + 62), (m_name + alt_txt)[:86], font=_load_font(14, "bold"), fill=(196, 181, 253, 255))
 
         ps = s.get("probs_summary") or {}
         if ps:
@@ -550,7 +558,7 @@ def render_serial_ladder_card(ladder: list[dict]) -> bytes:
                 f"Goles est: {s.get('lam_h',1.4):.2f} vs {s.get('lam_a',1.0):.2f}   •   "
                 f"+1.5 Partido: {ps.get('o15',0):.0f}%   •   Ambos marcan: {ps.get('btts',0):.0f}%"
             )
-            d.text((112, y0 + 85), meta_txt, font=_load_font(13, "reg"), fill=(186, 230, 253, 255))
+            d.text((112, y0 + 88), meta_txt, font=_load_font(13, "reg"), fill=(186, 230, 253, 255))
 
         odd_txt = f"@{float(s['odds']):.2f}"
         prob_txt = f"Prob. {s['prob']}%"

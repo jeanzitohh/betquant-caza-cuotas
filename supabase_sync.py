@@ -144,9 +144,13 @@ def settle_supabase_bets(
         prof = prof_map.get(uid)
         mode = (prof or {}).get("stake_mode", "flat")
         if prof and mode in ("fibonacci", "fibonacci_3"):
-            max_idx = 2 if mode == "fibonacci_3" else len(FIB_SEQ) - 1
             cur_step = int(prof.get("fib_step", 0))
-            next_step = 0 if won else min(cur_step + 1, max_idx)
+            if won:
+                next_step = 0
+            elif mode == "fibonacci_3":
+                next_step = 0 if cur_step >= 2 else cur_step + 1
+            else:
+                next_step = min(len(FIB_SEQ) - 1, cur_step + 1)
             prof["fib_step"] = next_step
             _sb_request(
                 supabase_url,

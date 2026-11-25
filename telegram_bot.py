@@ -187,7 +187,8 @@ def format_daily_effectiveness_block(rep: dict) -> str:
                     f"• <code>{d['date']}</code>: <b>{d['won']}/{d['settled']}</b> ({d['accuracy_pct']}%) | {d['pending']} pend."
                 )
             else:
-                lines.append(f"• <code>{d['date']}</code>: {d['pending']} pendientes por jugar")
+                pm = d.get("pending_matches") or d["pending"]
+                lines.append(f"• <code>{d['date']}</code>: {d['pending']} selecciones ({pm} partidos por jugar)")
     else:
         lines.append(
             f"\n<i>Aún no hay partidos finalizados hoy. {rep['pending']} pronósticos en seguimiento.</i>"
@@ -208,26 +209,22 @@ def format_next_by_hour_block(scan: dict) -> str:
     return "\n".join(lines)
 
 
-def format_serial_ladder_block(scan: dict) -> str:
-    lines = [
-        "<b>🪜 PRONÓSTICOS EN SERIE (POR TURNOS)</b>",
-        "<i>Un partido a la vez (≥2h15m entre inicios) para conocer el resultado antes de jugar el siguiente.</i>",
-    ]
-    ladder = scan.get("serial_ladder") or []
-    for s in ladder[:5]:
+def format_serial_ladder_block(scan: dict, items: list[dict] | None = None, header_note: str = "") -> str:
+    hdr = f"<b>🪜 PRONÓSTICOS EN SERIE{(' • ' + header_note) if header_note else ' (POR TURNOS)'}</b>"
+    lines = [hdr]
+    ladder = items if items is not None else (scan.get("serial_ladder") or [])
+    for s in ladder:
         ps = s.get("probs_summary") or {}
         hm, aw = ([x.strip() for x in s["title"].split(" vs ", 1)] if " vs " in s["title"] else (s["title"], "Visita"))
         lit = literal_market_text(s["market_name"], hm, aw)
-        det = ""
-        if ps:
-            det = (
-                f"\n📌 1X2: {ps.get('p1',0):.0f}% / {ps.get('px',0):.0f}% / {ps.get('p2',0):.0f}% | "
-                f"⚽ Goles est: <b>~{s.get('lam_h',1.4):.2f} vs ~{s.get('lam_a',1.0):.2f}</b> (+1.5: {ps.get('o15',0):.0f}%)"
-            )
+        alt_part = ""
+        if s.get("alt_market_name"):
+            alt_lit = literal_market_text(s["alt_market_name"], hm, aw)
+            alt_part = f"\n   <i>Alt:</i> {html.escape(alt_lit)} @<code>{s['alt_odds']:.2f}</code> ({s['alt_prob']}%)"
+        det = f" | Goles: ~{s.get('lam_h',1.4):.1f}v{s.get('lam_a',1.0):.1f} (+1.5: {ps.get('o15',0):.0f}%)" if ps else ""
         lines.append(
-            f"\n<b>Turno #{s['step']}</b> • 🕒 <code>{s['kickoff_col']} COL</code> <i>({s['gap_label']})</i>\n"
-            f"⚽ <b>{html.escape(s['title'])}</b>{det}\n"
-            f"👉 <b>{html.escape(lit)}</b> @<code>{s['odds']:.2f}</code> (Prob: <b>{s['prob']}%</b>)"
+            f"\n<b>#{s['step']}</b> <code>{s['kickoff_col'][5:]} COL</code> • <b>{html.escape(s['title'])}</b>{det}\n"
+            f"👉 <b>{html.escape(lit)}</b> @<code>{s['odds']:.2f}</code> ({s['prob']}%){alt_part}"
         )
     if not ladder:
         lines.append("\n<i>Sin partidos disponibles para armar la ruta en serie.</i>")
@@ -361,13 +358,18 @@ def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_
                     db.mark_alert_sent(eff_key)
                     sent_count += 1
 
-    # 4. Daily Serial Turn-by-Turn Schedule (+ PNG card)
+    # 4. Daily Serial Turn-by-Turn Schedule in 1:1 synced chunks (image count == caption count, never clipped)
     ladder = scan.get("serial_ladder") or []
     if ladder:
-        l_key = f"serial_ladder_v3:{ladder[0]['kickoff_col'][:10]}:{ladder[0]['event_id']}"
-        if not db.was_alert_sent(l_key):
-            cap = format_serial_ladder_block(scan)
-            ok = send_photo_bytes(token, channel_id, render_serial_ladder_card(ladder), cap) if HAS_CARDS else send_html(token, channel_id, cap)
+        chunk_size = 3
+        chunks = [ladder[i : i + chunk_size] for i in range(0, len(ladder), chunk_size)]
+        for c_idx, ch in enumerate(chunks, 1):
+            l_key = f"serial_ladder_v4:{ch[0]['kickoff_col'][:10]}:p{c_idx}:{ch[0]['event_id']}"
+            if db.was_alert_sent(l_key):
+                continue
+            lbl = f"Bloque {c_idx}/{len(chunks)}" if len(chunks) > 1 else ""
+            cap = format_serial_ladder_block(scan, items=ch, header_note=lbl)
+            ok = send_photo_bytes(token, channel_id, render_serial_ladder_card(ch, chunk_label=lbl), cap) if HAS_CARDS else send_html(token, channel_id, cap)
             if ok:
                 db.mark_alert_sent(l_key)
                 sent_count += 1

@@ -355,7 +355,7 @@
           <div style="display:flex;flex-wrap:wrap;gap:7px;">
             <button class="tab-btn active" onclick="switchTab('tabRadar', this)">Partidos por Liga <span class="pill-cnt" id="cntRadar">0</span></button>
             <button class="tab-btn" onclick="switchTab('tabAnalyzer', this)">Analizar Mi Cuota</button>
-            <button class="tab-btn" onclick="switchTab('tabCombos', this)">Combinadas del Bot <span class="pill-cnt" id="cntCombos">0</span></button>
+            <button class="tab-btn" onclick="switchTab('tabCombos', this)">Pronósticos y Combinadas <span class="pill-cnt" id="cntCombos">0</span></button>
             <button class="tab-btn" onclick="switchTab('tabAccount', this)">Mi Rendimiento <span class="pill-cnt" id="cntMyBets">0</span></button>
           </div>
           <input type="search" id="searchInput" class="search-input" placeholder="Buscar equipo o liga..." oninput="renderMatches()" />
@@ -391,9 +391,10 @@
           </div>
         </section>
 
-        <!-- TAB 3: Bot Suggested Combos -->
+        <!-- TAB 3: Combos & Full Pending Picks List -->
         <section id="tabCombos" class="tab-panel">
           <div class="matches-grid" id="combosGrid"></div>
+          <div class="glass table-card" id="allPendingWrap" style="margin-top:16px;"></div>
         </section>
 
         <!-- TAB 4: Personal Account Performance & Charts -->
@@ -724,7 +725,8 @@
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;">
             ${ladder.map(s => {
               const ps = s.probs_summary || {};
-              const meta = ps.o15 !== undefined ? `<div style="font-size:11px;color:var(--sub);margin-bottom:6px;">1X2: ${Math.round(ps.p1)}%/${Math.round(ps.px)}%/${Math.round(ps.p2)}% • Goles est: ${s.lam_h} vs ${s.lam_a} • +1.5: ${Math.round(ps.o15)}%</div>` : '';
+              const meta = ps.o15 !== undefined ? `<div style="font-size:11px;color:var(--sub);margin-bottom:4px;">1X2: ${Math.round(ps.p1)}%/${Math.round(ps.px)}%/${Math.round(ps.p2)}% • Goles est: ${s.lam_h} vs ${s.lam_a} • +1.5: ${Math.round(ps.o15)}%</div>` : '';
+              const alt = s.alt_market_name ? `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Alt: ${s.alt_market_name} @${Number(s.alt_odds).toFixed(2)} (${s.alt_prob}%)</div>` : '<div style="margin-bottom:4px;"></div>';
               return `
               <div class="mini-box" style="padding:12px;border-radius:14px;">
                 <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
@@ -733,7 +735,7 @@
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">${s.league_label}</div>
                 <div style="font-size:13px;font-weight:700;margin-bottom:4px;">${s.title}</div>
-                ${meta}
+                ${meta}${alt}
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
                   <span style="font-size:11.5px;font-weight:600;">${s.market_name} <strong class="num">@${Number(s.odds).toFixed(2)}</strong> (${s.prob}%)</span>
                   <button class="btn btn-primary" style="padding:4px 9px;font-size:11px;" onclick="addLegToSlip('${s.event_id}','${s.league}','${s.kickoff_col.slice(0,10)}','${s.title.replace(/'/g,'')}','${s.market}','${s.market_name.replace(/'/g,'')}',${s.odds},${(s.prob/100).toFixed(3)})">+ Cupón</button>
@@ -1056,14 +1058,29 @@
         </div>`;
     }
 
+    const MKT_LABELS = {
+      '1': 'Gana Local (1)', 'X': 'Empate (X)', '2': 'Gana Visitante (2)', '1X': 'Local o Empate (1X)', 'X2': 'Visitante o Empate (X2)',
+      'H_O05': 'Local +0.5 goles', 'H_O15': 'Local +1.5 goles', 'A_O05': 'Visitante +0.5 goles', 'A_O15': 'Visitante +1.5 goles',
+      'BB_H_1_O05': 'Local Gana + +0.5 goles', 'BB_H_1_O15': 'Local Gana + +1.5 goles',
+      'BB_H_1X_O05': 'Local 1X + +0.5 goles', 'BB_H_1X_O15': 'Local 1X + +1.5 goles',
+      'BB_A_2_O05': 'Visita Gana + +0.5 goles', 'BB_A_2_O15': 'Visita Gana + +1.5 goles',
+      'BB_A_X2_O05': 'Visita X2 + +0.5 goles', 'BB_A_X2_O15': 'Visita X2 + +1.5 goles'
+    };
+    function humanMkt(m) {
+      if (!m) return '';
+      if (m.includes('+')) return m.split('+').map(k => MKT_LABELS[k] || k).join(' + ');
+      return MKT_LABELS[m] || m;
+    }
+
     function renderCombos() {
       const pa = lastScan.parlays_a || [], pb = lastScan.opt_b || [];
+      const pendingAll = ((botReport && botReport.recent) || []).filter(r => r.status === 'PENDING');
       document.getElementById('cntCombos').textContent = pa.length + pb.length;
       const aHtml = pa.map(p => `
         <article class="match-card">
-          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);"><span>Combinada de 2</span><span class="num">${p.kickoff_col} COL</span></div>
-          <div class="mini-box" style="font-weight:600;">1) ${p.leg1}</div>
-          <div class="mini-box" style="font-weight:600;">2) ${p.leg2}</div>
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);"><span>Combinada del Día</span><span class="num">${p.kickoff_col} COL</span></div>
+          <div class="mini-box" style="font-weight:600;">1) <span class="num" style="color:var(--muted);">${(p.leg1_kickoff||p.kickoff_col).slice(5)}</span> • ${p.leg1}</div>
+          <div class="mini-box" style="font-weight:600;">2) <span class="num" style="color:var(--muted);">${(p.leg2_kickoff||p.kickoff_col).slice(5)}</span> • ${p.leg2}</div>
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div><strong class="num" style="font-size:17px;">@${p.combo_odds.toFixed(2)}</strong> ${evBadge(p.ev_pct)}</div>
             <span style="font-size:12px;color:var(--sub);">Prob: ${p.prob_est}%</span>
@@ -1080,6 +1097,30 @@
           </div>
         </article>`).join('');
       document.getElementById('combosGrid').innerHTML = (aHtml + bHtml) || '<div class="glass" style="padding:32px;text-align:center;color:var(--muted);">No hay combinadas en este rango.</div>';
+
+      const timeByKey = {};
+      ((rawCloudScan && rawCloudScan.matches) || lastScan.matches || []).forEach(m => { timeByKey[m.event_id] = m.kickoff_col; });
+      const pendBox = document.getElementById('allPendingWrap');
+      if (pendBox) {
+        pendBox.innerHTML = `
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong style="font-size:14px;">Todos los Pronósticos en Seguimiento (Uno a Uno)</strong>
+              <div style="font-size:11.5px;color:var(--muted);">Incluye cada jugada individual y combinada pendiente sin filtro de horario</div>
+            </div>
+            <span class="badge b-pend">${pendingAll.length} pendientes</span>
+          </div>
+          <table>
+            <thead><tr><th>Fecha / Hora COL</th><th>Tipo</th><th>Partido(s)</th><th>Selección</th><th>Cuota</th><th>Prob.</th></tr></thead>
+            <tbody>
+              ${pendingAll.map(t => {
+                const tipo = t.title.includes(' + ') ? 'Combinada' : (String(t.market).startsWith('BB_') ? 'Mismo Partido' : 'Individual');
+                const kCol = timeByKey[t.match_key] || t.match_date;
+                return `<tr><td class="num">${kCol}</td><td><span class="badge b-pend">${tipo}</span></td><td><strong>${t.title}</strong></td><td>${humanMkt(t.market)}</td><td class="num">@${Number(t.odds).toFixed(2)}</td><td class="num">${(Number(t.model_prob||0)*100).toFixed(1)}%</td></tr>`;
+              }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);">No hay selecciones pendientes.</td></tr>'}
+            </tbody>
+          </table>`;
+      }
     }
 
     function openDrawer(idx) {
@@ -1277,7 +1318,7 @@
           ${daily.slice(0, 5).map(d => `
             <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">
               <span class="num">${d.date}</span>
-              <span>${d.settled > 0 ? `<strong>${d.won} de ${d.settled}</strong> (${d.accuracy_pct}%)` : `${d.pending} pendientes`}</span>
+              <span>${d.settled > 0 ? `<strong>${d.won} de ${d.settled}</strong> (${d.accuracy_pct}%)` : `${d.pending} selecciones (${d.pending_matches || d.pending} partidos)`}</span>
             </div>`).join('') || '<div style="font-size:12px;color:var(--muted);">Sin registros aún.</div>'}
         </div>`;
     }
