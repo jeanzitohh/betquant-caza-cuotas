@@ -316,7 +316,7 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
 
     evals = []
     for m in upcoming:
-        l_alert = check_match_lineup_alerts(m.league, m.event_id, m.home, m.away, api_key=api_key)
+        l_alert = check_match_lineup_alerts(m.league, m.event_id, m.home, m.away, kickoff_col=m.kickoff_col, api_key=api_key)
         e = evaluate_match(m, team_all, team_home, team_away, lg_hg, lg_ag, calibration=calibration, lineup_alert=l_alert)
         evals.append(e)
     db = db_read if save else None

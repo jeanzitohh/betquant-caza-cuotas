@@ -503,8 +503,8 @@ HTML_PAGE = """<!DOCTYPE html>
               <button class="seg-btn" id="dateAll" onclick="setDateFilter('all')">Todos los días</button>
             </div>
             <div class="seg">
-              <button class="seg-btn active" id="viewChrono" onclick="setViewMode('chrono')">⏱ En Fila (Por Hora)</button>
-              <button class="seg-btn" id="viewLeague" onclick="setViewMode('league')">🏆 Por Ligas</button>
+              <button class="seg-btn active" id="viewLeague" onclick="setViewMode('league')">🏆 Por Ligas (Tarjetas)</button>
+              <button class="seg-btn" id="viewChrono" onclick="setViewMode('chrono')">⏱ Fila Continua (Por Hora)</button>
             </div>
           </div>
           <div id="hourRadarWrap" style="display:none;margin-bottom:14px;"></div>
@@ -852,12 +852,12 @@ HTML_PAGE = """<!DOCTYPE html>
     const sbClient = SUPABASE_ENABLED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
     const FIB_SEQ = [1, 2, 3, 5, 8];
 
-    const LEAGUE_ORDER = ['uefa.champions', 'ger.1', 'ita.1', 'eng.1', 'esp.1', 'fra.1', 'col.1'];
+    const LEAGUE_ORDER = ['col.1', 'uefa.champions', 'eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1'];
     const LEAGUE_SHORT = { 'col.1': 'COL', 'uefa.champions': 'UCL', 'eng.1': 'ENG', 'esp.1': 'ESP', 'ita.1': 'ITA', 'ger.1': 'GER', 'fra.1': 'FRA' };
 
     let currentScope = 'all';
     let dateFilter = 'today';
-    let viewMode = 'chrono';
+    let viewMode = 'league';
     let selectedLeague = null;
     let favOnly = false;
     let showHourRadar = false;
@@ -1702,59 +1702,75 @@ HTML_PAGE = """<!DOCTYPE html>
         return;
       }
 
-      const grouped = {};
-      list.forEach(m => {
-        if (!grouped[m.league]) grouped[m.league] = { label: m.league_label, items: [] };
-        grouped[m.league].items.push({ m, origIdx: lastScan.matches.indexOf(m) });
-      });
+      const allMatches = lastScan.matches || [];
+      const leagueLabels = {
+        'col.1': 'Liga BetPlay — Colombia',
+        'uefa.champions': 'UEFA Champions League',
+        'eng.1': 'Premier League — Inglaterra',
+        'esp.1': 'LaLiga — España',
+        'ita.1': 'Serie A — Italia',
+        'ger.1': 'Bundesliga — Alemania',
+        'fra.1': 'Ligue 1 — Francia'
+      };
 
-      const orderedKeys = Object.keys(grouped).sort((a, b) => {
-        const ia = LEAGUE_ORDER.indexOf(a), ib = LEAGUE_ORDER.indexOf(b);
-        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-      });
-
-      if (selectedLeague && grouped[selectedLeague]) {
-        const g = grouped[selectedLeague];
+      if (selectedLeague) {
+        let leagueMatches = list.filter(m => m.league === selectedLeague);
+        // If current dateFilter hides matches for this league, fallback to all upcoming
+        if (!leagueMatches.length && allMatches.some(m => m.league === selectedLeague)) {
+          leagueMatches = allMatches.filter(m => m.league === selectedLeague);
+        }
+        const label = leagueLabels[selectedLeague] || selectedLeague;
         const code = LEAGUE_SHORT[selectedLeague] || selectedLeague.toUpperCase().slice(0, 3);
-        const cards = g.items.map(({ m, origIdx }) => renderMatchCardHtml(m, origIdx, false)).join('');
+        const cards = leagueMatches.map(m => renderMatchCardHtml(m, lastScan.matches.indexOf(m), false)).join('');
         document.getElementById('leaguesContainer').innerHTML = `
           <section class="glass league-section">
-            <div class="league-header" style="flex-wrap:wrap;">
+            <div class="league-header" style="flex-wrap:wrap;gap:14px;">
               <div style="display:flex;align-items:center;gap:12px;">
-                <button class="btn" onclick="selectLeague(null)" style="padding:6px 12px;">← Ligas</button>
-                <img class="league-logo-sm" src="./logos/${selectedLeague}.png" alt="${g.label}" onerror="this.style.display='none'" />
+                <button class="btn btn-primary" onclick="selectLeague(null)" style="padding:7px 14px;font-size:12.5px;font-weight:700;">← Volver a Ligas</button>
+                <div class="league-logo-wrap" style="width:44px;height:44px;padding:4px;">
+                  <img class="league-logo-img" src="./logos/${selectedLeague}.png" alt="${label}" onerror="this.outerHTML='<span style=&quot;font-weight:800;font-size:11px;color:var(--violet);&quot;>${code}</span>'" />
+                </div>
                 <div>
-                  <h2 style="margin:0;font-size:16.5px;font-weight:700;">${g.label}</h2>
-                  <div style="font-size:11.5px;color:var(--muted);">Ordenados cronológicamente por fecha y hora</div>
+                  <h2 style="margin:0;font-size:17px;font-weight:700;">${label}</h2>
+                  <div style="font-size:11.5px;color:var(--muted);">Partidos ordenados cronológicamente por hora de inicio</div>
                 </div>
               </div>
-              <span class="badge b-pend">${g.items.length} ${g.items.length===1?'partido':'partidos'}</span>
+              <span class="badge b-pend">${leagueMatches.length} ${leagueMatches.length===1?'partido':'partidos'}</span>
             </div>
-            <div class="matches-grid">${cards}</div>
+            ${cards ? `<div class="matches-grid">${cards}</div>` : `<div style="padding:28px 20px;text-align:center;color:var(--muted);font-size:13px;">No hay partidos programados en esta liga para el filtro de fecha actual.<br><button class="btn" style="margin-top:10px;" onclick="setDateFilter('all')">Ver todos los días</button></div>`}
           </section>`;
         return;
       }
 
       document.getElementById('leaguesContainer').innerHTML = `
+        <div style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <h2 style="margin:0;font-size:16px;font-weight:700;">🏆 Ligas de Fútbol Destacadas</h2>
+            <div style="font-size:12px;color:var(--muted);">Toca cualquier liga para ver sus partidos con escudos oficiales, análisis y cuotas</div>
+          </div>
+          <button class="btn" style="font-size:12px;padding:6px 12px;" onclick="setViewMode('chrono')">⏱ Ver Fila Completa</button>
+        </div>
         <div class="leagues-cards-grid">
-          ${orderedKeys.map(lg => {
-            const g = grouped[lg];
-            const nextKick = g.items[0] ? g.items[0].m.kickoff_col : '';
+          ${LEAGUE_ORDER.map(lg => {
+            const lgMatches = allMatches.filter(m => m.league === lg);
+            const todayCount = lgMatches.filter(m => matchesDateFilter(m.kickoff_col)).length;
+            const nextKick = lgMatches[0] ? lgMatches[0].kickoff_col : 'Próximamente';
+            const label = leagueLabels[lg] || lg;
             const code = LEAGUE_SHORT[lg] || lg.toUpperCase().slice(0, 3);
             return `
             <article class="league-tile" onclick="selectLeague('${lg}')">
               <div style="display:flex;align-items:center;gap:14px;">
                 <div class="league-logo-wrap">
-                  <img class="league-logo-img" src="./logos/${lg}.png" alt="${g.label}" onerror="this.outerHTML='<span style=&quot;font-weight:800;font-size:13px;color:var(--violet);&quot;>${code}</span>'" />
+                  <img class="league-logo-img" src="./logos/${lg}.png" alt="${label}" onerror="this.outerHTML='<span style=&quot;font-weight:800;font-size:13px;color:var(--violet);&quot;>${code}</span>'" />
                 </div>
                 <div style="min-width:0;flex:1;">
-                  <div style="font-size:14.5px;font-weight:700;line-height:1.25;">${g.label}</div>
+                  <div style="font-size:14.5px;font-weight:700;line-height:1.25;">${label}</div>
                   <div class="num" style="font-size:11.5px;color:var(--muted);margin-top:3px;">Próximo: ${nextKick} COL</div>
                 </div>
               </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border);">
-                <span class="badge b-pend">${g.items.length} ${g.items.length===1?'partido':'partidos'}</span>
-                <span style="font-size:12px;font-weight:600;color:var(--violet);">Ver partidos →</span>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border);">
+                <span class="badge ${todayCount > 0 ? 'b-pos' : (lgMatches.length ? 'b-pend' : '')}">${todayCount > 0 ? `${todayCount} hoy` : `${lgMatches.length} partidos`}</span>
+                <span style="font-size:12px;font-weight:700;color:var(--violet);">Entrar a la liga →</span>
               </div>
             </article>`;
           }).join('')}

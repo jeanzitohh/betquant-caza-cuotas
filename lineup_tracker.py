@@ -1,3 +1,4 @@
+import datetime as dt
 import json
 import os
 import urllib.request
@@ -143,6 +144,7 @@ def check_match_lineup_alerts(
     event_id: str,
     home: str,
     away: str,
+    kickoff_col: str = "",
     api_fixture_id: int | None = None,
     api_key: str = "",
 ) -> Optional[dict]:
@@ -151,6 +153,17 @@ def check_match_lineup_alerts(
     Returns an alert dict ONLY if home or away has < 75% starters.
     Otherwise returns None (keeping the UI completely clean when normal).
     """
+    if kickoff_col:
+        try:
+            now_col = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=5)
+            k_dt = dt.datetime.fromisoformat(kickoff_col.replace(" ", "T"))
+            diff_h = (k_dt - now_col).total_seconds() / 3600.0
+            if diff_h > 3.0:
+                # Match is > 3h away; official lineups are guaranteed not to be posted yet
+                return None
+        except Exception:
+            pass
+
     cache = load_lineup_cache()
     rosters = fetch_espn_rosters(league, event_id)
     injuries_map = {}
