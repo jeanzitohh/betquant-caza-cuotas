@@ -228,7 +228,17 @@ def render_match_card(m: dict) -> bytes:
     if tw > 920:
         f_team = _load_font(25, "bold")
         tw = d.textlength(title, font=f_team)
-    d.text(((1200 - tw) / 2, 120), title, font=f_team, fill=(255, 255, 255, 255))
+    d.text(((1200 - tw) / 2, 116), title, font=f_team, fill=(255, 255, 255, 255))
+
+    # Lineup alert badge if team has < 75% titularity
+    l_alert = m.get("lineup_alert") or {}
+    if l_alert.get("is_alert"):
+        f_warn = _load_font(13, "bold")
+        w_txt = f"⚠️ ALERTA: <75% TITULARES EN {l_alert['team'].upper()} ({l_alert['starters_pct']}%)"
+        w_len = d.textlength(w_txt, font=f_warn)
+        _composite_rect(img, (int(600 - w_len/2 - 14), 148, int(600 + w_len/2 + 14), 168), radius=8, fill=(239, 68, 68, 60), outline=(239, 68, 68, 220), width=1)
+        d = ImageDraw.Draw(img)
+        d.text((int(600 - w_len/2), 150), w_txt, font=f_warn, fill=(254, 202, 202, 255))
 
     # Winner probabilities (market implied + model)
     s_inv = 1.0 / m["o1"] + 1.0 / m["ox"] + 1.0 / m["o2"]
@@ -236,7 +246,7 @@ def render_match_card(m: dict) -> bytes:
     px = (1.0 / m["ox"]) / s_inv
     p2 = (1.0 / m["o2"]) / s_inv
 
-    bar_x, bar_y, bar_w, bar_h = 84, 174, 1032, 24
+    bar_x, bar_y, bar_w, bar_h = 84, 178, 1032, 24
     w1 = int(bar_w * p1)
     wx = int(bar_w * px)
     d.rounded_rectangle((bar_x, bar_y, bar_x + w1, bar_y + bar_h), radius=10, fill=(139, 92, 246, 255))

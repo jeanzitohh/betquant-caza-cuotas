@@ -1591,6 +1591,11 @@ HTML_PAGE = """<!DOCTYPE html>
         const pairHintHtml = (bestPick && Number(bestPick.odds) < 1.50 && m.pair_hint)
           ? `<div style="font-size:11px;color:var(--orange);font-weight:600;margin-top:2px;">🔗 Para 1.50+: + ${m.pair_hint.partner_title} → @${Number(m.pair_hint.combo_odds).toFixed(2)}</div>`
           : '';
+        const lineupAlertHtml = (m.lineup_alert && m.lineup_alert.is_alert)
+          ? `<div style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);border-radius:6px;padding:3px 8px;margin:5px 0 2px;display:flex;align-items:center;gap:6px;font-size:11px;color:#EF4444;font-weight:700;">
+               <span>⚠️ &lt;75% Titulares: ${m.lineup_alert.team} (${m.lineup_alert.starters_pct}%)</span>
+             </div>`
+          : '';
         return `<article class="match-card">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
             <span class="num" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);">${lgPill}${m.kickoff_col} COL ${m.ou_line ? '• O/U ' + m.ou_line : ''}</span>
@@ -1641,6 +1646,7 @@ HTML_PAGE = """<!DOCTYPE html>
             <span style="color:var(--violet);font-weight:700;">2T +0.5: ${(m.probs_summary && m.probs_summary.p_2h_o05) || 78}%</span>
             <span class="badge b-pend" style="font-size:9.5px;padding:1px 6px;">2T ${(m.probs_summary && m.probs_summary.ratio_2h) || 56}% goles</span>
           </div>
+          ${lineupAlertHtml}
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid var(--border);">
             <div style="font-size:11.5px;font-weight:600;">${bestPick ? `${evBadge(bestPick.ev_pct)} @${bestPick.odds.toFixed(2)}` : '<span style="color:var(--muted);">Ver mercados</span>'}${pairHintHtml}</div>
             <div style="display:flex;gap:6px;">
@@ -1920,6 +1926,20 @@ HTML_PAGE = """<!DOCTYPE html>
       const p2_05 = ps.p_2h_o05 || (100 * (1 - Math.exp(-lam2))).toFixed(1);
       const p_most2 = ps.p_most_2h || 52;
 
+      const lineupBoxHtml = (m.lineup_alert && m.lineup_alert.is_alert) ? `
+        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.28);border-radius:12px;padding:12px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:8px;color:#DC2626;font-weight:700;font-size:13px;">
+            <span>⚠️ ALERTA DE ALINEACIÓN: Menos del 75% de titulares</span>
+          </div>
+          <div style="font-size:12px;margin-top:5px;color:var(--text);line-height:1.45;">
+            <b>${m.lineup_alert.team}</b> iniciará con sólo el <b>${m.lineup_alert.starters_pct}%</b> de sus titulares habituales (${m.lineup_alert.starters_count}/11).
+            ${m.lineup_alert.missing_names && m.lineup_alert.missing_names.length ? `<div style="margin-top:4px;color:var(--muted);font-size:11.5px;">Bajas detectadas / Suplentes: <i style="color:var(--text);">${m.lineup_alert.missing_names.slice(0,5).join(', ')}</i></div>` : ''}
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+            * El modelo cuantitativo ajustó automáticamente las probabilidades a la baja debido a la ausencia de titulares clave.
+          </div>
+        </div>` : '';
+
       const halfCardHtml = `
         <div class="glass" style="padding:14px;border-radius:14px;margin-bottom:16px;background:rgba(255,255,255,0.03);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -1961,7 +1981,7 @@ HTML_PAGE = """<!DOCTYPE html>
         <td><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;" onclick="addLegToSlip('${m.event_id}','${m.league}','${m.kickoff_col.slice(0,10)}','${m.home} vs ${m.away}','${mk.key}','${mk.name}',${mk.odds},${mk.prob/100});closeDrawer();">+ Cupón</button></td>
       </tr>`).join('');
 
-      document.getElementById('drBody').innerHTML = halfCardHtml + `<div class="table-card"><table><thead><tr><th>Mercado</th><th>Cuota</th><th>Est/Casa</th><th>Balance</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      document.getElementById('drBody').innerHTML = lineupBoxHtml + halfCardHtml + `<div class="table-card"><table><thead><tr><th>Mercado</th><th>Cuota</th><th>Est/Casa</th><th>Balance</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
       document.getElementById('drawerOverlay').classList.add('open');
     }
 

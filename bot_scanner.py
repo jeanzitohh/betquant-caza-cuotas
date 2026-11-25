@@ -22,6 +22,7 @@ from quant_math import (
     poisson_probs,
     rolling_team_summary,
 )
+from lineup_tracker import check_match_lineup_alerts, penalize_lambda_for_lineup
 
 DEFAULT_LEAGUES = ["col.1", "eng.1", "esp.1", "ita.1", "ger.1", "fra.1", "uefa.champions"]
 
@@ -166,6 +167,7 @@ def evaluate_match(
     lg_hg: dict,
     lg_ag: dict,
     calibration: dict | None = None,
+    lineup_alert: dict | None = None,
 ) -> dict:
     """Evaluate Sharp Value (if available), Poisson stats, Formula Option A legs, and Option B Bet Builders."""
     mkt_odds = build_match_markets(m)
@@ -183,10 +185,17 @@ def evaluate_match(
 
     if len(h_sp) >= 2 and len(a_sp) >= 2:
         lam_h, lam_a = estimate_team_lambdas(h_sp, a_sp, avg_h, avg_a)
-        qprobs = poisson_probs(lam_h, lam_a)
     else:
         lam_h, lam_a = calibrate_market_lambdas(m.o1, m.ox, m.o2, m.ou_line, m.o_over, m.o_under)
-        qprobs = poisson_probs(lam_h, lam_a)
+
+    # Penalize expected goals lambda if either team has < 75% titularity
+    if lineup_alert:
+        if lineup_alert.get("team") == m.home:
+            lam_h = penalize_lambda_for_lineup(lam_h, lineup_alert.get("starters_pct", 70.0))
+        elif lineup_alert.get("team") == m.away:
+            lam_a = penalize_lambda_for_lineup(lam_a, lineup_alert.get("starters_pct", 70.0))
+
+    qprobs = poisson_probs(lam_h, lam_a)
 
     # 1st Half (1T) & 2nd Half (2T) Goal Modeling
     half_data = half_time_breakdown(lam_h, lam_a)
@@ -284,6 +293,7 @@ def evaluate_match(
         "best_opt_a": best_opt_a,
         "best_opt_b": best_opt_b,
         "best_daily_safe": best_daily_safe,
+        "lineup_alert": lineup_alert,
     }
 
 
@@ -304,7 +314,11 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
     calibration = db_read.get_market_calibration()
     db_read.set_state("last_calibration", f"{len(calibration)} mercados medidos")
 
-    evals = [evaluate_match(m, team_all, team_home, team_away, lg_hg, lg_ag, calibration=calibration) for m in upcoming]
+    evals = []
+    for m in upcoming:
+        l_alert = check_match_lineup_alerts(m.league, m.event_id, m.home, m.away, api_key=api_key)
+        e = evaluate_match(m, team_all, team_home, team_away, lg_hg, lg_ag, calibration=calibration, lineup_alert=l_alert)
+        evals.append(e)
     db = db_read if save else None
     saved_count = 0
 
@@ -561,6 +575,7 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                 if e["best_opt_a"]
                 else None,
                 "opt_b_pick": None,
+                "lineup_alert": e.get("lineup_alert"),
             }
         )
 

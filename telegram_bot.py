@@ -313,9 +313,20 @@ def _build_detailed_match_caption(m: dict) -> str:
             f"({html.escape(ph['partner_pick'])} @<code>{ph['partner_odds']:.2f}</code>) → Total @<b>{ph['combo_odds']:.2f}</b>"
         )
 
+    lineup_warn = ""
+    al = m.get("lineup_alert") or {}
+    if al.get("is_alert"):
+        bajas_str = f" (Bajas detectadas: {', '.join(al.get('missing_names', [])[:4])})" if al.get("missing_names") else ""
+        lineup_warn = (
+            f"\n⚠️ <b>ALERTA DE ALINEACIÓN (&lt;75% TITULARES):</b>\n"
+            f"• <b>{html.escape(al['team'])}</b> cuenta con sólo el <b>{al['starters_pct']}%</b> de sus titulares habituales "
+            f"({al['starters_count']}/11 en cancha){html.escape(bajas_str)}. ¡Ajustar riesgo!\n\n"
+        )
+
     return (
         f"⚽ <b>{html.escape(m['home'])} vs {html.escape(m['away'])}</b>\n"
         f"🏆 {html.escape(m.get('league_label', m['league']))} • 🕒 <code>{m['kickoff_col']} COL</code>\n\n"
+        f"{lineup_warn}"
         f"📌 <b>GANADOR:</b> {fav_txt}\n"
         f"• {html.escape(m['home'])}: <b>{p1:.0f}%</b> (<code>@{m['o1']:.2f}</code>) | Empate: <b>{px:.0f}%</b> (<code>@{m['ox']:.2f}</code>) | {html.escape(m['away'])}: <b>{p2:.0f}%</b> (<code>@{m['o2']:.2f}</code>)\n\n"
         f"⚽ <b>GOLES ESPERADOS Y PORCENTAJES:</b>\n"
