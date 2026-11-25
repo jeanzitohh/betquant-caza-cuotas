@@ -2,6 +2,7 @@ import argparse
 import html
 import json
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -79,6 +80,10 @@ def send_photo_bytes(token: str, chat_id: str, png_bytes: bytes, caption: str) -
         with urllib.request.urlopen(req, timeout=25) as resp:
             parsed = json.loads(resp.read().decode("utf-8"))
             return bool(parsed.get("ok"))
+    except urllib.error.HTTPError as exc:
+        err = exc.read().decode("utf-8", errors="ignore")
+        print(f"Telegram sendPhoto HTTP {exc.code}: {err[:160]}")
+        return False
     except Exception:
         return False
 

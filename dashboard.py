@@ -714,27 +714,28 @@ HTML_PAGE = """<!DOCTYPE html>
     function renderHourRadar() {
       const box = document.getElementById('hourRadarWrap');
       if (!showHourRadar) { box.style.display = 'none'; return; }
-      const ladder = lastScan.serial_ladder || [];
+      const ladder1 = lastScan.serial_ladder || [];
+      const ladder2 = lastScan.serial_ladder_2 || [];
       const gList = lastScan.next_global || [];
       box.style.display = 'block';
-      if (!ladder.length && !gList.length) {
+      if (!ladder1.length && !ladder2.length && !gList.length) {
         box.innerHTML = '<div class="glass" style="padding:16px;font-size:12.5px;color:var(--muted);">No hay partidos próximos inmediatos en el radar en este instante.</div>';
         return;
       }
-      const serialHtml = ladder.length ? `
+      const renderLadderSection = (items, title, subtitle, emblemGrad) => items.length ? `
         <section class="glass league-section" style="margin-bottom:12px;">
           <div class="league-header">
             <div style="display:flex;align-items:center;gap:10px;">
-              <div class="league-emblem" style="background:linear-gradient(135deg,#7C3AED,#F97316);">🪜</div>
+              <div class="league-emblem" style="background:${emblemGrad};">🪜</div>
               <div>
-                <h2 style="margin:0;font-size:15.5px;font-weight:700;">Pronósticos en Serie (Por Turnos)</h2>
-                <div style="font-size:11.5px;color:var(--muted);">1 partido por turno (≥2h15m entre inicios) para conocer el resultado antes de jugar el siguiente.</div>
+                <h2 style="margin:0;font-size:15.5px;font-weight:700;">${title}</h2>
+                <div style="font-size:11.5px;color:var(--muted);">${subtitle}</div>
               </div>
             </div>
-            <span class="badge b-pos">${ladder.length} turnos</span>
+            <span class="badge b-pos">${items.length} turnos</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;">
-            ${ladder.map(s => {
+            ${items.map(s => {
               const ps = s.probs_summary || {};
               const meta = ps.o15 !== undefined ? `<div style="font-size:11px;color:var(--sub);margin-bottom:4px;">1X2: ${Math.round(ps.p1)}%/${Math.round(ps.px)}%/${Math.round(ps.p2)}% • Goles est: ${s.lam_h} vs ${s.lam_a} • +1.5: ${Math.round(ps.o15)}%</div>` : '';
               const alt = s.alt_market_name ? `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Alt: ${s.alt_market_name} @${Number(s.alt_odds).toFixed(2)} (${s.alt_prob}%)</div>` : '<div style="margin-bottom:4px;"></div>';
@@ -755,6 +756,10 @@ HTML_PAGE = """<!DOCTYPE html>
             }).join('')}
           </div>
         </section>` : '';
+
+      const serialHtml =
+        renderLadderSection(ladder1, 'Serie 1 • Línea Principal (Por Turnos)', '1 partido por turno (≥2h15m entre inicios) para conocer el resultado antes de jugar el siguiente.', 'linear-gradient(135deg,#7C3AED,#F97316)') +
+        renderLadderSection(ladder2, 'Serie 2 • Línea Paralela Independiente', 'Segunda cadena cronológica (≥2h15m entre sus propios turnos) para llevarla por separado sin cruzar montos.', 'linear-gradient(135deg,#10B981,#0EA5E9)');
 
       const globalHtml = gList.length ? `
         <section class="glass league-section">
@@ -833,7 +838,7 @@ HTML_PAGE = """<!DOCTYPE html>
           botReport = data.report_json || null;
         }
         const filtered = filterScanByScope(rawCloudScan, currentScope);
-        lastScan = { ...rawCloudScan, ...filtered, next_global: rawCloudScan.next_global || [], serial_ladder: rawCloudScan.serial_ladder || [], total_matches: filtered.matches.length };
+        lastScan = { ...rawCloudScan, ...filtered, next_global: rawCloudScan.next_global || [], serial_ladder: rawCloudScan.serial_ladder || [], serial_ladder_2: rawCloudScan.serial_ladder_2 || [], total_matches: filtered.matches.length };
         setStatus(false, `${lastScan.total_matches} partidos próximos • Act: ${rawCloudGen} COL`);
         populateAnalyzerSelects();
         renderHourRadar();

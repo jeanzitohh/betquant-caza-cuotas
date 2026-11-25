@@ -479,8 +479,8 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
             }
         )
 
-    next_global = fetch_next_global_matches(limit=10)
-    serial_ladder = build_serial_ladder(matches_detail, next_global)
+    next_global = fetch_next_global_matches(limit=12)
+    serial_ladder, serial_ladder_2 = build_dual_serial_ladders(matches_detail, next_global)
 
     return {
         "apifootball_active": bool(api_key),
@@ -494,6 +494,7 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
         "matches": matches_detail,
         "next_global": next_global,
         "serial_ladder": serial_ladder,
+        "serial_ladder_2": serial_ladder_2,
         "calibration": calibration,
     }
 
@@ -504,7 +505,18 @@ def build_serial_ladder(
     min_gap_minutes: int = 135,
     max_items: int = 10,
 ) -> list[dict]:
-    """Order individual 1-match picks strictly in series (>=2h15m apart) so Fibonacci waits for each outcome."""
+    """Return primary chronological 1-by-1 serial schedule."""
+    primary, _ = build_dual_serial_ladders(matches_detail, next_global, min_gap_minutes=min_gap_minutes, max_items=max_items)
+    return primary
+
+
+def build_dual_serial_ladders(
+    matches_detail: list[dict],
+    next_global: list[dict],
+    min_gap_minutes: int = 135,
+    max_items: int = 10,
+) -> tuple[list[dict], list[dict]]:
+    """Build 2 independent chronological ladders (Serie 1 & Serie 2) >=2h15m apart internally."""
     pool: dict[str, dict] = {}
     goal_combo_keys = {"BB_H_1_O05", "BB_H_1_O15", "BB_H_1X_O15", "BB_A_2_O05", "BB_A_2_O15", "BB_A_X2_O15", "H_O15", "A_O15"}
 
@@ -643,26 +655,32 @@ def build_serial_ladder(
     def _parse_dt(s: str) -> dt.datetime:
         return dt.datetime.strptime(s[:16], "%Y-%m-%d %H:%M")
 
-    ordered = sorted(pool.values(), key=lambda x: (x["kickoff_col"], -x["prob"]))
-    ladder: list[dict] = []
-    last_dt: dt.datetime | None = None
-    for item in ordered:
-        try:
-            cur_dt = _parse_dt(item["kickoff_col"])
-        except Exception:
-            continue
-        if last_dt is not None:
-            gap_min = int((cur_dt - last_dt).total_seconds() // 60)
-            if gap_min < min_gap_minutes:
+    def _pick_chain(candidates: list[dict]) -> list[dict]:
+        chain: list[dict] = []
+        last_dt: dt.datetime | None = None
+        for item in candidates:
+            try:
+                cur_dt = _parse_dt(item["kickoff_col"])
+            except Exception:
                 continue
-            gap_txt = f"+{gap_min // 60}h {gap_min % 60:02d}m después"
-        else:
-            gap_txt = "Primer turno disponible"
-        last_dt = cur_dt
-        ladder.append({**item, "step": len(ladder) + 1, "gap_label": gap_txt})
-        if len(ladder) >= max_items:
-            break
-    return ladder
+            if last_dt is not None:
+                gap_min = int((cur_dt - last_dt).total_seconds() // 60)
+                if gap_min < min_gap_minutes:
+                    continue
+                gap_txt = f"+{gap_min // 60}h {gap_min % 60:02d}m después"
+            else:
+                gap_txt = "Primer turno disponible"
+            last_dt = cur_dt
+            chain.append({**item, "step": len(chain) + 1, "gap_label": gap_txt})
+            if len(chain) >= max_items:
+                break
+        return chain
+
+    ordered = sorted(pool.values(), key=lambda x: (x["kickoff_col"], -x["prob"]))
+    serie_1 = _pick_chain(ordered)
+    used_ids = {s["event_id"] for s in serie_1}
+    serie_2 = _pick_chain([item for item in ordered if item["event_id"] not in used_ids])
+    return serie_1, serie_2
 
 
 def run_settle_pipeline() -> dict:
