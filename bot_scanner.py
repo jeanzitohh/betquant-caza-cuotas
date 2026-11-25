@@ -506,8 +506,23 @@ def build_serial_ladder(
 ) -> list[dict]:
     """Order individual 1-match picks strictly in series (>=2h15m apart) so Fibonacci waits for each outcome."""
     pool: dict[str, dict] = {}
+    goal_combo_keys = {"BB_H_1_O05", "BB_H_1_O15", "BB_H_1X_O15", "BB_A_2_O05", "BB_A_2_O15", "BB_A_X2_O15", "H_O15", "A_O15"}
+
     for m in matches_detail:
         pick = m.get("opt_b_pick") or m.get("opt_a_leg")
+        # If pick is too low (<1.38) or missing, elevate using goal/combined-goal markets
+        if not pick or float(pick["odds"]) < 1.38:
+            goal_mk = max(
+                (
+                    mk
+                    for mk in (m.get("all_markets") or [])
+                    if mk["key"] in goal_combo_keys and 1.35 <= mk["odds"] <= 1.85 and mk["prob"] >= 58.0
+                ),
+                key=lambda x: x["prob"],
+                default=None,
+            )
+            if goal_mk:
+                pick = goal_mk
         if not pick:
             best_mk = max(
                 (mk for mk in (m.get("all_markets") or []) if 1.22 <= mk["odds"] <= 1.90 and mk["prob"] >= 58.0),
@@ -528,21 +543,54 @@ def build_serial_ladder(
             "odds": round(float(pick["odds"]), 2),
             "prob": float(pick["prob"]),
             "ev_pct": float(pick["ev_pct"]),
+            "o1": m["o1"],
+            "ox": m["ox"],
+            "o2": m["o2"],
+            "lam_h": m["lam_h"],
+            "lam_a": m["lam_a"],
+            "probs_summary": m.get("probs_summary") or {},
         }
 
     for g in next_global:
         eid = str(g["event_id"])
         if eid in pool:
             continue
+        m_stub = UpcomingMatch(
+            league="global",
+            event_id=eid,
+            match_date=g["kickoff_col"][:10],
+            kickoff_utc=g["kickoff_utc"],
+            kickoff_col=g["kickoff_col"],
+            home=g["home"],
+            away=g["away"],
+            o1=g["o1"],
+            ox=g["ox"],
+            o2=g["o2"],
+            ou_line=g.get("ou_line"),
+            o_over=None,
+            o_under=None,
+            provider_name=g.get("provider", "ESPN"),
+        )
+        mkt_odds = build_match_markets(m_stub)
         lh, la = calibrate_market_lambdas(g["o1"], g["ox"], g["o2"], g.get("ou_line"), None, None)
         qp = poisson_probs(lh, la)
         p1, px, p2 = devig_3(g["o1"], g["ox"], g["o2"])
-        fav_k, fav_odd, fav_prob = ("1", g["o1"], qp["1"]) if p1 >= p2 else ("2", g["o2"], qp["2"])
-        if not (1.20 <= fav_odd <= 2.10):
-            # Fallback to favored team +0.5 or 1X/X2 estimate
-            fav_k = "H_O05" if p1 >= p2 else "A_O05"
-            fav_prob = qp[fav_k]
-            fav_odd = round(max(1.18, 1.0 / max(fav_prob * 1.04, 0.2)), 2)
+
+        # Prefer combined win+goals / team-goals market in 1.35-1.85 before falling back to straight 1X2
+        combo_cands = [
+            (k, mkt_odds[k], qp[k])
+            for k in goal_combo_keys
+            if k in mkt_odds and 1.35 <= mkt_odds[k] <= 1.85 and qp[k] >= 0.56
+        ]
+        if combo_cands:
+            fav_k, fav_odd, fav_prob = max(combo_cands, key=lambda x: x[2])
+        else:
+            fav_k, fav_odd, fav_prob = ("1", g["o1"], qp["1"]) if p1 >= p2 else ("2", g["o2"], qp["2"])
+            if not (1.20 <= fav_odd <= 2.10):
+                fav_k = "H_O05" if p1 >= p2 else "A_O05"
+                fav_prob = qp[fav_k]
+                fav_odd = round(max(1.18, 1.0 / max(fav_prob * 1.04, 0.2)), 2)
+
         ev_pct = round((fav_prob * fav_odd - 1.0) * 100.0, 1)
         pool[eid] = {
             "event_id": eid,
@@ -555,6 +603,23 @@ def build_serial_ladder(
             "odds": round(float(fav_odd), 2),
             "prob": round(fav_prob * 100.0, 1),
             "ev_pct": ev_pct,
+            "o1": g["o1"],
+            "ox": g["ox"],
+            "o2": g["o2"],
+            "lam_h": round(lh, 2),
+            "lam_a": round(la, 2),
+            "probs_summary": {
+                "p1": round(p1 * 100.0, 1),
+                "px": round(px * 100.0, 1),
+                "p2": round(p2 * 100.0, 1),
+                "h_o05": round(qp["H_O05"] * 100.0, 1),
+                "h_o15": round(qp["H_O15"] * 100.0, 1),
+                "a_o05": round(qp["A_O05"] * 100.0, 1),
+                "a_o15": round(qp["A_O15"] * 100.0, 1),
+                "o15": round(qp["O15"] * 100.0, 1),
+                "o25": round(qp["O25"] * 100.0, 1),
+                "btts": round(qp["H_O05"] * qp["A_O05"] * 100.0, 1),
+            },
         }
 
     def _parse_dt(s: str) -> dt.datetime:

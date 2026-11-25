@@ -344,9 +344,9 @@ def render_settled_card(settled_items: list[dict], rep: dict) -> bytes:
 
 
 def render_serial_ladder_card(ladder: list[dict]) -> bytes:
-    """Render a chronological 1-by-1 turn schedule card with no internal strategy jargon."""
+    """Render a chronological 1-by-1 turn schedule card with goal breakdown and zero internal jargon."""
     shown = ladder[:5]
-    h = 250 + max(1, len(shown)) * 112
+    h = 260 + max(1, len(shown)) * 130
     img = _create_backdrop(1200, h)
     _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", "Horarios Colombia (UTC-5)")
     _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
@@ -355,23 +355,32 @@ def render_serial_ladder_card(ladder: list[dict]) -> bytes:
     d.text((88, 126), "Secuencia cronológica: termina un partido y conoces el resultado antes de jugar el siguiente.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
 
     for idx, s in enumerate(shown):
-        y0 = 164 + idx * 110
-        _glass_panel(img, (84, y0, 1116, y0 + 94), radius=18, fill=(255, 255, 255, 18))
+        y0 = 164 + idx * 126
+        _glass_panel(img, (84, y0, 1116, y0 + 112), radius=18, fill=(255, 255, 255, 18))
         d = ImageDraw.Draw(img)
         lg_txt = "" if s["league_label"] in ("group-stage", "regular-season", "league-stage") else f" • {s['league_label']}"
-        d.text((112, y0 + 14), f"TURNO #{s['step']}  •  {s['kickoff_col']} COL  ({s['gap_label']}){lg_txt}", font=_load_font(14, "bold"), fill=(253, 186, 116, 255))
-        d.text((112, y0 + 38), str(s["title"])[:54], font=_load_font(21, "bold"), fill=(255, 255, 255, 255))
+        d.text((112, y0 + 12), f"TURNO #{s['step']}  •  {s['kickoff_col']} COL  ({s['gap_label']}){lg_txt}", font=_load_font(14, "bold"), fill=(253, 186, 116, 255))
+        d.text((112, y0 + 34), str(s["title"])[:54], font=_load_font(20, "bold"), fill=(255, 255, 255, 255))
         m_name = s["market_name"]
         if " vs " in s["title"]:
             hm, aw = [x.strip() for x in s["title"].split(" vs ", 1)]
             m_name = literal_market_text(m_name, hm, aw)
-        d.text((112, y0 + 66), m_name[:64], font=_load_font(15, "semi"), fill=(196, 181, 253, 255))
+        d.text((112, y0 + 62), m_name[:66], font=_load_font(15, "bold"), fill=(196, 181, 253, 255))
+
+        ps = s.get("probs_summary") or {}
+        if ps:
+            meta_txt = (
+                f"1X2: {ps.get('p1',0):.0f}% / {ps.get('px',0):.0f}% / {ps.get('p2',0):.0f}%   •   "
+                f"Goles est: {s.get('lam_h',1.4):.2f} vs {s.get('lam_a',1.0):.2f}   •   "
+                f"+1.5 Partido: {ps.get('o15',0):.0f}%   •   Ambos marcan: {ps.get('btts',0):.0f}%"
+            )
+            d.text((112, y0 + 85), meta_txt, font=_load_font(13, "reg"), fill=(186, 230, 253, 255))
 
         odd_txt = f"@{float(s['odds']):.2f}"
         prob_txt = f"Prob. {s['prob']}%"
         ow = d.textlength(odd_txt, font=_load_font(28, "bold"))
         prw = d.textlength(prob_txt, font=_load_font(15, "semi"))
-        d.text((1086 - ow, y0 + 18), odd_txt, font=_load_font(28, "bold"), fill=(255, 255, 255, 255))
+        d.text((1086 - ow, y0 + 20), odd_txt, font=_load_font(28, "bold"), fill=(255, 255, 255, 255))
         d.text((1086 - prw, y0 + 56), prob_txt, font=_load_font(15, "semi"), fill=(74, 222, 128, 255))
 
     buf = io.BytesIO()
@@ -511,9 +520,9 @@ def render_settled_card(settled_items: list[dict], rep: dict) -> bytes:
 
 
 def render_serial_ladder_card(ladder: list[dict]) -> bytes:
-    """Render a chronological 1-by-1 turn schedule card with no internal strategy jargon."""
+    """Render a chronological 1-by-1 turn schedule card with goal breakdown and zero internal jargon."""
     shown = ladder[:5]
-    h = 250 + max(1, len(shown)) * 112
+    h = 260 + max(1, len(shown)) * 130
     img = _create_backdrop(1200, h)
     _draw_brand_header(img, "PRONÓSTICOS EN SERIE • UN PARTIDO POR TURNO", "Horarios Colombia (UTC-5)")
     _glass_panel(img, (48, 102, 1152, h - 38), radius=28)
@@ -522,23 +531,32 @@ def render_serial_ladder_card(ladder: list[dict]) -> bytes:
     d.text((88, 126), "Secuencia cronológica: termina un partido y conoces el resultado antes de jugar el siguiente.", font=_load_font(16, "reg"), fill=(203, 213, 225, 255))
 
     for idx, s in enumerate(shown):
-        y0 = 164 + idx * 110
-        _glass_panel(img, (84, y0, 1116, y0 + 94), radius=18, fill=(255, 255, 255, 18))
+        y0 = 164 + idx * 126
+        _glass_panel(img, (84, y0, 1116, y0 + 112), radius=18, fill=(255, 255, 255, 18))
         d = ImageDraw.Draw(img)
         lg_txt = "" if s["league_label"] in ("group-stage", "regular-season", "league-stage") else f" • {s['league_label']}"
-        d.text((112, y0 + 14), f"TURNO #{s['step']}  •  {s['kickoff_col']} COL  ({s['gap_label']}){lg_txt}", font=_load_font(14, "bold"), fill=(253, 186, 116, 255))
-        d.text((112, y0 + 38), str(s["title"])[:54], font=_load_font(21, "bold"), fill=(255, 255, 255, 255))
+        d.text((112, y0 + 12), f"TURNO #{s['step']}  •  {s['kickoff_col']} COL  ({s['gap_label']}){lg_txt}", font=_load_font(14, "bold"), fill=(253, 186, 116, 255))
+        d.text((112, y0 + 34), str(s["title"])[:54], font=_load_font(20, "bold"), fill=(255, 255, 255, 255))
         m_name = s["market_name"]
         if " vs " in s["title"]:
             hm, aw = [x.strip() for x in s["title"].split(" vs ", 1)]
             m_name = literal_market_text(m_name, hm, aw)
-        d.text((112, y0 + 66), m_name[:64], font=_load_font(15, "semi"), fill=(196, 181, 253, 255))
+        d.text((112, y0 + 62), m_name[:66], font=_load_font(15, "bold"), fill=(196, 181, 253, 255))
+
+        ps = s.get("probs_summary") or {}
+        if ps:
+            meta_txt = (
+                f"1X2: {ps.get('p1',0):.0f}% / {ps.get('px',0):.0f}% / {ps.get('p2',0):.0f}%   •   "
+                f"Goles est: {s.get('lam_h',1.4):.2f} vs {s.get('lam_a',1.0):.2f}   •   "
+                f"+1.5 Partido: {ps.get('o15',0):.0f}%   •   Ambos marcan: {ps.get('btts',0):.0f}%"
+            )
+            d.text((112, y0 + 85), meta_txt, font=_load_font(13, "reg"), fill=(186, 230, 253, 255))
 
         odd_txt = f"@{float(s['odds']):.2f}"
         prob_txt = f"Prob. {s['prob']}%"
         ow = d.textlength(odd_txt, font=_load_font(28, "bold"))
         prw = d.textlength(prob_txt, font=_load_font(15, "semi"))
-        d.text((1086 - ow, y0 + 18), odd_txt, font=_load_font(28, "bold"), fill=(255, 255, 255, 255))
+        d.text((1086 - ow, y0 + 20), odd_txt, font=_load_font(28, "bold"), fill=(255, 255, 255, 255))
         d.text((1086 - prw, y0 + 56), prob_txt, font=_load_font(15, "semi"), fill=(74, 222, 128, 255))
 
     buf = io.BytesIO()

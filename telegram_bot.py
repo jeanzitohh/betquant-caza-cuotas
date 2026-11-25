@@ -214,11 +214,20 @@ def format_serial_ladder_block(scan: dict) -> str:
         "<i>Un partido a la vez (≥2h15m entre inicios) para conocer el resultado antes de jugar el siguiente.</i>",
     ]
     ladder = scan.get("serial_ladder") or []
-    for s in ladder[:8]:
+    for s in ladder[:5]:
+        ps = s.get("probs_summary") or {}
+        hm, aw = ([x.strip() for x in s["title"].split(" vs ", 1)] if " vs " in s["title"] else (s["title"], "Visita"))
+        lit = literal_market_text(s["market_name"], hm, aw)
+        det = ""
+        if ps:
+            det = (
+                f"\n📌 1X2: {ps.get('p1',0):.0f}% / {ps.get('px',0):.0f}% / {ps.get('p2',0):.0f}% | "
+                f"⚽ Goles est: <b>~{s.get('lam_h',1.4):.2f} vs ~{s.get('lam_a',1.0):.2f}</b> (+1.5: {ps.get('o15',0):.0f}%)"
+            )
         lines.append(
             f"\n<b>Turno #{s['step']}</b> • 🕒 <code>{s['kickoff_col']} COL</code> <i>({s['gap_label']})</i>\n"
-            f"⚽ <b>{html.escape(s['title'])}</b> ({html.escape(s['league_label'])})\n"
-            f"👉 <b>{html.escape(s['market_name'])}</b> @<code>{s['odds']:.2f}</code> | Prob: <b>{s['prob']}%</b>"
+            f"⚽ <b>{html.escape(s['title'])}</b>{det}\n"
+            f"👉 <b>{html.escape(lit)}</b> @<code>{s['odds']:.2f}</code> (Prob: <b>{s['prob']}%</b>)"
         )
     if not ladder:
         lines.append("\n<i>Sin partidos disponibles para armar la ruta en serie.</i>")
@@ -355,7 +364,7 @@ def publish_channel_updates(scan: dict, db: PaperTradingDB, token: str, channel_
     # 4. Daily Serial Turn-by-Turn Schedule (+ PNG card)
     ladder = scan.get("serial_ladder") or []
     if ladder:
-        l_key = f"serial_ladder_v2:{ladder[0]['kickoff_col'][:10]}:{ladder[0]['event_id']}"
+        l_key = f"serial_ladder_v3:{ladder[0]['kickoff_col'][:10]}:{ladder[0]['event_id']}"
         if not db.was_alert_sent(l_key):
             cap = format_serial_ladder_block(scan)
             ok = send_photo_bytes(token, channel_id, render_serial_ladder_card(ladder), cap) if HAS_CARDS else send_html(token, channel_id, cap)

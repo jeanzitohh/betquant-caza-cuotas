@@ -733,19 +733,24 @@ HTML_PAGE = """<!DOCTYPE html>
             <span class="badge b-pos">${ladder.length} turnos</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;">
-            ${ladder.map(s => `
+            ${ladder.map(s => {
+              const ps = s.probs_summary || {};
+              const meta = ps.o15 !== undefined ? `<div style="font-size:11px;color:var(--sub);margin-bottom:6px;">1X2: ${Math.round(ps.p1)}%/${Math.round(ps.px)}%/${Math.round(ps.p2)}% • Goles est: ${s.lam_h} vs ${s.lam_a} • +1.5: ${Math.round(ps.o15)}%</div>` : '';
+              return `
               <div class="mini-box" style="padding:12px;border-radius:14px;">
                 <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
                   <span style="font-weight:700;color:var(--violet);">Turno #${s.step} • ${s.gap_label}</span>
                   <span class="num" style="color:var(--muted);">${s.kickoff_col} COL</span>
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">${s.league_label}</div>
-                <div style="font-size:13px;font-weight:700;margin-bottom:6px;">${s.title}</div>
+                <div style="font-size:13px;font-weight:700;margin-bottom:4px;">${s.title}</div>
+                ${meta}
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
                   <span style="font-size:11.5px;font-weight:600;">${s.market_name} <strong class="num">@${Number(s.odds).toFixed(2)}</strong> (${s.prob}%)</span>
                   <button class="btn btn-primary" style="padding:4px 9px;font-size:11px;" onclick="addLegToSlip('${s.event_id}','${s.league}','${s.kickoff_col.slice(0,10)}','${s.title.replace(/'/g,'')}','${s.market}','${s.market_name.replace(/'/g,'')}',${s.odds},${(s.prob/100).toFixed(3)})">+ Cupón</button>
                 </div>
-              </div>`).join('')}
+              </div>`;
+            }).join('')}
           </div>
         </section>` : '';
 
