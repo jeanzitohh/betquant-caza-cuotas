@@ -678,22 +678,22 @@ HTML_PAGE = """<!DOCTYPE html>
       if (!mktName || !title || !title.includes(' vs ')) return mktName || '';
       const [home, away] = title.split(' vs ').map(x => x.trim());
       return mktName
-        .replace(/Mismo partido:\s*/g, '')
-        .replace(/BetBuilder:\s*/g, '')
-        .replace(/Local o Empate \(1X\)/g, `${home} Gana o Empata (1X)`)
-        .replace(/Visitante o Empate \(X2\)/g, `${away} Gana o Empata (X2)`)
-        .replace(/Gana Local \(1\)/g, `${home} Gana directo (1)`)
-        .replace(/Gana Visitante \(2\)/g, `${away} Gana directo (2)`)
-        .replace(/Local 1X/g, `${home} Gana o Empata (1X)`)
-        .replace(/Visita X2/g, `${away} Gana o Empata (X2)`)
-        .replace(/Local Gana/g, `${home} Gana`)
-        .replace(/Visita Gana/g, `${away} Gana`)
-        .replace(/Local \+0\.5 goles/g, `${home} anota +0.5 goles (mín. 1)`)
-        .replace(/Local \+1\.5 goles/g, `${home} anota +1.5 goles (mín. 2)`)
-        .replace(/Visitante \+0\.5 goles/g, `${away} anota +0.5 goles (mín. 1)`)
-        .replace(/Visitante \+1\.5 goles/g, `${away} anota +1.5 goles (mín. 2)`)
-        .replace(/Visita \+0\.5 goles/g, `${away} anota +0.5 goles (mín. 1)`)
-        .replace(/Visita \+1\.5 goles/g, `${away} anota +1.5 goles (mín. 2)`);
+        .replace('Mismo partido: ', '')
+        .replace('BetBuilder: ', '')
+        .replace('Local o Empate (1X)', `${home} Gana o Empata (1X)`)
+        .replace('Visitante o Empate (X2)', `${away} Gana o Empata (X2)`)
+        .replace('Gana Local (1)', `${home} Gana directo (1)`)
+        .replace('Gana Visitante (2)', `${away} Gana directo (2)`)
+        .replace('Local 1X', `${home} Gana o Empata (1X)`)
+        .replace('Visita X2', `${away} Gana o Empata (X2)`)
+        .replace('Local Gana', `${home} Gana`)
+        .replace('Visita Gana', `${away} Gana`)
+        .replace('Local +0.5 goles', `${home} anota +0.5 goles (mín. 1)`)
+        .replace('Local +1.5 goles', `${home} anota +1.5 goles (mín. 2)`)
+        .replace('Visitante +0.5 goles', `${away} anota +0.5 goles (mín. 1)`)
+        .replace('Visitante +1.5 goles', `${away} anota +1.5 goles (mín. 2)`)
+        .replace('Visita +0.5 goles', `${away} anota +0.5 goles (mín. 1)`)
+        .replace('Visita +1.5 goles', `${away} anota +1.5 goles (mín. 2)`);
     }
 
     if (SUPABASE_ENABLED) {
