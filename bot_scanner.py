@@ -501,17 +501,17 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
 def build_serial_ladder(
     matches_detail: list[dict],
     next_global: list[dict],
-    min_gap_minutes: int = 150,
+    min_gap_minutes: int = 135,
     max_items: int = 10,
 ) -> list[dict]:
-    """Order individual 1-match picks strictly in series (>=2h30m apart) so Fibonacci waits for each outcome."""
+    """Order individual 1-match picks strictly in series (>=2h15m apart) so Fibonacci waits for each outcome."""
     pool: dict[str, dict] = {}
     for m in matches_detail:
         pick = m.get("opt_b_pick") or m.get("opt_a_leg")
         if not pick:
             best_mk = max(
-                (mk for mk in (m.get("all_markets") or []) if 1.22 <= mk["odds"] <= 1.90),
-                key=lambda x: x["prob"] - (100.0 / x["odds"]) * 0.35,
+                (mk for mk in (m.get("all_markets") or []) if 1.22 <= mk["odds"] <= 1.90 and mk["prob"] >= 58.0),
+                key=lambda x: (x["ev_pct"] > 0, x["prob"]),
                 default=None,
             )
             if not best_mk:
@@ -560,7 +560,7 @@ def build_serial_ladder(
     def _parse_dt(s: str) -> dt.datetime:
         return dt.datetime.strptime(s[:16], "%Y-%m-%d %H:%M")
 
-    ordered = sorted(pool.values(), key=lambda x: x["kickoff_col"])
+    ordered = sorted(pool.values(), key=lambda x: (x["kickoff_col"], -x["prob"]))
     ladder: list[dict] = []
     last_dt: dt.datetime | None = None
     for item in ordered:
