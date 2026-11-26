@@ -156,10 +156,12 @@ HTML_PAGE = """<!DOCTYPE html>
       display: grid; grid-template-columns: 224px minmax(0, 1fr) 345px; gap: 18px; align-items: start;
       transition: grid-template-columns 0.2s ease;
     }
+    .main-wrap > div { min-width: 0; }
     .main-wrap.side-collapsed { grid-template-columns: minmax(0, 1fr) 345px; }
     .main-wrap.side-collapsed .side-nav { display: none; }
     .main-wrap.no-slip { grid-template-columns: 224px minmax(0, 1fr); }
-    .main-wrap.no-slip .slip-panel { display: none; }
+    .main-wrap.no-slip .right-sidebar { display: none !important; }
+    .main-wrap.no-slip .slip-panel { display: none !important; }
     .main-wrap.side-collapsed.no-slip { grid-template-columns: minmax(0, 1fr); }
 
     /* Left Collapsible Side Navigation */
@@ -196,16 +198,16 @@ HTML_PAGE = """<!DOCTYPE html>
     }
     .tab-btn.active { background: #FFFFFF; color: var(--violet); border-color: rgba(124,58,237,0.28); box-shadow: 0 4px 12px rgba(124,58,237,0.10); }
     .pill-cnt { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(124,58,237,0.10); color: var(--violet); }
-    .tab-panel { display: none; }
+    .tab-panel { display: none; min-width: 0; width: 100%; }
     .tab-panel.active { display: block; }
 
     /* Interactive League Selector Cards */
     .leagues-cards-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 14px;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px;
     }
     .league-tile {
-      background: rgba(255,255,255,0.86); border: 1px solid var(--border); border-radius: 20px;
-      padding: 18px; display: flex; flex-direction: column; gap: 12px; cursor: pointer;
+      background: rgba(255,255,255,0.88); border: 1px solid var(--border); border-radius: 20px;
+      padding: 16px 18px; display: flex; flex-direction: column; justify-content: space-between; min-height: 142px; cursor: pointer;
       transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
       box-shadow: var(--highlight), 0 6px 18px rgba(15,23,42,0.04);
     }
@@ -213,12 +215,136 @@ HTML_PAGE = """<!DOCTYPE html>
       transform: translateY(-3px); border-color: rgba(124,58,237,0.32);
       box-shadow: 0 14px 28px rgba(124,58,237,0.10);
     }
+    .league-tile:hover .league-arrow {
+      transform: translateX(4px); color: var(--violet);
+    }
     .league-logo-wrap {
-      width: 54px; height: 54px; border-radius: 16px; background: #F8FAFC;
+      width: 48px; height: 48px; border-radius: 14px; background: #F8FAFC;
       border: 1px solid var(--border); display: grid; place-items: center; padding: 6px; flex-shrink: 0;
     }
     .league-logo-img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .league-logo-sm { width: 36px; height: 36px; border-radius: 10px; background: #F8FAFC; border: 1px solid var(--border); padding: 4px; object-fit: contain; }
+    .league-arrow { font-size: 15px; font-weight: 700; color: var(--muted); transition: transform 0.15s ease, color 0.15s ease; }
+    .league-tile-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--sub);
+    }
+
+    /* Modern SaaS Combo Cards */
+    .combo-card {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+      box-shadow: var(--highlight), 0 6px 20px rgba(15, 23, 42, 0.05);
+      transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
+    }
+    .combo-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(124, 58, 237, 0.32);
+      box-shadow: 0 12px 28px rgba(124, 58, 237, 0.10);
+    }
+    .combo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .combo-odds-pill {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--violet);
+      background: rgba(124, 58, 237, 0.08);
+      padding: 3px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(124, 58, 237, 0.20);
+    }
+    .combo-legs-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      position: relative;
+    }
+    .combo-leg-box {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .combo-leg-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+    .leg-index {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(124, 58, 237, 0.12);
+      color: var(--violet);
+      display: inline-grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .combo-leg-pick {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #F8FAFC;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .combo-multiplier-badge {
+      align-self: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #7C3AED, #F97316);
+      color: #FFFFFF;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
+      margin: -4px 0;
+      z-index: 2;
+    }
+    .combo-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .prob-progress-track {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #E2E8F0;
+      overflow: hidden;
+    }
+    .prob-progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #10B981, #059669);
+    }
 
     /* Captcha Box */
     .captcha-box {
@@ -495,14 +621,14 @@ HTML_PAGE = """<!DOCTYPE html>
       <aside class="glass side-nav" id="sideNav">
         <div class="side-section-lbl">Menú</div>
         <button class="side-btn active" data-tab="tabRadar" onclick="switchTab('tabRadar', this)"><span>⚽ Partidos</span><span class="pill-cnt" id="cntRadar">0</span></button>
-        <button class="side-btn" id="btnTabChannel" data-tab="tabChannel" onclick="switchTab('tabChannel', this); markChannelRead()"><span>📢 Canal En Vivo</span><span class="pill-cnt" id="cntChannel">0</span></button>
-        <button class="side-btn" data-tab="tabAnalyzer" onclick="switchTab('tabAnalyzer', this)"><span>🎯 Analizar Cuota</span></button>
+        <button class="side-btn" id="btnTabChannel" data-tab="tabChannel" onclick="switchTab('tabChannel', this); markChannelRead()"><span>📢 Canal en vivo</span><span class="pill-cnt" id="cntChannel">0</span></button>
+        <button class="side-btn" data-tab="tabAnalyzer" onclick="switchTab('tabAnalyzer', this)"><span>🎯 Analizar cuota</span></button>
         <button class="side-btn" data-tab="tabCombos" onclick="switchTab('tabCombos', this)"><span>🔗 Combinadas</span><span class="pill-cnt" id="cntCombos">0</span></button>
-        <button class="side-btn" data-tab="tabAccount" onclick="switchTab('tabAccount', this)"><span>📊 Mi Rendimiento</span><span class="pill-cnt" id="cntMyBets">0</span></button>
-        <button class="side-btn" id="navBtnAdmin" data-tab="tabAdmin" style="display:none;" onclick="switchTab('tabAdmin', this); loadAdminUsers()"><span>👥 Usuarios</span><span class="pill-cnt" id="cntAdminUsers">0</span></button>
+        <button class="side-btn" data-tab="tabAccount" onclick="switchTab('tabAccount', this)"><span>📊 Mi rendimiento</span><span class="pill-cnt" id="cntMyBets">0</span></button>
+        <button class="side-btn" id="navBtnAdmin" data-tab="tabAdmin" onclick="switchTab('tabAdmin', this); if (currentUser && currentUser.is_admin) { loadAdminUsers(); loadAdminInvitations(); }"><span>⚙️ Configuración</span><span class="pill-cnt" id="cntAdminUsers" style="display:none;">0</span></button>
 
         <div class="bank-box" title="Saldo virtual en unidades (100u = banca inicial simulada para medir tu ROI sin arriesgar dinero real)">
-          <div style="font-size:10.5px;font-weight:700;color:var(--violet);text-transform:uppercase;">Banca Simulada</div>
+          <div style="font-size:10.5px;font-weight:700;color:var(--violet);text-transform:uppercase;">Banca simulada</div>
           <div class="num" style="font-size:17px;font-weight:800;margin-top:2px;" id="bankHeaderTag">100.00u</div>
           <div style="font-size:11px;color:var(--muted);line-height:1.35;margin-top:2px;">Unidades virtuales (100u = inicio) para medir tu rendimiento sin dinero real.</div>
         </div>
@@ -519,13 +645,13 @@ HTML_PAGE = """<!DOCTYPE html>
         <section id="tabRadar" class="tab-panel active">
           <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">
             <div class="seg">
-              <button class="seg-btn active" id="dateToday" onclick="setDateFilter('today')">📅 Solo Hoy</button>
+              <button class="seg-btn active" id="dateToday" onclick="setDateFilter('today')">📅 Solo hoy</button>
               <button class="seg-btn" id="dateTomorrow" onclick="setDateFilter('tomorrow')">Mañana</button>
               <button class="seg-btn" id="dateAll" onclick="setDateFilter('all')">Todos los días</button>
             </div>
             <div class="seg">
-              <button class="seg-btn active" id="viewLeague" onclick="setViewMode('league')">🏆 Por Ligas (Tarjetas)</button>
-              <button class="seg-btn" id="viewChrono" onclick="setViewMode('chrono')">⏱ Fila Continua (Por Hora)</button>
+              <button class="seg-btn active" id="viewLeague" onclick="setViewMode('league')">🏆 Por ligas (tarjetas)</button>
+              <button class="seg-btn" id="viewChrono" onclick="setViewMode('chrono')">⏱ Fila continua (por hora)</button>
             </div>
           </div>
           <div id="hourRadarWrap" style="display:none;margin-bottom:14px;"></div>
@@ -640,80 +766,112 @@ HTML_PAGE = """<!DOCTYPE html>
           </div>
         </section>
 
-        <!-- TAB 5: Super Admin Control Center (Users CRUD + Invitations Engine) -->
+        <!-- TAB 5: Configuración General y Centro de Control -->
         <section id="tabAdmin" class="tab-panel">
-          <div class="glass" style="padding:18px;margin-bottom:14px;">
-            <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
-              <div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span class="badge b-pos" style="font-size:11px;">👑 SUPER ADMIN</span>
-                  <h2 style="margin:0;font-size:18px;">Control Total de Usuarios e Invitaciones</h2>
-                </div>
-                <div style="font-size:12px;color:var(--muted);margin-top:3px;">
-                  Acceso supremo para <strong style="color:var(--violet);">juanmanuelton7@gmail.com</strong> • Gestión de cuentas, creación, edición, borrado e invitaciones.
+          <!-- General User Settings (Visible for all logged-in members) -->
+          <div class="glass" style="padding:18px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+              <span class="badge b-pos" style="font-size:11px;">⚙️ AJUSTES</span>
+              <h2 style="margin:0;font-size:18px;">Configuración de la cuenta y banca</h2>
+            </div>
+            <div class="charts-row" style="margin-bottom:0;">
+              <div class="glass" style="padding:14px;background:#FFFFFF;border-radius:14px;">
+                <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Gestión de montos (Stake)</div>
+                <div style="font-size:12px;color:var(--sub);margin:6px 0;" id="cfgStakeDesc">Modo actual: Monto fijo (2.0u)</div>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+                  <select id="cfgPrefMode" style="flex:1;padding:7px 10px;border-radius:10px;border:1px solid var(--border-strong);background:#FFFFFF;font-size:12px;">
+                    <option value="flat">Monto fijo (2u)</option>
+                    <option value="fibonacci_3">Progresión conservadora</option>
+                    <option value="fibonacci">Progresión escalonada</option>
+                  </select>
+                  <button class="btn btn-primary" style="padding:7px 12px;font-size:12px;" onclick="saveCfgPrefs()">Guardar</button>
                 </div>
               </div>
-              <div style="display:flex;flex-wrap:wrap;gap:8px;">
-                <button class="btn btn-primary" onclick="openCreateUserModal()">+ Crear Usuario</button>
-                <button class="btn" style="border-color:var(--violet);color:var(--violet);" onclick="openCreateInviteModal()">🎟️ Generar Invitación</button>
-                <button class="btn" onclick="loadAdminUsers(); loadAdminInvitations();">🔄 Actualizar</button>
+              <div class="glass" style="padding:14px;background:#FFFFFF;border-radius:14px;">
+                <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Alertas y notificaciones</div>
+                <div style="font-size:12px;color:var(--sub);margin:6px 0;">Recibe goles en vivo, picks del bot y avisos instantáneos</div>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+                  <button class="btn" style="flex:1;font-size:12px;padding:7px 10px;" onclick="togglePushNotifications()">🔔 Gestionar alertas web push</button>
+                </div>
               </div>
             </div>
-            <div class="charts-row" id="adminKpis" style="margin-bottom:0;"></div>
           </div>
 
-          <!-- Section: Registered Users CRUD -->
-          <div class="glass table-card" style="margin-bottom:16px;">
-            <div style="padding:14px 18px 8px;display:flex;justify-content:space-between;align-items:center;">
-              <h3 style="margin:0;font-size:15px;font-weight:700;">Usuarios Registrados en el Sistema</h3>
-              <span class="badge b-pend" id="cntAdminUsersBadge">0 usuarios</span>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Correo / Usuario</th>
-                  <th>Rol</th>
-                  <th>Registro</th>
-                  <th>Último Acceso</th>
-                  <th>Banca (u)</th>
-                  <th>Jugadas</th>
-                  <th>Neto</th>
-                  <th style="text-align:right;">Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="adminUsersBody">
-                <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px;">Cargando usuarios...</td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Section: Active Invitations Generator -->
-          <div class="glass table-card">
-            <div style="padding:14px 18px 8px;display:flex;justify-content:space-between;align-items:center;">
-              <div>
-                <h3 style="margin:0;font-size:15px;font-weight:700;">Enlaces e Invitaciones Activas</h3>
-                <div style="font-size:11.5px;color:var(--muted);">Genera enlaces directos o invitaciones por correo para nuevos miembros</div>
+          <!-- Section: Super Admin Control Wrap (Visible only to Admin users) -->
+          <div id="adminSectionsWrap" style="display:none;">
+            <div class="glass" style="padding:18px;margin-bottom:14px;">
+              <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
+                <div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="badge b-pos" style="font-size:11px;">👑 SUPER ADMIN</span>
+                    <h2 style="margin:0;font-size:18px;">Control total de usuarios e invitaciones</h2>
+                  </div>
+                  <div style="font-size:12px;color:var(--muted);margin-top:3px;">
+                    Acceso supremo para <strong style="color:var(--violet);">juanmanuelton7@gmail.com</strong> • Gestión de cuentas, creación, edición, borrado e invitaciones.
+                  </div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                  <button class="btn btn-primary" onclick="openCreateUserModal()">+ Crear usuario</button>
+                  <button class="btn" style="border-color:var(--violet);color:var(--violet);" onclick="openCreateInviteModal()">🎟️ Generar invitación</button>
+                  <button class="btn" onclick="loadAdminUsers(); loadAdminInvitations();">🔄 Actualizar</button>
+                </div>
               </div>
-              <button class="btn" style="font-size:11.5px;padding:4px 10px;" onclick="loadAdminInvitations()">Refrescar</button>
+              <div class="charts-row" id="adminKpis" style="margin-bottom:0;"></div>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Token / Código</th>
-                  <th>Enlace Compartible</th>
-                  <th>Correo Destino</th>
-                  <th>Rol Asignado</th>
-                  <th>Usos</th>
-                  <th>Expira</th>
-                  <th>Estado</th>
-                  <th style="text-align:right;">Acción</th>
-                </tr>
-              </thead>
-              <tbody id="adminInvitesBody">
-                <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Cargando invitaciones...</td></tr>
-              </tbody>
-            </table>
+
+            <!-- Section: Registered Users CRUD -->
+            <div class="glass table-card" style="margin-bottom:16px;">
+              <div style="padding:14px 18px 8px;display:flex;justify-content:space-between;align-items:center;">
+                <h3 style="margin:0;font-size:15px;font-weight:700;">Usuarios registrados en el sistema</h3>
+                <span class="badge b-pend" id="cntAdminUsersBadge">0 usuarios</span>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Correo / Usuario</th>
+                    <th>Rol</th>
+                    <th>Registro</th>
+                    <th>Último acceso</th>
+                    <th>Banca (u)</th>
+                    <th>Jugadas</th>
+                    <th>Neto</th>
+                    <th style="text-align:right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="adminUsersBody">
+                  <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px;">Cargando usuarios...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Section: Active Invitations Generator -->
+            <div class="glass table-card">
+              <div style="padding:14px 18px 8px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <h3 style="margin:0;font-size:15px;font-weight:700;">Enlaces e invitaciones activas</h3>
+                  <div style="font-size:11.5px;color:var(--muted);">Genera enlaces directos o invitaciones por correo para nuevos miembros</div>
+                </div>
+                <button class="btn" style="font-size:11.5px;padding:4px 10px;" onclick="loadAdminInvitations()">Refrescar</button>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Token / Código</th>
+                    <th>Enlace compartible</th>
+                    <th>Correo destino</th>
+                    <th>Rol asignado</th>
+                    <th>Usos</th>
+                    <th>Expira</th>
+                    <th>Estado</th>
+                    <th style="text-align:right;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="adminInvitesBody">
+                  <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Cargando invitaciones...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       </div>
@@ -723,7 +881,7 @@ HTML_PAGE = """<!DOCTYPE html>
         <div class="glass slip-panel" id="slipPanel" style="position:static;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <div>
-              <h3 style="margin:0;font-size:16px;">Mi Cupón</h3>
+              <h3 style="margin:0;font-size:16px;">Mi cupón</h3>
               <div style="font-size:11.5px;color:var(--muted);">Arma tu apuesta y edita cuotas</div>
             </div>
             <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="clearSlip()">Limpiar</button>
@@ -745,7 +903,7 @@ HTML_PAGE = """<!DOCTYPE html>
     <div class="glass" style="max-width:760px;width:94%;margin:auto;max-height:86vh;overflow-y:auto;padding:22px;border-radius:20px;">
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;">
         <div>
-          <h3 style="margin:0 0 2px;font-size:17px;font-weight:700;">⏱ Todos los Partidos de Hoy por Horario</h3>
+          <h3 style="margin:0 0 2px;font-size:17px;font-weight:700;">⏱ Todos los partidos de hoy por horario</h3>
           <div style="font-size:12px;color:var(--muted);" id="modalTodaySub">Partidos organizados por franja horaria</div>
         </div>
         <button class="btn" onclick="document.getElementById('modalAllMatchesToday').classList.remove('open')">Cerrar</button>
@@ -1181,12 +1339,15 @@ HTML_PAGE = """<!DOCTYPE html>
         document.getElementById('appShell').style.display = 'block';
         document.getElementById('adminComposer').style.display = currentUser.is_admin ? 'flex' : 'none';
         const admBtn = document.getElementById('navBtnAdmin');
-        if (admBtn) admBtn.style.display = currentUser.is_admin ? 'flex' : 'none';
+        if (admBtn) admBtn.style.display = 'flex';
         renderUserUI();
         if (!lastScan.matches.length) await runScan(false);
         await loadChannelPosts();
         subscribeChannelRealtime();
-        if (currentUser.is_admin) loadAdminUsers();
+        if (currentUser.is_admin) {
+          loadAdminUsers();
+          loadAdminInvitations();
+        }
         return;
       }
       if (STATIC_MODE) {
@@ -1488,13 +1649,18 @@ HTML_PAGE = """<!DOCTYPE html>
     function switchTab(id, btn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
+      const target = document.getElementById(id);
+      if (target) target.classList.add('active');
       if (btn) btn.classList.add('active');
       const wrap = document.getElementById('mainWrap');
       if (wrap) {
         const hideSlip = (id === 'tabChannel' || id === 'tabAccount' || id === 'tabAdmin');
         wrap.classList.toggle('no-slip', hideSlip);
         wrap.classList.remove('mobile-nav-open');
+      }
+      if (id === 'tabAdmin' && currentUser && currentUser.is_admin) {
+        loadAdminUsers();
+        loadAdminInvitations();
       }
     }
 
@@ -1654,23 +1820,26 @@ HTML_PAGE = """<!DOCTYPE html>
             <strong style="font-size:13px;color:var(--violet);">⏱ Franja ${timeKey}</strong>
             <span class="badge b-pend">${groups[timeKey].length} ${groups[timeKey].length===1?'partido':'partidos'}</span>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:10px;">
             ${groups[timeKey].map(m => {
               const origIdx = lastScan.matches.indexOf(m);
               const bestPick = m.opt_a_leg || (m.all_markets && m.all_markets[0]);
               const isLive = Boolean(m.is_live);
               return `
-              <div class="mini-box" style="padding:10px 12px;border-radius:12px;background:#FFFFFF;">
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px;">
-                  <span>${m.league_label.split('—')[0]}</span>
-                  <span class="num">${isLive ? '🔴 EN VIVO' : timeKey}</span>
+              <div class="glass" style="padding:12px 14px;border-radius:14px;background:#FFFFFF;border:1px solid var(--border);display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);">
+                  <span style="font-weight:600;color:var(--violet);">${m.league_label.split('—')[0]}</span>
+                  <span class="num" style="font-weight:700;">${isLive ? '🔴 En vivo' : timeKey}</span>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">
-                  <strong style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.home} vs ${m.away}</strong>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <img src="./logos/${m.league}.png" alt="" style="width:24px;height:24px;object-fit:contain;" onerror="this.style.display='none'" />
+                  <strong style="font-size:13.5px;color:var(--text);">${m.home} <span style="color:var(--orange);font-weight:400;">vs</span> ${m.away}</strong>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--border);">
-                  <span style="font-size:11px;color:var(--sub);">${bestPick ? `${bestPick.market_name || bestPick.name} @<b>${Number(bestPick.odds).toFixed(2)}</b>` : ''}</span>
-                  <button class="btn btn-primary" style="padding:3px 8px;font-size:10.5px;" onclick="document.getElementById('modalAllMatchesToday').classList.remove('open');openDrawer(${origIdx})">+ Cupón</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border);gap:8px;">
+                  <span class="badge b-pos" style="font-size:11px;padding:3px 8px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">
+                    ${bestPick ? `${bestPick.market_name || bestPick.name} @<b>${Number(bestPick.odds).toFixed(2)}</b>` : 'Ver cuotas'}
+                  </span>
+                  <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;font-weight:700;flex-shrink:0;" onclick="document.getElementById('modalAllMatchesToday').classList.remove('open');openDrawer(${origIdx})">+ Cupón</button>
                 </div>
               </div>`;
             }).join('')}
@@ -1914,7 +2083,7 @@ HTML_PAGE = """<!DOCTYPE html>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding-top:8px;border-top:1px solid var(--border);">
             <div style="font-size:11.5px;font-weight:600;">${bestPick ? `${evBadge(bestPick.ev_pct)} @${bestPick.odds.toFixed(2)}` : '<span style="color:var(--muted);">Ver mercados</span>'}${pairHintHtml}</div>
             <div style="display:flex;gap:6px;">
-              <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="openInAnalyzer(${origIdx})">Analizar Cuota</button>
+              <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="openInAnalyzer(${origIdx})">Analizar cuota</button>
               <button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px;" onclick="openDrawer(${origIdx})">+ Cupón</button>
             </div>
           </div>
@@ -2035,32 +2204,33 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('leaguesContainer').innerHTML = `
         <div style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
           <div>
-            <h2 style="margin:0;font-size:16px;font-weight:700;">🏆 Ligas de Fútbol Destacadas</h2>
+            <h2 style="margin:0;font-size:16px;font-weight:700;">🏆 Ligas de fútbol destacadas</h2>
             <div style="font-size:12px;color:var(--muted);">${dateFilter === 'today' ? `Mostrando primero las ${activeLeaguesCount} ligas con partidos programados para hoy` : 'Toca cualquier liga para ver sus partidos con escudos oficiales, análisis y cuotas'}</div>
           </div>
-          <button class="btn" style="font-size:12px;padding:6px 12px;" onclick="setViewMode('chrono')">⏱ Ver Fila Completa</button>
+          <button class="btn" style="font-size:12px;padding:6px 12px;" onclick="setViewMode('chrono')">⏱ Ver fila completa</button>
         </div>
         <div class="leagues-cards-grid">
           ${leaguesWithData.map(l => {
             const isTodayActive = l.activeCount > 0;
             const badgeHtml = isTodayActive
-              ? `<span class="badge b-pos" style="font-weight:800;font-size:11.5px;">🟢 ${l.activeCount} ${l.activeCount===1?'partido':'partidos'} hoy</span>`
-              : `<span class="badge b-pend">${l.total} partidos (${l.nextKick.slice(5, 10)})</span>`;
+              ? `<span class="badge b-pos" style="font-weight:700;font-size:11px;padding:3px 9px;">🟢 ${l.activeCount} ${l.activeCount===1?'partido':'partidos'} hoy</span>`
+              : `<span class="badge b-pend" style="font-size:11px;padding:3px 8px;">${l.total} partidos (${l.nextKick.slice(5, 10)})</span>`;
             const borderStyle = isTodayActive ? 'border: 1.5px solid var(--violet); box-shadow: 0 4px 14px rgba(124,58,237,0.08);' : '';
             return `
             <article class="league-tile" onclick="selectLeague('${l.league}')" style="${borderStyle}">
-              <div style="display:flex;align-items:center;gap:14px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
                 <div class="league-logo-wrap">
                   <img class="league-logo-img" src="./logos/${l.league}.png" alt="${l.label}" onerror="this.outerHTML='<span style=&quot;font-weight:800;font-size:13px;color:var(--violet);&quot;>${l.code}</span>'" />
                 </div>
-                <div style="min-width:0;flex:1;">
-                  <div style="font-size:14.5px;font-weight:700;line-height:1.25;">${l.label}</div>
-                  <div class="num" style="font-size:11.5px;color:var(--muted);margin-top:3px;">Próximo: ${l.nextKick} COL</div>
-                </div>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border);">
                 ${badgeHtml}
-                <span style="font-size:12px;font-weight:700;color:var(--violet);">Entrar a la liga →</span>
+              </div>
+              <div style="margin-top:8px;">
+                <div style="font-size:15px;font-weight:700;line-height:1.3;color:var(--text);">${l.label}</div>
+                <div class="num" style="font-size:11.5px;color:var(--muted);margin-top:4px;">⏱ Próximo: ${l.nextKick} COL</div>
+              </div>
+              <div class="league-tile-footer">
+                <span>Ver partidos y cuotas</span>
+                <span class="league-arrow">→</span>
               </div>
             </article>`;
           }).join('')}
@@ -2164,30 +2334,151 @@ HTML_PAGE = """<!DOCTYPE html>
       return MKT_LABELS[m] || m;
     }
 
+    function parseLegStr(legStr) {
+      let league = '', match = legStr, pick = '', odds = '';
+      if (!legStr) return { league, match, pick, odds };
+      if (legStr.startsWith('(')) {
+        const closeIdx = legStr.indexOf(')');
+        if (closeIdx > 0) {
+          league = legStr.slice(1, closeIdx);
+          legStr = legStr.slice(closeIdx + 1).trim();
+        }
+      }
+      const parts = legStr.split(': ');
+      if (parts.length >= 2) {
+        match = parts[0].trim();
+        const pickAndOdds = parts.slice(1).join(': ');
+        const oddsIdx = pickAndOdds.lastIndexOf('@');
+        if (oddsIdx !== -1) {
+          pick = pickAndOdds.slice(0, oddsIdx).trim();
+          odds = pickAndOdds.slice(oddsIdx + 1).trim();
+        } else {
+          pick = pickAndOdds.trim();
+        }
+      }
+      return { league, match, pick, odds };
+    }
+
+    function addComboToSlip(idx) {
+      const p = (lastScan.parlays_a || [])[idx];
+      if (!p) return;
+      if (p.legs && p.legs.length >= 2) {
+        p.legs.forEach((lg, i) => {
+          const m = (lastScan.matches || []).find(x => x.event_id === lg.event_id);
+          const parsed = parseLegStr(i === 0 ? p.leg1 : p.leg2);
+          const mktKey = lg.market || (p.market_key ? p.market_key.split('+')[i] : 'O05');
+          const oddsVal = parseFloat(parsed.odds) || 1.25;
+          const probVal = Math.min(0.95, Math.max(0.60, (p.prob_est / 100.0) ** 0.5));
+          const title = m ? `${m.home} vs ${m.away}` : (parsed.match || 'Partido');
+          const league = lg.league || (m ? m.league : 'global');
+          const match_date = lg.match_date || (m ? m.match_date : (p.kickoff_col ? p.kickoff_col.slice(0, 10) : ''));
+          const market_name = parsed.pick || humanMkt(mktKey);
+          addToSlip(lg.event_id, league, match_date, title, mktKey, market_name, oddsVal, probVal);
+        });
+        setStatus(false, '¡Combinada agregada a tu cupón!');
+      }
+    }
+
     function renderCombos() {
       const pa = lastScan.parlays_a || [], pb = lastScan.opt_b || [];
       const pendingAll = ((botReport && botReport.recent) || []).filter(r => r.status === 'PENDING');
       document.getElementById('cntCombos').textContent = pa.length + pb.length;
-      const aHtml = pa.map(p => `
-        <article class="match-card">
-          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);"><span>Combinada del Día</span><span class="num">${p.kickoff_col} COL</span></div>
-          <div class="mini-box" style="font-weight:600;">1) <span class="num" style="color:var(--muted);">${(p.leg1_kickoff||p.kickoff_col).slice(5)}</span> • ${p.leg1}</div>
-          <div class="mini-box" style="font-weight:600;">2) <span class="num" style="color:var(--muted);">${(p.leg2_kickoff||p.kickoff_col).slice(5)}</span> • ${p.leg2}</div>
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div><strong class="num" style="font-size:17px;">@${p.combo_odds.toFixed(2)}</strong> ${evBadge(p.ev_pct)}</div>
-            <span style="font-size:12px;color:var(--sub);">Prob: ${p.prob_est}%</span>
+
+      const aHtml = pa.map((p, idx) => {
+        const l1 = parseLegStr(p.leg1);
+        const l2 = parseLegStr(p.leg2);
+        const time1 = (p.leg1_kickoff || p.kickoff_col).slice(11, 16);
+        const time2 = (p.leg2_kickoff || p.kickoff_col).slice(11, 16);
+        return `
+        <article class="combo-card">
+          <div class="combo-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="badge b-pos" style="font-weight:700;">🎯 Combinada del día</span>
+              <span class="num" style="font-size:12px;color:var(--muted);">⏱ ${p.kickoff_col} COL</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="combo-odds-pill">@ ${p.combo_odds.toFixed(2)}</span>
+              ${evBadge(p.ev_pct)}
+            </div>
           </div>
-        </article>`).join('');
+
+          <div class="combo-legs-wrap">
+            <div class="combo-leg-box">
+              <div class="combo-leg-head">
+                <span class="leg-index">1</span>
+                <span style="font-size:13px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l1.match}</span>
+                <span class="num" style="font-size:11px;color:var(--muted);">${time1} COL</span>
+              </div>
+              <div class="combo-leg-pick">
+                <span style="font-weight:600;color:var(--violet);">${l1.pick}</span>
+                <span class="num" style="font-weight:700;">@${l1.odds || '1.25'}</span>
+              </div>
+            </div>
+
+            <div class="combo-multiplier-badge">×</div>
+
+            <div class="combo-leg-box">
+              <div class="combo-leg-head">
+                <span class="leg-index">2</span>
+                <span style="font-size:13px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l2.match}</span>
+                <span class="num" style="font-size:11px;color:var(--muted);">${time2} COL</span>
+              </div>
+              <div class="combo-leg-pick">
+                <span style="font-weight:600;color:var(--violet);">${l2.pick}</span>
+                <span class="num" style="font-weight:700;">@${l2.odds || '1.25'}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="combo-footer">
+            <div style="flex:1;min-width:180px;">
+              <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--sub);margin-bottom:5px;">
+                <span>Probabilidad estimada del modelo</span>
+                <strong class="num" style="color:var(--text);">${p.prob_est}%</strong>
+              </div>
+              <div class="prob-progress-track">
+                <div class="prob-progress-fill" style="width:${Math.min(100, Math.max(10, p.prob_est))}%;"></div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="addComboToSlip(${idx})" style="padding:7px 14px;font-size:12px;font-weight:700;white-space:nowrap;">
+              + Agregar al cupón
+            </button>
+          </div>
+        </article>`;
+      }).join('');
+
       const bHtml = pb.map(b => `
-        <article class="match-card">
-          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);"><span>Mismo Partido</span><span class="num">${b.kickoff_col} COL</span></div>
-          <div style="font-weight:700;">${b.title}</div>
-          <div class="mini-box" style="font-weight:600;color:var(--violet);">${b.market_name}</div>
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div><strong class="num" style="font-size:17px;">@~${b.odds.toFixed(2)}</strong> ${evBadge(b.ev_pct)}</div>
-            <span style="font-size:12px;color:var(--sub);">Prob: ${b.prob_est}%</span>
+        <article class="combo-card">
+          <div class="combo-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="badge b-pos" style="font-weight:700;">🔗 Mismo partido</span>
+              <span class="num" style="font-size:12px;color:var(--muted);">⏱ ${b.kickoff_col} COL</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="combo-odds-pill">@~${b.odds.toFixed(2)}</span>
+              ${evBadge(b.ev_pct)}
+            </div>
+          </div>
+          <div class="combo-leg-box">
+            <div style="font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:4px;">${b.title}</div>
+            <div class="combo-leg-pick">
+              <span style="font-weight:600;color:var(--violet);">${b.market_name}</span>
+              <span class="num" style="font-weight:700;">@${b.odds.toFixed(2)}</span>
+            </div>
+          </div>
+          <div class="combo-footer">
+            <div style="flex:1;min-width:180px;">
+              <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--sub);margin-bottom:5px;">
+                <span>Probabilidad estimada</span>
+                <strong class="num" style="color:var(--text);">${b.prob_est}%</strong>
+              </div>
+              <div class="prob-progress-track">
+                <div class="prob-progress-fill" style="width:${Math.min(100, Math.max(10, b.prob_est))}%;"></div>
+              </div>
+            </div>
           </div>
         </article>`).join('');
+
       document.getElementById('combosGrid').innerHTML = (aHtml + bHtml) || '<div class="glass" style="padding:32px;text-align:center;color:var(--muted);">No hay combinadas en este rango.</div>';
 
       const timeByKey = {};
@@ -2195,23 +2486,27 @@ HTML_PAGE = """<!DOCTYPE html>
       const pendBox = document.getElementById('allPendingWrap');
       if (pendBox) {
         pendBox.innerHTML = `
-          <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <strong style="font-size:14px;">Todos los Pronósticos en Seguimiento (Uno a Uno)</strong>
-              <div style="font-size:11.5px;color:var(--muted);">Incluye cada jugada individual y combinada pendiente sin filtro de horario</div>
+          <details style="padding:14px 16px;">
+            <summary style="cursor:pointer;font-weight:700;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <span>📋 Todos los pronósticos en seguimiento (detalle individual)</span>
+                <div style="font-size:11.5px;color:var(--muted);font-weight:400;margin-top:2px;">Despliega para auditar cada jugada individual y combinada pendiente</div>
+              </div>
+              <span class="badge b-pend">${pendingAll.length} pendientes</span>
+            </summary>
+            <div style="margin-top:14px;overflow-x:auto;">
+              <table>
+                <thead><tr><th>Fecha / Hora COL</th><th>Tipo</th><th>Partido(s)</th><th>Selección</th><th>Cuota</th><th>Prob.</th></tr></thead>
+                <tbody>
+                  ${pendingAll.map(t => {
+                    const tipo = t.title.includes(' + ') ? 'Combinada' : (String(t.market).startsWith('BB_') ? 'Mismo partido' : 'Individual');
+                    const kCol = timeByKey[t.match_key] || t.match_date;
+                    return `<tr><td class="num">${kCol}</td><td><span class="badge b-pend">${tipo}</span></td><td><strong>${t.title}</strong></td><td>${humanMkt(t.market)}</td><td class="num">@${Number(t.odds).toFixed(2)}</td><td class="num">${(Number(t.model_prob||0)*100).toFixed(1)}%</td></tr>`;
+                  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">No hay selecciones pendientes.</td></tr>'}
+                </tbody>
+              </table>
             </div>
-            <span class="badge b-pend">${pendingAll.length} pendientes</span>
-          </div>
-          <table>
-            <thead><tr><th>Fecha / Hora COL</th><th>Tipo</th><th>Partido(s)</th><th>Selección</th><th>Cuota</th><th>Prob.</th></tr></thead>
-            <tbody>
-              ${pendingAll.map(t => {
-                const tipo = t.title.includes(' + ') ? 'Combinada' : (String(t.market).startsWith('BB_') ? 'Mismo Partido' : 'Individual');
-                const kCol = timeByKey[t.match_key] || t.match_date;
-                return `<tr><td class="num">${kCol}</td><td><span class="badge b-pend">${tipo}</span></td><td><strong>${t.title}</strong></td><td>${humanMkt(t.market)}</td><td class="num">@${Number(t.odds).toFixed(2)}</td><td class="num">${(Number(t.model_prob||0)*100).toFixed(1)}%</td></tr>`;
-              }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);">No hay selecciones pendientes.</td></tr>'}
-            </tbody>
-          </table>`;
+          </details>`;
       }
     }
 
@@ -2412,13 +2707,20 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('bankHeaderTag').textContent = `${d.bankroll_u.toFixed(2)}u`;
       document.getElementById('myBankVal').textContent = `${d.bankroll_u.toFixed(2)}u`;
       document.getElementById('myRoiBadge').innerHTML = `<span class="badge ${d.roi_pct>=0?'b-pos':'b-lost'}">ROI ${d.roi_pct>=0?'+':''}${d.roi_pct}%</span>`;
-      document.getElementById('prefMode').value = u.stake_mode;
+      if (document.getElementById('prefMode')) document.getElementById('prefMode').value = u.stake_mode;
+      if (document.getElementById('cfgPrefMode')) document.getElementById('cfgPrefMode').value = u.stake_mode;
       const modeDesc = u.stake_mode === 'fibonacci_3'
-        ? `Modo actual: Progresión Conservadora (Próximo monto: ${d.next_fib_stake}u)`
+        ? `Modo actual: Progresión conservadora (Próximo monto: ${d.next_fib_stake}u)`
         : (u.stake_mode === 'fibonacci'
-          ? `Modo actual: Progresión Escalonada (Próximo monto: ${d.next_fib_stake}u)`
-          : 'Modo actual: Monto Fijo (2.0u)');
-      document.getElementById('stakeModeDesc').textContent = modeDesc;
+          ? `Modo actual: Progresión escalonada (Próximo monto: ${d.next_fib_stake}u)`
+          : 'Modo actual: Monto fijo (2.0u)');
+      if (document.getElementById('stakeModeDesc')) document.getElementById('stakeModeDesc').textContent = modeDesc;
+      if (document.getElementById('cfgStakeDesc')) document.getElementById('cfgStakeDesc').textContent = modeDesc;
+
+      const adminWrap = document.getElementById('adminSectionsWrap');
+      if (adminWrap) adminWrap.style.display = u.is_admin ? 'block' : 'none';
+      const cntBadge = document.getElementById('cntAdminUsers');
+      if (cntBadge) cntBadge.style.display = u.is_admin ? 'inline-block' : 'none';
 
       const pts = d.equity_curve && d.equity_curve.length > 1 ? d.equity_curve : [100, 100];
       const W = 320, H = 74, pad = 6, minV = Math.min(...pts, 95), maxV = Math.max(...pts, 105), span = Math.max(1, maxV - minV);
@@ -2459,7 +2761,7 @@ HTML_PAGE = """<!DOCTYPE html>
       box.innerHTML = `
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
           <div>
-            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Efectividad Diaria de Pronósticos</div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Efectividad diaria de pronósticos</div>
             <div style="font-size:14px;margin-top:2px;">${headline} • Acumulado: <strong>${rep.won}/${rep.settled} (${rep.accuracy_pct || 0}%)</strong></div>
           </div>
           <span class="badge ${rep.roi_pct >= 0 ? 'b-pos' : 'b-warn'}">Balance ${rep.roi_pct >= 0 ? '+' : ''}${rep.roi_pct}%</span>
@@ -2478,10 +2780,27 @@ HTML_PAGE = """<!DOCTYPE html>
       const stake_mode = document.getElementById('prefMode').value;
       if (SUPABASE_ENABLED && currentUser) {
         await sbClient.from('user_profiles').update({ stake_mode }).eq('user_id', currentUser.id);
+        setStatus(false, 'Preferencias guardadas.');
         await checkAuth();
         return;
       }
       await fetch('/api/user/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({stake_mode, bankroll_base: 100}) });
+      setStatus(false, 'Preferencias guardadas.');
+      await checkAuth();
+    }
+
+    async function saveCfgPrefs() {
+      const el = document.getElementById('cfgPrefMode');
+      if (!el) return;
+      const stake_mode = el.value;
+      if (SUPABASE_ENABLED && currentUser) {
+        await sbClient.from('user_profiles').update({ stake_mode }).eq('user_id', currentUser.id);
+        setStatus(false, 'Preferencias guardadas.');
+        await checkAuth();
+        return;
+      }
+      await fetch('/api/user/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({stake_mode, bankroll_base: 100}) });
+      setStatus(false, 'Preferencias guardadas.');
       await checkAuth();
     }
 
@@ -2548,7 +2867,7 @@ HTML_PAGE = """<!DOCTYPE html>
           document.getElementById('cntChannel').textContent = String(channelPosts.length);
           renderChannelPosts();
           if (document.hidden && 'Notification' in window && Notification.permission === 'granted' && swReg) {
-            swReg.showNotification(post.title || 'Caza Cuotas • Canal En Vivo', {
+            swReg.showNotification(post.title || 'Caza Cuotas • Canal en vivo', {
               body: (post.body_html || '').replace(/<[^>]+>/g, ' ').slice(0, 140),
               icon: './icon-192.png',
               tag: 'caza-live-' + post.id
@@ -2569,7 +2888,7 @@ HTML_PAGE = """<!DOCTYPE html>
       const box = document.getElementById('channelFeed');
       if (!box) return;
       if (!SUPABASE_ENABLED) {
-        box.innerHTML = '<div class="glass" style="padding:26px;text-align:center;color:var(--muted);">El Canal En Vivo funciona en la versión web conectada a la nube.</div>';
+        box.innerHTML = '<div class="glass" style="padding:26px;text-align:center;color:var(--muted);">El canal en vivo funciona en la versión web conectada a la nube.</div>';
         return;
       }
       const list = channelPosts.filter(p => channelFilter === 'all' || p.kind === channelFilter);
@@ -2872,21 +3191,31 @@ HTML_PAGE = """<!DOCTYPE html>
       body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Consultando invitaciones...</td></tr>';
       let rows = [];
       if (SUPABASE_ENABLED) {
-        const { data, error } = await sbClient.rpc('admin_list_invitations');
-        if (error) {
-          body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--amber);padding:16px;">Error cargando invitaciones (${error.message}).</td></tr>`;
-          return;
+        try {
+          const { data, error } = await sbClient.rpc('admin_list_invitations');
+          if (error) {
+            const fb = await sbClient.from('invitations').select('*').order('created_at', { ascending: false });
+            rows = fb.data || [];
+          } else {
+            rows = data || [];
+          }
+        } catch (e) {
+          try {
+            const fb = await sbClient.from('invitations').select('*').order('created_at', { ascending: false });
+            rows = fb.data || [];
+          } catch (e2) {
+            rows = [];
+          }
         }
-        rows = data || [];
       } else {
         try {
           const r = await fetch('/api/admin/invitations');
-          if (!r.ok) return;
-          const d = await r.json();
-          rows = d.invitations || [];
+          if (r.ok) {
+            const d = await r.json();
+            rows = d.invitations || [];
+          }
         } catch (e) {
-          body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--amber);padding:16px;">Error: ${e.message}</td></tr>`;
-          return;
+          rows = [];
         }
       }
 
@@ -2904,7 +3233,7 @@ HTML_PAGE = """<!DOCTYPE html>
               <button class="btn" style="padding:3px 8px;font-size:11px;" onclick="copyInviteLink('${i.token}')">📋 Copiar</button>
             </div>
           </td>
-          <td>${i.email || '<span style="color:var(--muted);">Enlace Público</span>'}</td>
+          <td>${i.email || '<span style="color:var(--muted);">Enlace público</span>'}</td>
           <td><span class="badge ${i.role === 'admin' ? 'b-pos' : 'b-pend'}">${i.role === 'admin' ? 'Admin 👑' : 'Miembro'}</span></td>
           <td class="num">${i.uses_count} / ${i.max_uses}</td>
           <td class="num">${expStr}</td>
@@ -2913,7 +3242,7 @@ HTML_PAGE = """<!DOCTYPE html>
             <button class="btn" style="padding:4px 8px;font-size:11px;color:var(--red);border-color:rgba(239,68,68,0.3);" onclick="deleteInvite(${i.id})" title="Revocar invitación">🗑️</button>
           </td>
         </tr>`;
-      }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px;">No hay invitaciones creadas todavía.</td></tr>';
+      }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px;">No hay invitaciones creadas todavía. Toca "Generar invitación" para crear una.</td></tr>';
     }
 
     async function deleteInvite(id) {
@@ -2971,7 +3300,7 @@ HTML_PAGE = """<!DOCTYPE html>
           document.getElementById('adminPostFile').value = '';
           document.getElementById('adminImgName').textContent = 'Sin imagen adjunta';
           await loadChannelPosts();
-          setStatus(false, 'Anuncio publicado en el Canal En Vivo.');
+          setStatus(false, 'Anuncio publicado en el canal en vivo.');
         } else {
           setStatus(false, 'Error publicando anuncio: ' + error.message);
         }
