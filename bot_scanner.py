@@ -162,11 +162,80 @@ def grade_market(market: str, hg: int, ag: int, summary: dict | None = None) -> 
         if market == "2H_O15": return g_2h >= 2
         if market == "MOST_GOALS_2H": return g_2h > g_1h
         if market == "MOST_GOALS_1H": return g_1h > g_2h
+        # Team-specific half goals if team side is tagged
+        g_1h_h = sum(1 for g in goals if _get_m(g) <= 45 and g.get("team") == "home")
+        g_1h_a = sum(1 for g in goals if _get_m(g) <= 45 and g.get("team") == "away")
+        g_2h_h = sum(1 for g in goals if _get_m(g) > 45 and g.get("team") == "home")
+        g_2h_a = sum(1 for g in goals if _get_m(g) > 45 and g.get("team") == "away")
+        if market == "1H_H_O05": return g_1h_h >= 1
+        if market == "1H_A_O05": return g_1h_a >= 1
+        if market == "2H_H_O05": return g_2h_h >= 1
+        if market == "2H_A_O05": return g_2h_a >= 1
     elif (hg + ag) >= 2:
         # Fallback if no goal breakdown: 2H has >=1 goal if total is >= 2 in 85% of cases
         if market == "2H_O05": return True
+        if market == "1H_O05" and (hg + ag) >= 3: return True
 
     return False
+
+
+def score_market_candidate(
+    k: str,
+    odd: float,
+    cp: float,
+    h_stat: dict,
+    a_stat: dict,
+    lam_h: float,
+    lam_a: float,
+) -> float:
+    """Score straight market candidates favoring the ~75%-84% probability / 1.25-1.55 odds sweet spot.
+
+    Penalizes extreme probabilities (>88% forces tiny 1.05-1.18 odds; <65% is too volatile).
+    Rewards strong statistical alignment with team historical form and market edge.
+    Prevents single-market monotony (like 2H_O05 dominance) by balancing across diverse markets.
+    """
+    # 1. Target probability centered at 0.79 (optimal ~75% - 84%)
+    prob_score = -abs(cp - 0.79) * 4.2
+
+    # 2. Target odds centered at 1.36 (sweet spot 1.28 - 1.50)
+    odds_score = -abs(odd - 1.36) * 1.8
+    if odd < 1.20:
+        odds_score -= (1.20 - odd) * 5.0  # heavy penalty for tiny odds (<1.20)
+
+    # 3. Model Expectancy (Edge)
+    ev = cp * odd - 1.0
+    ev_score = ev * 2.5
+
+    # 4. Team Historical Grounding bonus
+    hist_bonus = 0.0
+    if k == "1":
+        hist_bonus = float(h_stat.get("win_pct", 0.5)) * 0.35
+    elif k == "2":
+        hist_bonus = float(a_stat.get("win_pct", 0.5)) * 0.35
+    elif k == "1X":
+        hist_bonus = float(h_stat.get("unbeaten_pct", 0.7)) * 0.30
+    elif k == "X2":
+        hist_bonus = float(a_stat.get("unbeaten_pct", 0.7)) * 0.30
+    elif k == "H_O05":
+        hist_bonus = float(h_stat.get("o05_pct", 0.7)) * 0.26
+    elif k == "A_O05":
+        hist_bonus = float(a_stat.get("o05_pct", 0.7)) * 0.26
+    elif k == "H_O15":
+        hist_bonus = float(h_stat.get("o15_pct", 0.4)) * 0.30
+    elif k == "A_O15":
+        hist_bonus = float(a_stat.get("o15_pct", 0.4)) * 0.30
+    elif k == "1H_O05":
+        tot_lam = lam_h + lam_a
+        hist_bonus = 0.14 if tot_lam >= 2.2 else 0.07
+    elif k in ("1H_H_O05", "2H_H_O05"):
+        hist_bonus = 0.12 if lam_h >= 1.3 else 0.04
+    elif k in ("1H_A_O05", "2H_A_O05"):
+        hist_bonus = 0.12 if lam_a >= 1.3 else 0.04
+    elif k == "2H_O05":
+        # Neutral baseline so it competes fairly instead of dominating
+        hist_bonus = 0.02
+
+    return prob_score + odds_score + ev_score + hist_bonus
 
 
 def evaluate_match(
@@ -223,29 +292,50 @@ def evaluate_match(
                 sharp_picks.append({"market": k, "odds": soft_o, "bookmaker": bm_name, "sharp_prob": p_map[k], "ev_pct": ev})
 
     opt_a_cands = []
-    if h_stat["n"] >= 5 and a_stat["n"] >= 5:
-        if h_stat["win_pct"] >= 0.50 and (h_stat["win_pct"] - a_stat["win_pct"]) >= 0.15 and h_stat["gf_avg"] >= 1.3:
+
+    # 1X2 & Double Chance markets (evaluated from Poisson model & team form)
+    if qprobs.get("1", 0) >= 0.58 and 1.20 <= mkt_odds.get("1", 99) <= 1.75:
+        if h_stat.get("n", 0) < 2 or h_stat.get("win_pct", 0) >= 0.40 or m.o1 <= 1.65:
             opt_a_cands.append("1")
-        if h_stat["unbeaten_pct"] >= 0.70 and h_stat["gf_avg"] >= 1.0:
-            opt_a_cands.append("1X")
-        if a_stat["win_pct"] >= 0.50 and (a_stat["win_pct"] - h_stat["win_pct"]) >= 0.15 and a_stat["gf_avg"] >= 1.3:
+    if qprobs.get("2", 0) >= 0.58 and 1.20 <= mkt_odds.get("2", 99) <= 1.75:
+        if a_stat.get("n", 0) < 2 or a_stat.get("win_pct", 0) >= 0.40 or m.o2 <= 1.65:
             opt_a_cands.append("2")
-        if a_stat["unbeaten_pct"] >= 0.70 and a_stat["gf_avg"] >= 1.0:
+    if qprobs.get("1X", 0) >= 0.70 and 1.18 <= mkt_odds.get("1X", 99) <= 1.62:
+        if h_stat.get("n", 0) < 2 or h_stat.get("unbeaten_pct", 0) >= 0.58 or m.o1 <= 2.25:
+            opt_a_cands.append("1X")
+    if qprobs.get("X2", 0) >= 0.70 and 1.18 <= mkt_odds.get("X2", 99) <= 1.62:
+        if a_stat.get("n", 0) < 2 or a_stat.get("unbeaten_pct", 0) >= 0.58 or m.o2 <= 2.25:
             opt_a_cands.append("X2")
-        if h_stat["o05_pct"] >= 0.75 and h_stat["gf_avg"] >= 1.2 and a_stat["ga_avg"] >= 0.9:
+
+    # Team Goals markets
+    if qprobs.get("H_O05", 0) >= 0.70 and 1.18 <= mkt_odds.get("H_O05", 99) <= 1.55:
+        if h_stat.get("n", 0) < 2 or h_stat.get("o05_pct", 0) >= 0.65 or h_stat.get("gf_avg", 0) >= 1.0:
             opt_a_cands.append("H_O05")
-        if h_stat["o15_pct"] >= 0.45 and h_stat["gf_avg"] >= 1.5 and a_stat["ga_avg"] >= 1.2:
-            opt_a_cands.append("H_O15")
-        if a_stat["o05_pct"] >= 0.75 and a_stat["gf_avg"] >= 1.2 and h_stat["ga_avg"] >= 0.9:
+    if qprobs.get("A_O05", 0) >= 0.70 and 1.18 <= mkt_odds.get("A_O05", 99) <= 1.55:
+        if a_stat.get("n", 0) < 2 or a_stat.get("o05_pct", 0) >= 0.65 or a_stat.get("gf_avg", 0) >= 1.0:
             opt_a_cands.append("A_O05")
-        if a_stat["o15_pct"] >= 0.45 and a_stat["gf_avg"] >= 1.5 and h_stat["ga_avg"] >= 1.2:
+    if qprobs.get("H_O15", 0) >= 0.55 and 1.30 <= mkt_odds.get("H_O15", 99) <= 1.75:
+        if h_stat.get("n", 0) >= 2 and h_stat.get("gf_avg", 0) >= 1.4:
+            opt_a_cands.append("H_O15")
+    if qprobs.get("A_O15", 0) >= 0.55 and 1.30 <= mkt_odds.get("A_O15", 99) <= 1.75:
+        if a_stat.get("n", 0) >= 2 and a_stat.get("gf_avg", 0) >= 1.4:
             opt_a_cands.append("A_O15")
 
-    # High-probability half-time goal lines as candidate straight legs
-    if qprobs.get("2H_O05", 0) >= 0.72:
-        opt_a_cands.append("2H_O05")
-    if qprobs.get("1H_O05", 0) >= 0.65:
+    # Half-time goal markets
+    if qprobs.get("1H_O05", 0) >= 0.65 and 1.20 <= mkt_odds.get("1H_O05", 99) <= 1.62:
         opt_a_cands.append("1H_O05")
+    if qprobs.get("2H_O05", 0) >= 0.72 and 1.18 <= mkt_odds.get("2H_O05", 99) <= 1.50:
+        opt_a_cands.append("2H_O05")
+
+    # Team half-time goal markets
+    if qprobs.get("1H_H_O05", 0) >= 0.58 and 1.28 <= mkt_odds.get("1H_H_O05", 99) <= 1.75:
+        opt_a_cands.append("1H_H_O05")
+    if qprobs.get("1H_A_O05", 0) >= 0.58 and 1.28 <= mkt_odds.get("1H_A_O05", 99) <= 1.75:
+        opt_a_cands.append("1H_A_O05")
+    if qprobs.get("2H_H_O05", 0) >= 0.62 and 1.25 <= mkt_odds.get("2H_H_O05", 99) <= 1.68:
+        opt_a_cands.append("2H_H_O05")
+    if qprobs.get("2H_A_O05", 0) >= 0.62 and 1.25 <= mkt_odds.get("2H_A_O05", 99) <= 1.68:
+        opt_a_cands.append("2H_A_O05")
 
     cal = calibration or {}
 
@@ -258,10 +348,15 @@ def evaluate_match(
 
     opt_a_valid = []
     for k in opt_a_cands:
+        if k not in mkt_odds or k not in qprobs:
+            continue
         cp, blk = _cal_prob(k)
-        if not blk and 1.18 <= mkt_odds[k] <= 1.65 and cp >= 0.62:
+        if not blk and 1.15 <= mkt_odds[k] <= 1.75 and cp >= 0.58:
             opt_a_valid.append((k, mkt_odds[k], cp))
-    best_opt_a = max(opt_a_valid, key=lambda x: (x[2], -abs(x[1] - 1.32))) if opt_a_valid else None
+
+    # Sort candidates using sweet-spot scoring (targeting ~75%-84% prob and 1.25-1.55 odds with team form alignment)
+    opt_a_valid.sort(key=lambda x: score_market_candidate(x[0], x[1], x[2], h_stat, a_stat, lam_h, lam_a), reverse=True)
+    best_opt_a = opt_a_valid[0] if opt_a_valid else None
 
     # Straight real bookmaker markets ONLY (1, X, 2, 1X, X2, 2H_O05, 1H_O05, H_O15, A_O15, etc.)
     # Synthetic same-match Bet Builders are blocked because bookmakers apply correlation discounts.
@@ -280,12 +375,13 @@ def evaluate_match(
     # Best individual pick for daily accuracy tracking ("BOT_DIARIO") — Straight markets only
     safe_pool = []
     for k, odd in mkt_odds.items():
-        if k.startswith("BB_") or not (1.20 <= odd <= 1.75):
+        if k.startswith("BB_") or not (1.18 <= odd <= 1.75) or k not in qprobs:
             continue
         cp, blk = _cal_prob(k)
         if not blk and cp >= 0.65:
             safe_pool.append((k, odd, cp))
-    best_daily_safe = max(safe_pool, key=lambda x: (x[2], -abs(x[1] - 1.40))) if safe_pool else None
+    safe_pool.sort(key=lambda x: score_market_candidate(x[0], x[1], x[2], h_stat, a_stat, lam_h, lam_a), reverse=True)
+    best_daily_safe = safe_pool[0] if safe_pool else None
 
     return {
         "match": m,
@@ -393,13 +489,14 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                     )
                 )
 
-    # Build 2-match same-day combinadas strictly targeting >= 1.50 (1.50–1.95) sorted by highest probability
-    # ONLY uses pure real straight markets (no same-match Bet Builders) so bookmakers never slash correlated odds
+    # Build 2-match same-day combinadas strictly targeting >= 1.50 (1.50–1.95)
+    # ONLY uses pure real straight markets (no same-match Bet Builders) so bookmakers never slash correlated odds.
+    # Prioritizes close kickoff times (same time slot or close) and complementary markets (e.g. Double Chance + Goals)
     leg_pool: list[tuple[int, str, float, float]] = []
     for idx, e in enumerate(evals):
         seen_k: set[str] = set()
         for k, o, p in e.get("opt_a_all") or []:
-            if k not in seen_k and 1.12 <= o <= 1.65 and p >= 0.62:
+            if k not in seen_k and 1.16 <= o <= 1.62 and p >= 0.65:
                 leg_pool.append((idx, k, o, p))
                 seen_k.add(k)
 
@@ -407,24 +504,43 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
     for a_i in range(len(leg_pool)):
         i, k1, o1, p1 = leg_pool[a_i]
         m1 = evals[i]["match"]
-        d1 = dt.date.fromisoformat(m1.kickoff_col[:10])
+        t1 = dt.datetime.fromisoformat(m1.kickoff_col)
         for b_j in range(a_i + 1, len(leg_pool)):
             j, k2, o2, p2 = leg_pool[b_j]
             if i == j:
                 continue
             m2 = evals[j]["match"]
-            d2 = dt.date.fromisoformat(m2.kickoff_col[:10])
-            if abs((d2 - d1).days) > 0:
+            t2 = dt.datetime.fromisoformat(m2.kickoff_col)
+            if t1.date() != t2.date():
                 continue
-            combo = round(o1 * o2, 3)
+            combo = round(o1 * o2, 2)
             p_combo = p1 * p2
-            if 1.50 <= combo <= 1.95 and p_combo >= 0.45:
-                cand_pairs.append((p_combo >= 0.50, round(p_combo, 4), -abs(combo - 1.65), i, k1, o1, p1, j, k2, o2, p2, combo, p_combo))
+            if 1.48 <= combo <= 1.98 and p_combo >= 0.48:
+                # Time proximity: prefer games in the same time slot or close (within 3h)
+                diff_hours = abs((t1 - t2).total_seconds()) / 3600.0
+                time_penalty = -(diff_hours * 0.04)
 
-    cand_pairs.sort(reverse=True)
+                # Synergy & diversity: disincentivize identical markets (especially duplicate goals),
+                # strongly incentivize Result/Double-Chance + Goals or different angles
+                is_res1 = k1 in ("1", "2", "1X", "X2")
+                is_res2 = k2 in ("1", "2", "1X", "X2")
+                if k1 == k2:
+                    synergy = -0.25  # penalize duplicate market
+                elif (is_res1 and not is_res2) or (is_res2 and not is_res1):
+                    synergy = +0.22  # Reward classic "Gana/Empata en uno + Goles en otro"
+                else:
+                    synergy = +0.08
+
+                # Target parlay odds sweet spot 1.55 - 1.75
+                odds_target = -abs(combo - 1.66) * 0.6
+                pair_score = (p_combo * 1.8) + odds_target + time_penalty + synergy
+
+                cand_pairs.append((pair_score, combo, p_combo, i, k1, o1, p1, j, k2, o2, p2))
+
+    cand_pairs.sort(key=lambda x: x[0], reverse=True)
     parlays_a = []
     used: set[int] = set()
-    for _, _, _, i, k1, o1, p1, j, k2, o2, p2, combo, p_combo in cand_pairs:
+    for _, combo, p_combo, i, k1, o1, p1, j, k2, o2, p2 in cand_pairs:
         if i in used or j in used:
             continue
         used.add(i)
@@ -608,10 +724,13 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
             continue
         o1 = float(pk["odds"])
         p1 = float(pk["prob"]) / 100.0
-        d1 = md["kickoff_col"][:10]
+        t1 = dt.datetime.fromisoformat(md["kickoff_col"])
         best_partner = None
         for other in matches_detail:
-            if other["event_id"] == md["event_id"] or other["kickoff_col"][:10] != d1:
+            if other["event_id"] == md["event_id"]:
+                continue
+            t2 = dt.datetime.fromisoformat(other["kickoff_col"])
+            if t1.date() != t2.date():
                 continue
             opk = other.get("opt_a_leg")
             if not opk:
@@ -619,10 +738,13 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
             o2 = float(opk["odds"])
             p2 = float(opk["prob"]) / 100.0
             c_odd = round(o1 * o2, 2)
-            if 1.50 <= c_odd <= 1.98:
+            if 1.48 <= c_odd <= 1.98:
+                diff_h = abs((t1 - t2).total_seconds()) / 3600.0
+                time_penalty = -(diff_h * 0.04)
+                synergy = -0.20 if opk["market_name"] == pk["market_name"] else 0.15
+                partner_score = (p1 * p2 * 1.6) - abs(c_odd - 1.66) * 0.5 + time_penalty + synergy
                 cand = (
-                    p1 * p2,
-                    -abs(c_odd - 1.65),
+                    partner_score,
                     {
                         "partner_event_id": other["event_id"],
                         "partner_title": f"{other['home']} vs {other['away']}",
@@ -632,10 +754,10 @@ def run_scan_pipeline(leagues: list[str] | None = None, days: int = 3, save: boo
                         "combo_prob": round(p1 * p2 * 100.0, 1),
                     },
                 )
-                if best_partner is None or (cand[0], cand[1]) > (best_partner[0], best_partner[1]):
+                if best_partner is None or cand[0] > best_partner[0]:
                     best_partner = cand
         if best_partner:
-            md["pair_hint"] = best_partner[2]
+            md["pair_hint"] = best_partner[1]
 
     next_global = fetch_next_global_matches(limit=12)
     serial_ladder, serial_ladder_2 = build_dual_serial_ladders(matches_detail, next_global)
