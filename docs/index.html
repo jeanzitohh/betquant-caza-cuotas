@@ -1826,11 +1826,14 @@
               <div class="glass" style="padding:12px 14px;border-radius:14px;background:#FFFFFF;border:1px solid var(--border);display:flex;flex-direction:column;gap:8px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);">
                   <span style="font-weight:600;color:var(--violet);">${m.league_label.split('—')[0]}</span>
-                  <span class="num" style="font-weight:700;">${isLive ? '🔴 En vivo' : timeKey}</span>
+                  <span class="num" style="font-weight:700;">${m.is_completed ? '<span class="badge" style="background:#10B981;color:#fff;">Finalizado</span>' : (isLive ? '<span class="badge" style="background:#EF4444;color:#fff;">🔴 ' + (m.live_clock || 'En vivo') + '</span>' : timeKey)}</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:10px;">
-                  <img src="./logos/${m.league}.png" alt="" style="width:24px;height:24px;object-fit:contain;" onerror="this.style.display='none'" />
-                  <strong style="font-size:13.5px;color:var(--text);">${m.home} <span style="color:var(--orange);font-weight:400;">vs</span> ${m.away}</strong>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                  <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                    <img src="./logos/${m.league}.png" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'" />
+                    <strong style="font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.home} <span style="color:var(--orange);font-weight:400;">vs</span> ${m.away}</strong>
+                  </div>
+                  ${(m.is_completed || isLive) ? `<span class="badge" style="background:${m.is_completed ? '#10B981' : '#EF4444'};color:#fff;font-weight:800;font-size:12px;padding:2px 7px;flex-shrink:0;">${m.home_score} - ${m.away_score}</span>` : ''}
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border);gap:8px;">
                   <span class="badge b-pos" style="font-size:11px;padding:3px 8px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">
@@ -2190,7 +2193,7 @@
           : '';
         return `<article class="match-card">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-            <span class="num" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);">${lgPill}${m.kickoff_col} COL ${m.ou_line ? '• O/U ' + m.ou_line : ''}</span>
+            <span class="num" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);">${lgPill}${m.kickoff_col} COL ${m.is_completed ? '<span class="badge" style="background:#10B981;color:#fff;font-size:10px;padding:1px 6px;">Finalizado</span>' : (m.is_live ? '<span class="badge" style="background:#EF4444;color:#fff;font-size:10px;padding:1px 6px;">' + (m.live_clock || 'En vivo') + '</span>' : '')} ${m.ou_line ? '• O/U ' + m.ou_line : ''}</span>
             <button class="fav-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite('${m.event_id}')" title="Marcar favorito">★</button>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0 6px;">
@@ -2199,7 +2202,7 @@
               <span class="team-fallback" style="${m.home_logo ? 'display:none;' : 'display:inline-flex;'}width:24px;height:24px;border-radius:6px;background:rgba(124,58,237,0.15);color:var(--violet);font-size:10px;font-weight:800;align-items:center;justify-content:center;flex-shrink:0;">${m.home.slice(0,2).toUpperCase()}</span>
               <span style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${m.home}">${m.home}</span>
             </div>
-            <span style="color:var(--orange);font-weight:800;font-size:11.5px;padding:0 4px;flex-shrink:0;">VS</span>
+            ${m.is_completed ? `<span class="badge" style="background:#10B981;color:#fff;font-weight:800;font-size:13px;padding:3px 9px;border-radius:8px;">${m.home_score} - ${m.away_score}</span>` : (m.is_live ? `<span class="badge" style="background:#EF4444;color:#fff;font-weight:800;font-size:13px;padding:3px 9px;border-radius:8px;animation:pulseBall 1.5s infinite;">${m.home_score} - ${m.away_score}</span>` : `<span style="color:var(--orange);font-weight:800;font-size:11.5px;padding:0 4px;flex-shrink:0;">VS</span>`)}
             <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:1;min-width:0;text-align:right;">
               <span style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${m.away}">${m.away}</span>
               ${m.away_logo ? `<img src="${m.away_logo}" alt="${m.away}" style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline-flex';" />` : ''}
@@ -2248,6 +2251,25 @@
           </div>
         </article>`;
       };
+
+      if (q) {
+        const cards = list.map(m => renderMatchCardHtml(m, lastScan.matches.indexOf(m), true)).join('');
+        document.getElementById('leaguesContainer').innerHTML = `
+          <section class="glass league-section">
+            <div class="league-header">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div class="league-emblem" style="background:linear-gradient(135deg,#7C3AED,#0EA5E9);">🔍</div>
+                <div>
+                  <h2 style="margin:0;font-size:16px;font-weight:700;">Resultados para "${q}"</h2>
+                  <div style="font-size:11.5px;color:var(--muted);">${list.length} ${list.length === 1 ? 'partido encontrado' : 'partidos encontrados'}</div>
+                </div>
+              </div>
+              <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="document.getElementById('searchInput').value=''; renderMatches();">Limpiar búsqueda</button>
+            </div>
+            <div class="matches-grid">${cards}</div>
+          </section>`;
+        return;
+      }
 
       if (viewMode === 'chrono') {
         if (dateFilter === 'today' || dateFilter === 'tomorrow') {
