@@ -52,6 +52,12 @@ class UpcomingMatch:
     away_logo: str = ""
     sharp_probs: tuple[float, float, float] | None = None
     best_soft_odds: dict[str, tuple[float, str]] | None = None  # key -> (odds, bookmaker)
+    is_live: bool = False
+    is_completed: bool = False
+    live_clock: str = ""
+    live_status: str = ""
+    home_score: int = 0
+    away_score: int = 0
 
 
 def utc_to_colombia_str(kickoff_utc: str) -> str:
@@ -118,10 +124,11 @@ def _extract_scoreboard_odds(comp: dict) -> tuple[float, float, float, float | N
 
 
 def fetch_espn_upcoming(leagues: list[str], days_ahead: int = 3) -> list[UpcomingMatch]:
-    """Fetch upcoming pre-match fixtures with odds from ESPN's free scoreboard."""
-    today = dt.date.today()
+    """Fetch upcoming pre-match and in-play fixtures with odds from ESPN's free scoreboard."""
+    now_utc = dt.datetime.now(dt.timezone.utc)
+    today_col = (now_utc - dt.timedelta(hours=5)).date()
     tasks = [
-        (lg, (today + dt.timedelta(days=off)).strftime("%Y%m%d"))
+        (lg, (today_col + dt.timedelta(days=off)).strftime("%Y%m%d"))
         for lg in leagues
         for off in range(days_ahead)
     ]
@@ -143,11 +150,16 @@ def fetch_espn_upcoming(leagues: list[str], days_ahead: int = 3) -> list[Upcomin
                 if eid in seen_ids:
                     continue
                 comp = (ev.get("competitions") or [{}])[0]
-                if comp.get("status", {}).get("type", {}).get("state") != "pre":
+                st_type = comp.get("status", {}).get("type", {})
+                st_state = st_type.get("state", "pre")
+                if st_state not in ("pre", "in"):
                     continue
                 parsed_odds = _extract_scoreboard_odds(comp)
                 if not parsed_odds:
-                    continue
+                    if st_state == "in":
+                        parsed_odds = (2.10, 3.10, 3.20, 2.5, 1.85, 1.85, "Live")
+                    else:
+                        continue
                 comps = comp.get("competitors") or []
                 home = next((c for c in comps if c.get("homeAway") == "home"), None)
                 away = next((c for c in comps if c.get("homeAway") == "away"), None)
@@ -158,6 +170,14 @@ def fetch_espn_upcoming(leagues: list[str], days_ahead: int = 3) -> list[Upcomin
                 seen_ids.add(eid)
                 home_logo = home.get("team", {}).get("logo") or ""
                 away_logo = away.get("team", {}).get("logo") or ""
+                is_live = (st_state == "in")
+                clock = comp.get("status", {}).get("displayClock", "")
+                st_desc = st_type.get("description", "")
+                try:
+                    h_score = int(home.get("score") or 0)
+                    a_score = int(away.get("score") or 0)
+                except Exception:
+                    h_score, a_score = 0, 0
                 matches.append(
                     UpcomingMatch(
                         league=lg,
@@ -176,6 +196,11 @@ def fetch_espn_upcoming(leagues: list[str], days_ahead: int = 3) -> list[Upcomin
                         provider_name=prov,
                         home_logo=home_logo,
                         away_logo=away_logo,
+                        is_live=is_live,
+                        live_clock=clock,
+                        live_status=st_desc,
+                        home_score=h_score,
+                        away_score=a_score,
                     )
                 )
 

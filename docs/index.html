@@ -500,6 +500,7 @@
               <button class="seg-btn" id="viewChrono" onclick="setViewMode('chrono')">⏱ Fila Continua (Por Hora)</button>
             </div>
           </div>
+          <div id="matchCenterWrap" style="margin-bottom:14px;"></div>
           <div id="hourRadarWrap" style="display:none;margin-bottom:14px;"></div>
           <div class="leagues-stack" id="leaguesContainer"></div>
         </section>
@@ -1304,11 +1305,17 @@
     }
 
     function colDateOffset(daysOffset = 0) {
-      return new Date(Date.now() + (-5 * 3600000) + daysOffset * 86400000).toISOString().slice(0, 10);
+      const now = new Date();
+      const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const colDate = new Date(utcMs - (5 * 3600000) + (daysOffset * 86400000));
+      const y = colDate.getFullYear();
+      const m = String(colDate.getMonth() + 1).padStart(2, '0');
+      const d = String(colDate.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
     }
 
-    function matchesDateFilter(kickoffCol) {
-      if (dateFilter === 'all') return true;
+    function matchesDateFilter(kickoffCol, isLive = false) {
+      if (dateFilter === 'all' || isLive) return true;
       const target = dateFilter === 'today' ? colDateOffset(0) : colDateOffset(1);
       return String(kickoffCol || '').slice(0, 10) === target;
     }
@@ -1554,7 +1561,88 @@
       }
     }
 
+    function enableLiveGoalNotifications() {
+      if (!('Notification' in window)) {
+        alert('Este navegador no soporta notificaciones Web.');
+        return;
+      }
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') {
+          new Notification('⚽ Caza Cuotas • Match Center', {
+            body: '¡Alertas activadas! Te avisaremos en tiempo real ante goles, tarjetas y al comenzar partidos.',
+            icon: './icon-192.png'
+          });
+        } else {
+          alert('Notificaciones no permitidas. Puedes activarlas en el candado del navegador.');
+        }
+      });
+    }
+
+    function renderMatchCenter() {
+      const box = document.getElementById('matchCenterWrap');
+      if (!box) return;
+      const all = lastScan.matches || [];
+      const urgentMatches = all.filter(m => {
+        if (m.is_live) return true;
+        const kick = String(m.kickoff_col || '');
+        const todayStr = colDateOffset(0);
+        return kick.startsWith(todayStr);
+      });
+
+      if (!urgentMatches.length) {
+        box.innerHTML = '';
+        box.style.display = 'none';
+        return;
+      }
+
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div class="glass" style="border-radius:18px;padding:16px;margin-bottom:16px;background:linear-gradient(135deg,rgba(15,23,42,0.92),rgba(30,27,75,0.95));border:1px solid rgba(124,58,237,0.38);box-shadow:0 12px 28px rgba(124,58,237,0.18);color:#FFFFFF;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.12);">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="badge" style="background:#EF4444;color:#FFFFFF;font-weight:800;font-size:11px;padding:3px 9px;">🔴 MATCH CENTER EN VIVO</span>
+              <span style="font-size:12.5px;color:rgba(255,255,255,0.75);">Seguimiento minuto a minuto y alertas instantáneas</span>
+            </div>
+            <button class="btn" style="background:rgba(255,255,255,0.12);color:#FFFFFF;border:1px solid rgba(255,255,255,0.25);font-size:11.5px;padding:5px 12px;" onclick="enableLiveGoalNotifications()">🔔 Activar Alertas de Goles</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;">
+            ${urgentMatches.map(m => {
+              const origIdx = lastScan.matches.indexOf(m);
+              const isLive = Boolean(m.is_live);
+              const scoreText = isLive ? `${m.home_score || 0} - ${m.away_score || 0}` : 'VS';
+              const statusPill = isLive
+                ? `<span class="badge" style="background:#EF4444;color:#FFFFFF;font-size:10.5px;font-weight:800;">🔴 ${m.live_clock || m.live_status || 'EN VIVO'}</span>`
+                : `<span class="badge" style="background:rgba(249,115,22,0.2);color:#FB923C;border:1px solid rgba(249,115,22,0.4);font-size:10.5px;font-weight:700;">🕒 ${m.kickoff_col.slice(11)} COL • HOY</span>`;
+              const bestPick = m.opt_a_leg || (m.all_markets && m.all_markets[0]);
+              return `
+              <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:12px 14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <span style="font-size:11px;color:rgba(255,255,255,0.65);">${m.league_label}</span>
+                  ${statusPill}
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+                  <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                    ${m.home_logo ? `<img src="${m.home_logo}" alt="" style="width:28px;height:28px;object-fit:contain;" />` : ''}
+                    <span style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.home}</span>
+                  </div>
+                  <div style="font-size:16px;font-weight:900;color:${isLive ? '#34D399' : 'var(--orange)'};padding:0 8px;">${scoreText}</div>
+                  <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:1;min-width:0;">
+                    <span style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;">${m.away}</span>
+                    ${m.away_logo ? `<img src="${m.away_logo}" alt="" style="width:28px;height:28px;object-fit:contain;" />` : ''}
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);font-size:11.5px;">
+                  <span style="color:rgba(255,255,255,0.85);">${bestPick ? `👉 <b>${bestPick.market_name || bestPick.name}</b> @<b>${Number(bestPick.odds).toFixed(2)}</b>` : 'Ver análisis'}</span>
+                  <button class="btn btn-primary" style="padding:4px 9px;font-size:11px;" onclick="openDrawer(${origIdx})">+ Ver Cuotas</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+    }
+
     function renderMatches() {
+      renderMatchCenter();
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
       const list = (lastScan.matches || [])
         .filter(m => {
