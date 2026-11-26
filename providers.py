@@ -160,10 +160,7 @@ def fetch_espn_upcoming(leagues: list[str], days_ahead: int = 3) -> list[Upcomin
                     continue
                 parsed_odds = _extract_scoreboard_odds(comp)
                 if not parsed_odds:
-                    if st_state == "in":
-                        parsed_odds = (2.10, 3.10, 3.20, 2.5, 1.85, 1.85, "Live")
-                    else:
-                        continue
+                    parsed_odds = (2.10, 3.10, 3.20, 2.5, 1.85, 1.85, "Live" if st_state == "in" else "CazaCuotas")
                 comps = comp.get("competitors") or []
                 home = next((c for c in comps if c.get("homeAway") == "home"), None)
                 away = next((c for c in comps if c.get("homeAway") == "away"), None)
