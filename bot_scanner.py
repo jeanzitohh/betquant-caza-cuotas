@@ -24,7 +24,17 @@ from quant_math import (
 )
 from lineup_tracker import check_match_lineup_alerts, penalize_lambda_for_lineup
 
-DEFAULT_LEAGUES = ["col.1", "eng.1", "esp.1", "ita.1", "ger.1", "fra.1", "uefa.champions"]
+DEFAULT_LEAGUES = [
+    "col.1",
+    "uefa.champions",
+    "uefa.europa",
+    "uefa.europa.conf",
+    "eng.1",
+    "esp.1",
+    "ita.1",
+    "ger.1",
+    "fra.1",
+]
 
 MARKET_NAMES = {
     "1": "Gana Local (1)",

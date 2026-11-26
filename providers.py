@@ -13,6 +13,8 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 
 LEAGUE_LABELS = {
     "uefa.champions": "UEFA Champions League",
+    "uefa.europa": "UEFA Europa League",
+    "uefa.europa.conf": "UEFA Conference League",
     "ger.1": "Bundesliga — Alemania",
     "ita.1": "Serie A — Italia",
     "eng.1": "Premier League — Inglaterra",
@@ -29,6 +31,8 @@ APIFOOTBALL_LEAGUE_IDS = {
     "ger.1": 78,
     "fra.1": 61,
     "uefa.champions": 2,
+    "uefa.europa": 3,
+    "uefa.europa.conf": 848,
 }
 
 

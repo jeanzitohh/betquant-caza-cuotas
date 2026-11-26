@@ -861,8 +861,8 @@
     const sbClient = SUPABASE_ENABLED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
     const FIB_SEQ = [1, 2, 3, 5, 8];
 
-    const LEAGUE_ORDER = ['col.1', 'uefa.champions', 'eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1'];
-    const LEAGUE_SHORT = { 'col.1': 'COL', 'uefa.champions': 'UCL', 'eng.1': 'ENG', 'esp.1': 'ESP', 'ita.1': 'ITA', 'ger.1': 'GER', 'fra.1': 'FRA' };
+    const LEAGUE_ORDER = ['col.1', 'uefa.champions', 'uefa.europa', 'uefa.europa.conf', 'eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1'];
+    const LEAGUE_SHORT = { 'col.1': 'COL', 'uefa.champions': 'UCL', 'uefa.europa': 'UEL', 'uefa.europa.conf': 'UECL', 'eng.1': 'ENG', 'esp.1': 'ESP', 'ita.1': 'ITA', 'ger.1': 'GER', 'fra.1': 'FRA' };
 
     let currentScope = 'all';
     let dateFilter = 'today';
@@ -1802,6 +1802,8 @@
       const leagueLabels = {
         'col.1': 'Liga BetPlay — Colombia',
         'uefa.champions': 'UEFA Champions League',
+        'uefa.europa': 'UEFA Europa League',
+        'uefa.europa.conf': 'UEFA Conference League',
         'eng.1': 'Premier League — Inglaterra',
         'esp.1': 'LaLiga — España',
         'ita.1': 'Serie A — Italia',
