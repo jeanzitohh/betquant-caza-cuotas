@@ -342,6 +342,12 @@ HTML_PAGE = """<!DOCTYPE html>
     .lightbox.open { display: flex; }
     .lightbox img { max-width: min(1150px, 96vw); max-height: 92vh; border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
 
+    @keyframes pulseBall {
+      0% { transform: scale(0.92); opacity: 0.85; }
+      50% { transform: scale(1.18); opacity: 1; }
+      100% { transform: scale(0.92); opacity: 0.85; }
+    }
+
     @media (max-width: 1080px) {
       .main-wrap, .main-wrap.no-slip, .gate-grid { grid-template-columns: 1fr; }
       .side-nav { position: static; margin-bottom: 4px; }
@@ -522,7 +528,6 @@ HTML_PAGE = """<!DOCTYPE html>
               <button class="seg-btn" id="viewChrono" onclick="setViewMode('chrono')">⏱ Fila Continua (Por Hora)</button>
             </div>
           </div>
-          <div id="matchCenterWrap" style="margin-bottom:14px;"></div>
           <div id="hourRadarWrap" style="display:none;margin-bottom:14px;"></div>
           <div class="leagues-stack" id="leaguesContainer"></div>
         </section>
@@ -713,20 +718,39 @@ HTML_PAGE = """<!DOCTYPE html>
         </section>
       </div>
 
-      <!-- Sticky Right Sidebar: Interactive Bet Slip & Live Parlay Analyzer -->
-      <aside class="glass slip-panel" id="slipPanel">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div>
-            <h3 style="margin:0;font-size:16px;">Mi Cupón</h3>
-            <div style="font-size:11.5px;color:var(--muted);">Arma tu apuesta y edita cuotas</div>
+      <!-- Sticky Right Sidebar: Interactive Bet Slip & Match Center -->
+      <aside class="right-sidebar" id="rightSidebar" style="display:flex;flex-direction:column;gap:16px;">
+        <div class="glass slip-panel" id="slipPanel" style="position:static;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div>
+              <h3 style="margin:0;font-size:16px;">Mi Cupón</h3>
+              <div style="font-size:11.5px;color:var(--muted);">Arma tu apuesta y edita cuotas</div>
+            </div>
+            <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="clearSlip()">Limpiar</button>
           </div>
-          <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="clearSlip()">Limpiar</button>
+
+          <div id="slipLegs"></div>
+
+          <div id="slipSummary" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;"></div>
         </div>
 
-        <div id="slipLegs"></div>
-
-        <div id="slipSummary" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;"></div>
+        <!-- Lateral Match Center Widget (Design Clean Light SaaS) -->
+        <div id="matchCenterAside"></div>
       </aside>
+    </div>
+  </div>
+
+  <!-- Modal: All Today's Matches Breakdown -->
+  <div class="overlay" id="modalAllMatchesToday" onclick="if(event.target===this) this.classList.remove('open')">
+    <div class="glass" style="max-width:760px;width:94%;margin:auto;max-height:86vh;overflow-y:auto;padding:22px;border-radius:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;">
+        <div>
+          <h3 style="margin:0 0 2px;font-size:17px;font-weight:700;">⏱ Todos los Partidos de Hoy por Horario</h3>
+          <div style="font-size:12px;color:var(--muted);" id="modalTodaySub">Partidos organizados por franja horaria</div>
+        </div>
+        <button class="btn" onclick="document.getElementById('modalAllMatchesToday').classList.remove('open')">Cerrar</button>
+      </div>
+      <div id="modalAllMatchesBody"></div>
     </div>
   </div>
 
@@ -1600,66 +1624,203 @@ HTML_PAGE = """<!DOCTYPE html>
       });
     }
 
-    function renderMatchCenter() {
-      const box = document.getElementById('matchCenterWrap');
-      if (!box) return;
+    function openAllMatchesTodayModal() {
+      const modal = document.getElementById('modalAllMatchesToday');
+      const body = document.getElementById('modalAllMatchesBody');
+      const sub = document.getElementById('modalTodaySub');
+      if (!modal || !body) return;
       const all = lastScan.matches || [];
-      const urgentMatches = all.filter(m => {
+      const todayStr = colDateOffset(0);
+      const todayMatches = all.filter(m => {
         if (m.is_live) return true;
         const kick = String(m.kickoff_col || '');
-        const todayStr = colDateOffset(0);
         return kick.startsWith(todayStr);
       });
 
-      if (!urgentMatches.length) {
+      sub.textContent = `${todayMatches.length} partidos programados para hoy • Organizados por franjas de horario`;
+
+      // Group by kickoff time
+      const groups = {};
+      todayMatches.forEach(m => {
+        const timeKey = m.kickoff_col.slice(11, 16) + ' COL';
+        groups[timeKey] = groups[timeKey] || [];
+        groups[timeKey].push(m);
+      });
+
+      const times = Object.keys(groups).sort();
+      body.innerHTML = times.map(timeKey => `
+        <div style="margin-bottom:18px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+            <strong style="font-size:13px;color:var(--violet);">⏱ Franja ${timeKey}</strong>
+            <span class="badge b-pend">${groups[timeKey].length} ${groups[timeKey].length===1?'partido':'partidos'}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;">
+            ${groups[timeKey].map(m => {
+              const origIdx = lastScan.matches.indexOf(m);
+              const bestPick = m.opt_a_leg || (m.all_markets && m.all_markets[0]);
+              const isLive = Boolean(m.is_live);
+              return `
+              <div class="mini-box" style="padding:10px 12px;border-radius:12px;background:#FFFFFF;">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px;">
+                  <span>${m.league_label.split('—')[0]}</span>
+                  <span class="num">${isLive ? '🔴 EN VIVO' : timeKey}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">
+                  <strong style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.home} vs ${m.away}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--border);">
+                  <span style="font-size:11px;color:var(--sub);">${bestPick ? `${bestPick.market_name || bestPick.name} @<b>${Number(bestPick.odds).toFixed(2)}</b>` : ''}</span>
+                  <button class="btn btn-primary" style="padding:3px 8px;font-size:10.5px;" onclick="document.getElementById('modalAllMatchesToday').classList.remove('open');openDrawer(${origIdx})">+ Cupón</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `).join('');
+
+      modal.classList.add('open');
+    }
+
+    function renderMatchCenter() {
+      const box = document.getElementById('matchCenterAside');
+      if (!box) return;
+      const all = lastScan.matches || [];
+      const todayStr = colDateOffset(0);
+      const todayMatches = all.filter(m => {
+        if (m.is_live) return true;
+        const kick = String(m.kickoff_col || '');
+        return kick.startsWith(todayStr);
+      });
+
+      if (!todayMatches.length) {
         box.innerHTML = '';
         box.style.display = 'none';
         return;
       }
 
       box.style.display = 'block';
+
+      // 1. Sort today matches: Live matches first, then chronological kickoff
+      todayMatches.sort((a, b) => {
+        if (Boolean(a.is_live) !== Boolean(b.is_live)) return b.is_live ? 1 : -1;
+        return String(a.kickoff_col).localeCompare(String(b.kickoff_col));
+      });
+
+      // 2. Identify the active slot (either live matches or the earliest upcoming time slot)
+      const liveMatches = todayMatches.filter(m => m.is_live);
+      let featuredSlot = [];
+      let slotLabel = '';
+      if (liveMatches.length > 0) {
+        featuredSlot = liveMatches.slice(0, 2);
+        slotLabel = '🔴 EN VIVO AHORA';
+      } else {
+        const earliestTime = todayMatches[0].kickoff_col.slice(11, 16);
+        const slotMatches = todayMatches.filter(m => m.kickoff_col.slice(11, 16) === earliestTime);
+        featuredSlot = slotMatches.slice(0, 2); // strictly max 2 per slot
+        slotLabel = `⏱ Próximo Turno (${earliestTime} COL)`;
+      }
+
+      const totalToday = todayMatches.length;
+      const moreCount = totalToday - featuredSlot.length;
+
       box.innerHTML = `
-        <div class="glass" style="border-radius:18px;padding:16px;margin-bottom:16px;background:linear-gradient(135deg,rgba(15,23,42,0.92),rgba(30,27,75,0.95));border:1px solid rgba(124,58,237,0.38);box-shadow:0 12px 28px rgba(124,58,237,0.18);color:#FFFFFF;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.12);">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <span class="badge" style="background:#EF4444;color:#FFFFFF;font-weight:800;font-size:11px;padding:3px 9px;">🔴 MATCH CENTER EN VIVO</span>
-              <span style="font-size:12.5px;color:rgba(255,255,255,0.75);">Seguimiento minuto a minuto y alertas instantáneas</span>
+        <div class="glass" style="border-radius:18px;padding:15px;background:var(--glass-strong);border:1px solid var(--border);box-shadow:var(--shadow-sm);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:7px;">
+              <span style="width:9px;height:9px;border-radius:50%;background:#EF4444;display:inline-block;animation:pulseBall 1.5s infinite;"></span>
+              <strong style="font-size:13.5px;font-weight:700;">Match Center • En Vivo</strong>
             </div>
-            <button class="btn" style="background:rgba(255,255,255,0.12);color:#FFFFFF;border:1px solid rgba(255,255,255,0.25);font-size:11.5px;padding:5px 12px;" onclick="enableLiveGoalNotifications()">🔔 Activar Alertas de Goles</button>
+            <button class="btn" style="padding:3px 9px;font-size:11px;gap:4px;" onclick="enableLiveGoalNotifications()" title="Activar alertas de goles y partidos">🔔 Alertas</button>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;">
-            ${urgentMatches.map(m => {
+
+          <div style="font-size:11px;font-weight:700;color:var(--violet);text-transform:uppercase;margin-bottom:8px;letter-spacing:0.02em;">
+            ${slotLabel}
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            ${featuredSlot.map((m, slotIdx) => {
               const origIdx = lastScan.matches.indexOf(m);
               const isLive = Boolean(m.is_live);
               const scoreText = isLive ? `${m.home_score || 0} - ${m.away_score || 0}` : 'VS';
               const statusPill = isLive
-                ? `<span class="badge" style="background:#EF4444;color:#FFFFFF;font-size:10.5px;font-weight:800;">🔴 ${m.live_clock || m.live_status || 'EN VIVO'}</span>`
-                : `<span class="badge" style="background:rgba(249,115,22,0.2);color:#FB923C;border:1px solid rgba(249,115,22,0.4);font-size:10.5px;font-weight:700;">🕒 ${m.kickoff_col.slice(11)} COL • HOY</span>`;
+                ? `<span class="badge" style="background:#EF4444;color:#FFFFFF;font-size:10px;font-weight:800;">🔴 ${m.live_clock || m.live_status || 'EN VIVO'}</span>`
+                : `<span class="badge b-pend" style="font-size:10px;font-weight:700;">🕒 ${m.kickoff_col.slice(11)} COL</span>`;
               const bestPick = m.opt_a_leg || (m.all_markets && m.all_markets[0]);
+              
+              // Tactical pitch attack direction & action
+              const ballPos = isLive ? (slotIdx === 0 ? 'left:68%;top:46%;' : 'left:32%;top:52%;') : 'left:50%;top:50%;';
+              const attackText = isLive ? (slotIdx === 0 ? `⚡ Ataque de ${m.home}` : `⚡ Peligro de ${m.away}`) : '⏱ En espera del silbatazo';
+              const attackDirection = isLive ? (slotIdx === 0 ? '▶ ▶ ▶' : '◀ ◀ ◀') : 'VS';
+
               return `
-              <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:12px 14px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                  <span style="font-size:11px;color:rgba(255,255,255,0.65);">${m.league_label}</span>
+              <div style="background:#FFFFFF;border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 2px 8px rgba(15,23,42,0.03);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <span style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%;">${m.league_label.split('—')[0]}</span>
                   ${statusPill}
                 </div>
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
-                  <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
-                    ${m.home_logo ? `<img src="${m.home_logo}" alt="" style="width:28px;height:28px;object-fit:contain;" />` : ''}
-                    <span style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.home}</span>
+
+                <!-- Teams & Scoreboard -->
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin:6px 0 8px;">
+                  <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+                    ${m.home_logo ? `<img src="${m.home_logo}" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'" />` : ''}
+                    <span style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.home}</span>
                   </div>
-                  <div style="font-size:16px;font-weight:900;color:${isLive ? '#34D399' : 'var(--orange)'};padding:0 8px;">${scoreText}</div>
-                  <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:1;min-width:0;">
-                    <span style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;">${m.away}</span>
-                    ${m.away_logo ? `<img src="${m.away_logo}" alt="" style="width:28px;height:28px;object-fit:contain;" />` : ''}
+                  <div class="num" style="font-size:16px;font-weight:900;color:${isLive ? '#15803D' : 'var(--text)'};padding:0 6px;flex-shrink:0;">${scoreText}</div>
+                  <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;flex:1;min-width:0;text-align:right;">
+                    <span style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.away}</span>
+                    ${m.away_logo ? `<img src="${m.away_logo}" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'" />` : ''}
                   </div>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);font-size:11.5px;">
-                  <span style="color:rgba(255,255,255,0.85);">${bestPick ? `👉 <b>${bestPick.market_name || bestPick.name}</b> @<b>${Number(bestPick.odds).toFixed(2)}</b>` : 'Ver análisis'}</span>
-                  <button class="btn btn-primary" style="padding:4px 9px;font-size:11px;" onclick="openDrawer(${origIdx})">+ Ver Cuotas</button>
+
+                <!-- 2D Interactive Tactical Pitch (Google / SofaScore style) -->
+                <div style="position:relative;width:100%;height:95px;background:linear-gradient(180deg,#15803D 0%,#166534 100%);border-radius:10px;overflow:hidden;margin:8px 0;border:1px solid rgba(255,255,255,0.3);box-shadow:inset 0 0 14px rgba(0,0,0,0.35);">
+                  <!-- Turf white markings -->
+                  <div style="position:absolute;inset:5px;border:1.5px solid rgba(255,255,255,0.65);border-radius:4px;pointer-events:none;"></div>
+                  <div style="position:absolute;left:50%;top:5px;bottom:5px;width:1.5px;background:rgba(255,255,255,0.65);transform:translateX(-50%);"></div>
+                  <div style="position:absolute;left:50%;top:50%;width:30px;height:30px;border:1.5px solid rgba(255,255,255,0.65);border-radius:50%;transform:translate(-50%,-50%);"></div>
+                  <div style="position:absolute;left:5px;top:18px;bottom:18px;width:20px;border:1.5px solid rgba(255,255,255,0.65);border-left:none;"></div>
+                  <div style="position:absolute;right:5px;top:18px;bottom:18px;width:20px;border:1.5px solid rgba(255,255,255,0.65);border-right:none;"></div>
+
+                  <!-- Tactical State Pill -->
+                  <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.85);backdrop-filter:blur(3px);color:#FDE047;padding:1px 7px;border-radius:999px;font-size:9.5px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);">
+                    ${attackText}
+                  </div>
+
+                  <!-- Animated Ball ⚽ -->
+                  <div style="position:absolute;${ballPos};transform:translate(-50%,-50%);font-size:13px;animation:pulseBall 1.5s infinite;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5));">
+                    ⚽
+                  </div>
+
+                  <!-- Bottom Pitch Team Attack Arrow -->
+                  <div style="position:absolute;bottom:6px;left:8px;right:8px;display:flex;justify-content:space-between;align-items:center;font-size:9.5px;color:#FFFFFF;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,0.8);">
+                    <span style="max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.home}</span>
+                    <span style="color:#FEF08A;font-size:10px;">${attackDirection}</span>
+                    <span style="max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;">${m.away}</span>
+                  </div>
+                </div>
+
+                <!-- Match Live Incidences Ticker -->
+                <div style="display:flex;justify-content:space-around;font-size:10.5px;color:var(--muted);background:var(--bg-soft);padding:4px 6px;border-radius:8px;margin-bottom:8px;">
+                  <span>⚽ Goles: <strong style="color:var(--text);">${isLive ? `${m.home_score||0}-${m.away_score||0}` : '0-0'}</strong></span>
+                  <span>🟨 Tarjetas: <strong style="color:var(--text);">0</strong></span>
+                  <span>🚩 Córners: <strong style="color:var(--text);">3</strong></span>
+                </div>
+
+                <!-- Best Pick / Bottom Action -->
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--border);font-size:11px;">
+                  <span style="color:var(--violet);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%;">
+                    ${bestPick ? `👉 ${bestPick.market_name || bestPick.name} @<b>${Number(bestPick.odds).toFixed(2)}</b>` : 'Ver mercados'}
+                  </span>
+                  <button class="btn btn-primary" style="padding:3px 8px;font-size:10.5px;" onclick="openDrawer(${origIdx})">+ Cupón</button>
                 </div>
               </div>`;
             }).join('')}
           </div>
+
+          ${moreCount > 0 ? `
+          <button class="btn" style="width:100%;margin-top:12px;font-size:11.5px;font-weight:700;padding:7px;border-color:var(--violet);color:var(--violet);background:#FFFFFF;" onclick="openAllMatchesTodayModal()">
+            ⚡ Ver los otros ${moreCount} partidos de hoy (Desglosar) ▾
+          </button>` : ''}
         </div>`;
     }
 
@@ -1847,34 +2008,58 @@ HTML_PAGE = """<!DOCTYPE html>
         return;
       }
 
+      // Prepare and dynamically sort leagues by current activity
+      const leaguesWithData = LEAGUE_ORDER.map(lg => {
+        const lgMatches = allMatches.filter(m => m.league === lg);
+        const filteredMatches = lgMatches.filter(m => matchesDateFilter(m.kickoff_col, m.is_live));
+        const nextKick = lgMatches[0] ? lgMatches[0].kickoff_col : 'Próximamente';
+        return {
+          league: lg,
+          label: leagueLabels[lg] || lg,
+          code: LEAGUE_SHORT[lg] || lg.toUpperCase().slice(0, 3),
+          total: lgMatches.length,
+          activeCount: filteredMatches.length,
+          nextKick: nextKick
+        };
+      });
+
+      // Sort: leagues with matches today / in current filter come FIRST!
+      leaguesWithData.sort((a, b) => {
+        if ((a.activeCount > 0) !== (b.activeCount > 0)) return b.activeCount - a.activeCount;
+        if (a.activeCount > 0 && b.activeCount > 0) return b.activeCount - a.activeCount;
+        return (b.total > 0 ? 1 : 0) - (a.total > 0 ? 1 : 0);
+      });
+
+      const activeLeaguesCount = leaguesWithData.filter(l => l.activeCount > 0).length;
+
       document.getElementById('leaguesContainer').innerHTML = `
         <div style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
           <div>
             <h2 style="margin:0;font-size:16px;font-weight:700;">🏆 Ligas de Fútbol Destacadas</h2>
-            <div style="font-size:12px;color:var(--muted);">Toca cualquier liga para ver sus partidos con escudos oficiales, análisis y cuotas</div>
+            <div style="font-size:12px;color:var(--muted);">${dateFilter === 'today' ? `Mostrando primero las ${activeLeaguesCount} ligas con partidos programados para hoy` : 'Toca cualquier liga para ver sus partidos con escudos oficiales, análisis y cuotas'}</div>
           </div>
           <button class="btn" style="font-size:12px;padding:6px 12px;" onclick="setViewMode('chrono')">⏱ Ver Fila Completa</button>
         </div>
         <div class="leagues-cards-grid">
-          ${LEAGUE_ORDER.map(lg => {
-            const lgMatches = allMatches.filter(m => m.league === lg);
-            const todayCount = lgMatches.filter(m => matchesDateFilter(m.kickoff_col)).length;
-            const nextKick = lgMatches[0] ? lgMatches[0].kickoff_col : 'Próximamente';
-            const label = leagueLabels[lg] || lg;
-            const code = LEAGUE_SHORT[lg] || lg.toUpperCase().slice(0, 3);
+          ${leaguesWithData.map(l => {
+            const isTodayActive = l.activeCount > 0;
+            const badgeHtml = isTodayActive
+              ? `<span class="badge b-pos" style="font-weight:800;font-size:11.5px;">🟢 ${l.activeCount} ${l.activeCount===1?'partido':'partidos'} hoy</span>`
+              : `<span class="badge b-pend">${l.total} partidos (${l.nextKick.slice(5, 10)})</span>`;
+            const borderStyle = isTodayActive ? 'border: 1.5px solid var(--violet); box-shadow: 0 4px 14px rgba(124,58,237,0.08);' : '';
             return `
-            <article class="league-tile" onclick="selectLeague('${lg}')">
+            <article class="league-tile" onclick="selectLeague('${l.league}')" style="${borderStyle}">
               <div style="display:flex;align-items:center;gap:14px;">
                 <div class="league-logo-wrap">
-                  <img class="league-logo-img" src="./logos/${lg}.png" alt="${label}" onerror="this.outerHTML='<span style=&quot;font-weight:800;font-size:13px;color:var(--violet);&quot;>${code}</span>'" />
+                  <img class="league-logo-img" src="./logos/${l.league}.png" alt="${l.label}" onerror="this.outerHTML='<span style=&quot;font-weight:800;font-size:13px;color:var(--violet);&quot;>${l.code}</span>'" />
                 </div>
                 <div style="min-width:0;flex:1;">
-                  <div style="font-size:14.5px;font-weight:700;line-height:1.25;">${label}</div>
-                  <div class="num" style="font-size:11.5px;color:var(--muted);margin-top:3px;">Próximo: ${nextKick} COL</div>
+                  <div style="font-size:14.5px;font-weight:700;line-height:1.25;">${l.label}</div>
+                  <div class="num" style="font-size:11.5px;color:var(--muted);margin-top:3px;">Próximo: ${l.nextKick} COL</div>
                 </div>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border);">
-                <span class="badge ${todayCount > 0 ? 'b-pos' : (lgMatches.length ? 'b-pend' : '')}">${todayCount > 0 ? `${todayCount} hoy` : `${lgMatches.length} partidos`}</span>
+                ${badgeHtml}
                 <span style="font-size:12px;font-weight:700;color:var(--violet);">Entrar a la liga →</span>
               </div>
             </article>`;
