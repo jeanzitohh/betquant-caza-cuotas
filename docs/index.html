@@ -1707,6 +1707,8 @@
         renderCombos();
         renderSlip();
         renderBotEffectiveness();
+        pollLiveMatches();
+        if (!livePollTimer) livePollTimer = setInterval(pollLiveMatches, 15000);
         return;
       }
       setStatus(true, 'Consultando partidos y estadísticas...');
@@ -1724,6 +1726,8 @@
       renderCombos();
       renderSlip();
       renderBotEffectiveness();
+      pollLiveMatches();
+      if (!livePollTimer) livePollTimer = setInterval(pollLiveMatches, 15000);
     }
 
     async function runSettle() {
@@ -1843,6 +1847,135 @@
       modal.classList.add('open');
     }
 
+    let livePollTimer = null;
+    const knownGoalEvents = new Set();
+
+    function showLiveGoalNotification(team, home, away, hScore, aScore, minute) {
+      const toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;background:linear-gradient(135deg,#15803D,#059669);color:#FFFFFF;padding:14px 18px;border-radius:18px;box-shadow:0 12px 32px rgba(0,0,0,0.3);font-family:inherit;display:flex;align-items:center;gap:12px;animation:pulseBall 1.5s infinite;';
+      toast.innerHTML = `
+        <span style="font-size:26px;">⚽</span>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#FEF08A;letter-spacing:0.04em;">¡Gol en vivo! (${minute || 'Ahora'})</div>
+          <strong style="font-size:14px;color:#FFFFFF;">${home} ${hScore} - ${aScore} ${away}</strong>
+          <div style="font-size:11.5px;color:#F0FDF4;margin-top:2px;">Anotación de ${team}</div>
+        </div>
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => toast.remove(), 500);
+      }, 7000);
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(`⚽ ¡GOL DE ${team.toUpperCase()}!`, {
+            body: `${home} ${hScore} - ${aScore} ${away} • Minuto ${minute}`,
+            icon: './icon-192.png',
+            tag: `goal-${home}-${away}-${hScore}-${aScore}`
+          });
+        } catch (e) {}
+      }
+    }
+
+    async function fetchMatchLiveStats(m) {
+      try {
+        const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${m.event_id}`);
+        if (!r.ok) return;
+        const d = await r.json();
+        const box = d.boxscore || {};
+        const teams = box.teams || [];
+        const hTeam = teams.find(t => t.homeAway === 'home') || {};
+        const aTeam = teams.find(t => t.homeAway === 'away') || {};
+        const getStat = (t, name) => {
+          const s = (t.statistics || []).find(x => x.name === name);
+          return s ? parseInt(s.displayValue || 0, 10) : 0;
+        };
+        m.corners = getStat(hTeam, 'wonCorners') + getStat(aTeam, 'wonCorners');
+        m.yellow_cards = getStat(hTeam, 'yellowCards') + getStat(aTeam, 'yellowCards');
+        m.shots = getStat(hTeam, 'totalShots') + getStat(aTeam, 'totalShots');
+        const goals = d.keyEvents ? d.keyEvents.filter(e => (e.type && e.type.text === 'Goal')) : [];
+        if (goals.length) {
+          m.recent_goal = goals[goals.length - 1];
+        }
+        renderMatchCenter();
+      } catch (e) {}
+    }
+
+    async function pollLiveMatches() {
+      if (!lastScan || !lastScan.matches || !lastScan.matches.length) return;
+      const todayStr = colDateOffset(0);
+      const todayMatches = lastScan.matches.filter(m => {
+        if (m.is_live) return true;
+        const kick = String(m.kickoff_col || '');
+        return kick.startsWith(todayStr);
+      });
+      if (!todayMatches.length) return;
+
+      const leagues = [...new Set(todayMatches.map(m => m.league))];
+      let hasUpdates = false;
+
+      for (const lg of leagues) {
+        try {
+          const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lg}/scoreboard`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const events = data.events || [];
+
+          for (const ev of events) {
+            const m = lastScan.matches.find(x => x.event_id === ev.id);
+            if (!m) continue;
+            const comp = (ev.competitions && ev.competitions[0]) || {};
+            const comps = comp.competitors || [];
+            const home = comps.find(c => c.homeAway === 'home') || {};
+            const away = comps.find(c => c.homeAway === 'away') || {};
+            const st = ev.status || {};
+            const stType = st.type || {};
+            const isLive = (stType.state === 'in');
+            const isCompleted = (stType.state === 'post');
+            const hScore = parseInt(home.score || 0, 10);
+            const aScore = parseInt(away.score || 0, 10);
+            const clock = st.displayClock || stType.shortDetail || (isLive ? 'En vivo' : '');
+
+            // Detect goal
+            const prevH = m.home_score || 0;
+            const prevA = m.away_score || 0;
+            if (isLive && (hScore > prevH || aScore > prevA)) {
+              const goalKey = `${ev.id}_${hScore}_${aScore}`;
+              if (!knownGoalEvents.has(goalKey)) {
+                knownGoalEvents.add(goalKey);
+                const scoringTeam = hScore > prevH ? m.home : m.away;
+                showLiveGoalNotification(scoringTeam, m.home, m.away, hScore, aScore, clock);
+              }
+            }
+
+            if (m.is_live !== isLive || m.home_score !== hScore || m.away_score !== aScore || m.live_clock !== clock) {
+              m.is_live = isLive;
+              m.is_completed = isCompleted;
+              m.home_score = hScore;
+              m.away_score = aScore;
+              m.live_clock = clock;
+              m.live_status = stType.description || (isLive ? 'En vivo' : '');
+              if (home.team && home.team.logo && !m.home_logo) m.home_logo = home.team.logo;
+              if (away.team && away.team.logo && !m.away_logo) m.away_logo = away.team.logo;
+              hasUpdates = true;
+            }
+
+            if (isLive && (!m.corners || !m.shots)) {
+              fetchMatchLiveStats(m);
+            }
+          }
+        } catch (err) {
+          // ignore network errors
+        }
+      }
+
+      if (hasUpdates) {
+        renderMatchCenter();
+      }
+    }
+
     function renderMatchCenter() {
       const box = document.getElementById('matchCenterAside');
       if (!box) return;
@@ -1874,12 +2007,12 @@
       let slotLabel = '';
       if (liveMatches.length > 0) {
         featuredSlot = liveMatches.slice(0, 2);
-        slotLabel = '🔴 EN VIVO AHORA';
+        slotLabel = '🔴 En vivo ahora';
       } else {
         const earliestTime = todayMatches[0].kickoff_col.slice(11, 16);
         const slotMatches = todayMatches.filter(m => m.kickoff_col.slice(11, 16) === earliestTime);
-        featuredSlot = slotMatches.slice(0, 2); // strictly max 2 per slot
-        slotLabel = `⏱ Próximo Turno (${earliestTime} COL)`;
+        featuredSlot = slotMatches.slice(0, 2);
+        slotLabel = `⏱ Próximo turno (${earliestTime} COL)`;
       }
 
       const totalToday = todayMatches.length;
@@ -1890,7 +2023,7 @@
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);">
             <div style="display:flex;align-items:center;gap:7px;">
               <span style="width:9px;height:9px;border-radius:50%;background:#EF4444;display:inline-block;animation:pulseBall 1.5s infinite;"></span>
-              <strong style="font-size:13.5px;font-weight:700;">Match Center • En Vivo</strong>
+              <strong style="font-size:13.5px;font-weight:700;">Match center en vivo</strong>
             </div>
             <button class="btn" style="padding:3px 9px;font-size:11px;gap:4px;" onclick="enableLiveGoalNotifications()" title="Activar alertas de goles y partidos">🔔 Alertas</button>
           </div>
@@ -1905,14 +2038,16 @@
               const isLive = Boolean(m.is_live);
               const scoreText = isLive ? `${m.home_score || 0} - ${m.away_score || 0}` : 'VS';
               const statusPill = isLive
-                ? `<span class="badge" style="background:#EF4444;color:#FFFFFF;font-size:10px;font-weight:800;">🔴 ${m.live_clock || m.live_status || 'EN VIVO'}</span>`
+                ? `<span class="badge" style="background:#EF4444;color:#FFFFFF;font-size:10.5px;font-weight:800;padding:2px 7px;animation:pulseBall 1.5s infinite;">🔴 ${m.live_clock || m.live_status || 'EN VIVO'}</span>`
                 : `<span class="badge b-pend" style="font-size:10px;font-weight:700;">🕒 ${m.kickoff_col.slice(11)} COL</span>`;
               const bestPick = m.opt_a_leg || (m.all_markets && m.all_markets[0]);
               
               // Tactical pitch attack direction & action
-              const ballPos = isLive ? (slotIdx === 0 ? 'left:68%;top:46%;' : 'left:32%;top:52%;') : 'left:50%;top:50%;';
-              const attackText = isLive ? (slotIdx === 0 ? `⚡ Ataque de ${m.home}` : `⚡ Peligro de ${m.away}`) : '⏱ En espera del silbatazo';
-              const attackDirection = isLive ? (slotIdx === 0 ? '▶ ▶ ▶' : '◀ ◀ ◀') : 'VS';
+              const ballPos = isLive ? (m.home_score > m.away_score ? 'left:72%;top:48%;' : (m.away_score > m.home_score ? 'left:28%;top:52%;' : 'left:62%;top:46%;')) : 'left:50%;top:50%;';
+              const attackText = isLive
+                ? (m.recent_goal ? `⚽ ¡GOL! ${m.recent_goal.minute} • ${m.recent_goal.text.slice(0, 30)}...` : `⚡ En juego (${m.live_clock || '1T'}) • Presión alta`)
+                : '⏱ En espera del silbatazo';
+              const attackDirection = isLive ? (m.home_score >= m.away_score ? '▶ ▶ ▶ Ataque ' + m.home : '◀ ◀ ◀ Ataque ' + m.away) : 'VS';
 
               return `
               <div style="background:#FFFFFF;border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 2px 8px rgba(15,23,42,0.03);">
@@ -1927,7 +2062,7 @@
                     ${m.home_logo ? `<img src="${m.home_logo}" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'" />` : ''}
                     <span style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.home}</span>
                   </div>
-                  <div class="num" style="font-size:16px;font-weight:900;color:${isLive ? '#15803D' : 'var(--text)'};padding:0 6px;flex-shrink:0;">${scoreText}</div>
+                  <div class="num" style="font-size:18px;font-weight:900;color:${isLive ? '#15803D' : 'var(--text)'};padding:0 8px;flex-shrink:0;${isLive ? 'background:rgba(22,163,74,0.1);border-radius:8px;' : ''}">${scoreText}</div>
                   <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;flex:1;min-width:0;text-align:right;">
                     <span style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.away}</span>
                     ${m.away_logo ? `<img src="${m.away_logo}" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'" />` : ''}
@@ -1944,7 +2079,7 @@
                   <div style="position:absolute;right:5px;top:18px;bottom:18px;width:20px;border:1.5px solid rgba(255,255,255,0.65);border-right:none;"></div>
 
                   <!-- Tactical State Pill -->
-                  <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.85);backdrop-filter:blur(3px);color:#FDE047;padding:1px 7px;border-radius:999px;font-size:9.5px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);">
+                  <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.85);backdrop-filter:blur(3px);color:#FDE047;padding:1px 7px;border-radius:999px;font-size:9.5px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);max-width:90%;overflow:hidden;text-overflow:ellipsis;">
                     ${attackText}
                   </div>
 
@@ -1964,8 +2099,8 @@
                 <!-- Match Live Incidences Ticker -->
                 <div style="display:flex;justify-content:space-around;font-size:10.5px;color:var(--muted);background:var(--bg-soft);padding:4px 6px;border-radius:8px;margin-bottom:8px;">
                   <span>⚽ Goles: <strong style="color:var(--text);">${isLive ? `${m.home_score||0}-${m.away_score||0}` : '0-0'}</strong></span>
-                  <span>🟨 Tarjetas: <strong style="color:var(--text);">0</strong></span>
-                  <span>🚩 Córners: <strong style="color:var(--text);">3</strong></span>
+                  <span>🟨 Tarjetas: <strong style="color:var(--text);">${m.yellow_cards || 0}</strong></span>
+                  <span>🚩 Córners: <strong style="color:var(--text);">${m.corners || 1}</strong></span>
                 </div>
 
                 <!-- Best Pick / Bottom Action -->
