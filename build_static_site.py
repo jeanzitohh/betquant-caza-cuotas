@@ -108,10 +108,27 @@ def export_static_site(scan_res: dict | None = None, report_res: dict | None = N
                 with open(os.path.join(src_logos, fn), "rb") as rf, open(os.path.join(dst_logos, fn), "wb") as wf:
                     wf.write(rf.read())
 
-    # PWA Icons & Manifest & Service Worker
+    # PWA Icons & Manifest & Service Worker & Favicons
     for sz in (192, 512):
         with open(os.path.join(DOCS_DIR, f"icon-{sz}.png"), "wb") as f:
             f.write(render_app_icon(sz))
+
+    # Also render 32x32 favicon
+    with open(os.path.join(DOCS_DIR, "favicon-32.png"), "wb") as f:
+        f.write(render_app_icon(32))
+    with open(os.path.join(DOCS_DIR, "favicon.png"), "wb") as f:
+        f.write(render_app_icon(32))
+
+    # Copy favicon.svg and favicon.ico from root to docs if exist
+    for fav_name in ("favicon.svg", "favicon.ico", "favicon-32.png"):
+        src_f = os.path.join(BASE_DIR, fav_name)
+        dst_f = os.path.join(DOCS_DIR, fav_name)
+        if os.path.isfile(src_f) and not os.path.samefile(src_f, dst_f) if os.path.exists(dst_f) else os.path.isfile(src_f):
+            try:
+                with open(src_f, "rb") as rf, open(dst_f, "wb") as wf:
+                    wf.write(rf.read())
+            except Exception:
+                pass
 
     manifest = {
         "name": "Caza Cuotas",

@@ -846,7 +846,7 @@ def png_to_webp_data_url(png_bytes: bytes, max_w: int = 1120) -> str:
 
 
 def render_app_icon(size: int = 512) -> bytes:
-    """Generate the official Caza Cuotas squircle PWA icon PNG."""
+    """Generate the official Caza Cuotas squircle PWA icon PNG with crosshair target and CC emblem."""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     pad = int(size * 0.04)
     rad = int(size * 0.24)
@@ -863,13 +863,48 @@ def render_app_icon(size: int = 512) -> bytes:
     md.rounded_rectangle((pad, pad, size - pad, size - pad), radius=rad, fill=255)
     img.paste(grad, (0, 0), mask)
 
-    s = size / 32.0
+    scale = size / 512.0
+    center = size / 2.0
     d = ImageDraw.Draw(img)
-    crown = [(5 * s, 10 * s), (9 * s, 5 * s), (13 * s, 9 * s), (19 * s, 9 * s), (23 * s, 5 * s), (27 * s, 10 * s), (25 * s, 22 * s), (16 * s, 27 * s), (7 * s, 22 * s)]
-    d.polygon(crown, fill=(15, 15, 30, 235), outline=(255, 255, 255, 240))
-    visor = [(8.5 * s, 13 * s), (14.5 * s, 13 * s), (16 * s, 14.5 * s), (17.5 * s, 13 * s), (23.5 * s, 13 * s), (23.5 * s, 17.5 * s), (17 * s, 18.2 * s), (16 * s, 16.5 * s), (15 * s, 18.2 * s), (8.5 * s, 17.5 * s)]
-    d.polygon(visor, fill=(249, 115, 22, 255), outline=(253, 224, 71, 255))
-    d.ellipse((14.6 * s, 20.1 * s, 17.4 * s, 22.9 * s), fill=(248, 250, 252, 255))
+
+    # Tactical target / crosshair rings
+    rad_out = 168 * scale
+    rad_in = 112 * scale
+    lw = max(2, int(6 * scale))
+
+    d.ellipse(
+        [center - rad_out, center - rad_out, center + rad_out, center + rad_out],
+        outline=(255, 255, 255, 120),
+        width=max(2, int(5 * scale)),
+    )
+    d.ellipse(
+        [center - rad_in, center - rad_in, center + rad_in, center + rad_in],
+        outline=(255, 255, 255, 80),
+        width=max(2, int(4 * scale)),
+    )
+
+    # Crosshair reticle tick marks
+    tick_len = 36 * scale
+    d.line([center, center - rad_out - tick_len, center, center - rad_out + tick_len * 0.6], fill=(255, 255, 255, 240), width=lw)
+    d.line([center, center + rad_out - tick_len * 0.6, center, center + rad_out + tick_len], fill=(255, 255, 255, 240), width=lw)
+    d.line([center - rad_out - tick_len, center, center - rad_out + tick_len * 0.6, center], fill=(255, 255, 255, 240), width=lw)
+    d.line([center + rad_out - tick_len * 0.6, center, center + rad_out + tick_len, center], fill=(255, 255, 255, 240), width=lw)
+
+    # CC Monogram typography
+    font = _load_font(int(150 * scale), "bold")
+    text = "CC"
+    t_box = d.textbbox((0, 0), text, font=font)
+    tw = t_box[2] - t_box[0]
+    th = t_box[3] - t_box[1]
+    tx = center - tw / 2.0 - t_box[0]
+    ty = center - th / 2.0 - t_box[1]
+
+    d.text((tx, ty + int(4 * scale)), text, font=font, fill=(15, 23, 42, 130))
+    d.text((tx, ty), text, font=font, fill=(255, 255, 255, 255))
+
+    # Gold center target dot
+    dot_r = max(2, int(6 * scale))
+    d.ellipse([center - dot_r, center - dot_r, center + dot_r, center + dot_r], fill=(253, 224, 71, 255))
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
