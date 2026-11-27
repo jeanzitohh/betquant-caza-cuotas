@@ -9,7 +9,7 @@ from providers import load_env
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOCS_DIR = os.path.join(BASE_DIR, "docs")
 
-SW_JS = """const CACHE_NAME = 'caza-cuotas-v4';
+SW_JS = """const CACHE_NAME = 'caza-cuotas-v5';
 const SHELL_URLS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {

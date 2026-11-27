@@ -1,4 +1,4 @@
-const CACHE_NAME = 'caza-cuotas-v4';
+const CACHE_NAME = 'caza-cuotas-v5';
 const SHELL_URLS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
