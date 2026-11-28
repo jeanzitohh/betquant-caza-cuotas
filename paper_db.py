@@ -452,6 +452,11 @@ class PaperTradingDB:
                 st["prob_sum"] += float(r["model_prob"])
                 st["profit_u"] += float(r["profit_u"])
 
+        foundational_markets = {
+            "1", "2", "X", "1X", "X2",
+            "1H_O05", "2H_O05", "1H_H_O05", "1H_A_O05", "2H_H_O05", "2H_A_O05",
+            "H_O05", "A_O05", "H_O15", "A_O15",
+        }
         calibration: dict[str, dict] = {}
         for mk, st in stats.items():
             n = st["settled"]
@@ -460,8 +465,10 @@ class PaperTradingDB:
             # Empirical Bayes adjustment toward actual settled accuracy
             shrunk = (st["won"] + 5.0 * avg_prob) / (n + 5.0)
             bias = round(shrunk - avg_prob, 4)
-            blocked = n >= 5 and win_rate < 0.52 and st["profit_u"] < -3.0
-            label = "Bloqueado temporalmente" if blocked else ("Ajuste estricto" if bias < -0.04 else ("Rendimiento óptimo" if win_rate >= 0.68 and n >= 3 else "Calibrando"))
+            # Foundational bookmaker markets are never hard-blocked by small paper-trading variance
+            is_foundational = mk in foundational_markets
+            blocked = False if is_foundational else (n >= 15 and win_rate < 0.45 and st["profit_u"] < -10.0)
+            label = "Bloqueado temporalmente" if blocked else ("Rendimiento óptimo" if win_rate >= 0.68 and n >= 5 else ("Ajuste estricto" if bias < -0.04 else "En seguimiento"))
             calibration[mk] = {
                 "settled": n,
                 "won": st["won"],

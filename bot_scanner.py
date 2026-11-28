@@ -188,52 +188,82 @@ def score_market_candidate(
     lam_h: float,
     lam_a: float,
 ) -> float:
-    """Score straight market candidates favoring the ~75%-84% probability / 1.25-1.55 odds sweet spot.
+    """Score straight market candidates prioritizing ~75%-84% probability / 1.25-1.55 odds sweet spot.
 
-    Penalizes extreme probabilities (>88% forces tiny 1.05-1.18 odds; <65% is too volatile).
-    Rewards strong statistical alignment with team historical form and market edge.
-    Prevents single-market monotony (like 2H_O05 dominance) by balancing across diverse markets.
+    Penalizes extreme probabilities (>88% forces tiny 1.05-1.18 odds; <62% is too volatile).
+    Rewards strong statistical alignment with team historical form, expected goals, and market edge.
+    Prevents single-market monotony (like 2H_O05 dominance) by balancing across diverse markets:
+    - Gana (1 / 2)
+    - Gana / Empata (1X / X2)
+    - Goles en 1T (1H_O05, 1H_H_O05, 1H_A_O05)
+    - Goles en 2T (2H_O05, 2H_H_O05, 2H_A_O05)
+    - Goles por equipo (H_O05, A_O05, H_O15, A_O15)
     """
-    # 1. Target probability centered at 0.79 (optimal ~75% - 84%)
-    prob_score = -abs(cp - 0.79) * 4.2
+    # 1. Target probability centered at 0.79 (~74% - 84%)
+    prob_score = -abs(cp - 0.79) * 3.5
+    if cp > 0.88:
+        prob_score -= (cp - 0.88) * 6.0  # heavy penalty for tiny odds (<1.20)
+    elif cp < 0.62:
+        prob_score -= (0.62 - cp) * 5.0  # penalty for risky low probabilities
 
-    # 2. Target odds centered at 1.36 (sweet spot 1.28 - 1.50)
-    odds_score = -abs(odd - 1.36) * 1.8
-    if odd < 1.20:
-        odds_score -= (1.20 - odd) * 5.0  # heavy penalty for tiny odds (<1.20)
+    # 2. Target odds centered at 1.38 (sweet spot 1.28 - 1.55)
+    odds_score = -abs(odd - 1.38) * 1.5
+    if odd < 1.22:
+        odds_score -= (1.22 - odd) * 7.0  # strong penalty for micro-odds (<1.22)
+    elif odd > 1.65:
+        odds_score -= (odd - 1.65) * 2.0
 
     # 3. Model Expectancy (Edge)
     ev = cp * odd - 1.0
-    ev_score = ev * 2.5
+    ev_score = ev * 2.8
 
     # 4. Team Historical Grounding bonus
     hist_bonus = 0.0
+    h_n = h_stat.get("n", 0)
+    a_n = a_stat.get("n", 0)
+
     if k == "1":
-        hist_bonus = float(h_stat.get("win_pct", 0.5)) * 0.35
+        win_rate = float(h_stat.get("win_pct", 0.5)) if h_n >= 2 else 0.5
+        hist_bonus = (win_rate - 0.40) * 0.60 + (0.15 if lam_h > lam_a * 1.4 else 0.0)
     elif k == "2":
-        hist_bonus = float(a_stat.get("win_pct", 0.5)) * 0.35
+        win_rate = float(a_stat.get("win_pct", 0.5)) if a_n >= 2 else 0.5
+        hist_bonus = (win_rate - 0.40) * 0.60 + (0.15 if lam_a > lam_h * 1.4 else 0.0)
     elif k == "1X":
-        hist_bonus = float(h_stat.get("unbeaten_pct", 0.7)) * 0.30
+        unbeaten = float(h_stat.get("unbeaten_pct", 0.7)) if h_n >= 2 else 0.7
+        hist_bonus = (unbeaten - 0.65) * 0.50
     elif k == "X2":
-        hist_bonus = float(a_stat.get("unbeaten_pct", 0.7)) * 0.30
+        unbeaten = float(a_stat.get("unbeaten_pct", 0.7)) if a_n >= 2 else 0.7
+        hist_bonus = (unbeaten - 0.65) * 0.50
     elif k == "H_O05":
-        hist_bonus = float(h_stat.get("o05_pct", 0.7)) * 0.26
+        o05 = float(h_stat.get("o05_pct", 0.7)) if h_n >= 2 else 0.7
+        hist_bonus = (o05 - 0.70) * 0.45
     elif k == "A_O05":
-        hist_bonus = float(a_stat.get("o05_pct", 0.7)) * 0.26
+        o05 = float(a_stat.get("o05_pct", 0.7)) if a_n >= 2 else 0.7
+        hist_bonus = (o05 - 0.70) * 0.45
     elif k == "H_O15":
-        hist_bonus = float(h_stat.get("o15_pct", 0.4)) * 0.30
+        o15 = float(h_stat.get("o15_pct", 0.4)) if h_n >= 2 else 0.4
+        hist_bonus = (o15 - 0.45) * 0.50 + (0.10 if lam_h >= 1.6 else 0.0)
     elif k == "A_O15":
-        hist_bonus = float(a_stat.get("o15_pct", 0.4)) * 0.30
+        o15 = float(a_stat.get("o15_pct", 0.4)) if a_n >= 2 else 0.4
+        hist_bonus = (o15 - 0.45) * 0.50 + (0.10 if lam_a >= 1.6 else 0.0)
     elif k == "1H_O05":
         tot_lam = lam_h + lam_a
-        hist_bonus = 0.14 if tot_lam >= 2.2 else 0.07
-    elif k in ("1H_H_O05", "2H_H_O05"):
-        hist_bonus = 0.12 if lam_h >= 1.3 else 0.04
-    elif k in ("1H_A_O05", "2H_A_O05"):
-        hist_bonus = 0.12 if lam_a >= 1.3 else 0.04
+        hist_bonus = 0.15 if tot_lam >= 2.4 else (0.08 if tot_lam >= 2.0 else -0.05)
+    elif k == "1H_H_O05":
+        gf = float(h_stat.get("gf_avg", 1.2))
+        hist_bonus = 0.18 if (gf >= 1.5 or lam_h >= 1.5) else 0.05
+    elif k == "1H_A_O05":
+        gf = float(a_stat.get("gf_avg", 1.1))
+        hist_bonus = 0.18 if (gf >= 1.5 or lam_a >= 1.5) else 0.05
+    elif k == "2H_H_O05":
+        gf = float(h_stat.get("gf_avg", 1.2))
+        hist_bonus = 0.18 if (gf >= 1.3 or lam_h >= 1.3) else 0.05
+    elif k == "2H_A_O05":
+        gf = float(a_stat.get("gf_avg", 1.1))
+        hist_bonus = 0.18 if (gf >= 1.3 or lam_a >= 1.3) else 0.05
     elif k == "2H_O05":
-        # Neutral baseline so it competes fairly instead of dominating
-        hist_bonus = 0.02
+        tot_lam = lam_h + lam_a
+        hist_bonus = 0.05 if tot_lam >= 2.2 else -0.05
 
     return prob_score + odds_score + ev_score + hist_bonus
 
@@ -293,57 +323,64 @@ def evaluate_match(
 
     opt_a_cands = []
 
-    # 1X2 & Double Chance markets (evaluated from Poisson model & team form)
-    if qprobs.get("1", 0) >= 0.58 and 1.20 <= mkt_odds.get("1", 99) <= 1.75:
-        if h_stat.get("n", 0) < 2 or h_stat.get("win_pct", 0) >= 0.40 or m.o1 <= 1.65:
+    # 1. Gana (1 / 2) (1X2 Moneyline)
+    if 1.22 <= mkt_odds.get("1", 99) <= 1.75 and qprobs.get("1", 0) >= 0.56:
+        if h_stat.get("n", 0) < 2 or h_stat.get("win_pct", 0) >= 0.38 or m.o1 <= 1.68:
             opt_a_cands.append("1")
-    if qprobs.get("2", 0) >= 0.58 and 1.20 <= mkt_odds.get("2", 99) <= 1.75:
-        if a_stat.get("n", 0) < 2 or a_stat.get("win_pct", 0) >= 0.40 or m.o2 <= 1.65:
+    if 1.22 <= mkt_odds.get("2", 99) <= 1.75 and qprobs.get("2", 0) >= 0.56:
+        if a_stat.get("n", 0) < 2 or a_stat.get("win_pct", 0) >= 0.38 or m.o2 <= 1.68:
             opt_a_cands.append("2")
-    if qprobs.get("1X", 0) >= 0.70 and 1.18 <= mkt_odds.get("1X", 99) <= 1.62:
-        if h_stat.get("n", 0) < 2 or h_stat.get("unbeaten_pct", 0) >= 0.58 or m.o1 <= 2.25:
+
+    # 2. Gana / Empata (1X / X2) (Doble Oportunidad)
+    if 1.20 <= mkt_odds.get("1X", 99) <= 1.65 and qprobs.get("1X", 0) >= 0.68:
+        if h_stat.get("n", 0) < 2 or h_stat.get("unbeaten_pct", 0) >= 0.55 or m.o1 <= 2.25:
             opt_a_cands.append("1X")
-    if qprobs.get("X2", 0) >= 0.70 and 1.18 <= mkt_odds.get("X2", 99) <= 1.62:
-        if a_stat.get("n", 0) < 2 or a_stat.get("unbeaten_pct", 0) >= 0.58 or m.o2 <= 2.25:
+    if 1.20 <= mkt_odds.get("X2", 99) <= 1.65 and qprobs.get("X2", 0) >= 0.68:
+        if a_stat.get("n", 0) < 2 or a_stat.get("unbeaten_pct", 0) >= 0.55 or m.o2 <= 2.25:
             opt_a_cands.append("X2")
 
-    # Team Goals markets
-    if qprobs.get("H_O05", 0) >= 0.70 and 1.18 <= mkt_odds.get("H_O05", 99) <= 1.55:
-        if h_stat.get("n", 0) < 2 or h_stat.get("o05_pct", 0) >= 0.65 or h_stat.get("gf_avg", 0) >= 1.0:
-            opt_a_cands.append("H_O05")
-    if qprobs.get("A_O05", 0) >= 0.70 and 1.18 <= mkt_odds.get("A_O05", 99) <= 1.55:
-        if a_stat.get("n", 0) < 2 or a_stat.get("o05_pct", 0) >= 0.65 or a_stat.get("gf_avg", 0) >= 1.0:
-            opt_a_cands.append("A_O05")
-    if qprobs.get("H_O15", 0) >= 0.55 and 1.30 <= mkt_odds.get("H_O15", 99) <= 1.75:
-        if h_stat.get("n", 0) >= 2 and h_stat.get("gf_avg", 0) >= 1.4:
-            opt_a_cands.append("H_O15")
-    if qprobs.get("A_O15", 0) >= 0.55 and 1.30 <= mkt_odds.get("A_O15", 99) <= 1.75:
-        if a_stat.get("n", 0) >= 2 and a_stat.get("gf_avg", 0) >= 1.4:
-            opt_a_cands.append("A_O15")
-
-    # Half-time goal markets
-    if qprobs.get("1H_O05", 0) >= 0.65 and 1.20 <= mkt_odds.get("1H_O05", 99) <= 1.62:
+    # 3. Goles Primera Mitad (partido y por equipo)
+    if 1.22 <= mkt_odds.get("1H_O05", 99) <= 1.65 and qprobs.get("1H_O05", 0) >= 0.64:
         opt_a_cands.append("1H_O05")
-    if qprobs.get("2H_O05", 0) >= 0.72 and 1.18 <= mkt_odds.get("2H_O05", 99) <= 1.50:
-        opt_a_cands.append("2H_O05")
-
-    # Team half-time goal markets
-    if qprobs.get("1H_H_O05", 0) >= 0.58 and 1.28 <= mkt_odds.get("1H_H_O05", 99) <= 1.75:
+    if 1.25 <= mkt_odds.get("1H_H_O05", 99) <= 1.75 and qprobs.get("1H_H_O05", 0) >= 0.54:
         opt_a_cands.append("1H_H_O05")
-    if qprobs.get("1H_A_O05", 0) >= 0.58 and 1.28 <= mkt_odds.get("1H_A_O05", 99) <= 1.75:
+    if 1.25 <= mkt_odds.get("1H_A_O05", 99) <= 1.75 and qprobs.get("1H_A_O05", 0) >= 0.54:
         opt_a_cands.append("1H_A_O05")
-    if qprobs.get("2H_H_O05", 0) >= 0.62 and 1.25 <= mkt_odds.get("2H_H_O05", 99) <= 1.68:
+
+    # 4. Goles Segunda Mitad (partido y por equipo)
+    if 1.22 <= mkt_odds.get("2H_O05", 99) <= 1.55 and qprobs.get("2H_O05", 0) >= 0.70:
+        opt_a_cands.append("2H_O05")
+    if 1.25 <= mkt_odds.get("2H_H_O05", 99) <= 1.70 and qprobs.get("2H_H_O05", 0) >= 0.58:
         opt_a_cands.append("2H_H_O05")
-    if qprobs.get("2H_A_O05", 0) >= 0.62 and 1.25 <= mkt_odds.get("2H_A_O05", 99) <= 1.68:
+    if 1.25 <= mkt_odds.get("2H_A_O05", 99) <= 1.70 and qprobs.get("2H_A_O05", 0) >= 0.58:
         opt_a_cands.append("2H_A_O05")
+
+    # Team Goals Full Match
+    if 1.20 <= mkt_odds.get("H_O05", 99) <= 1.50 and qprobs.get("H_O05", 0) >= 0.70:
+        opt_a_cands.append("H_O05")
+    if 1.20 <= mkt_odds.get("A_O05", 99) <= 1.50 and qprobs.get("A_O05", 0) >= 0.70:
+        opt_a_cands.append("A_O05")
+    if 1.30 <= mkt_odds.get("H_O15", 99) <= 1.75 and qprobs.get("H_O15", 0) >= 0.55:
+        if h_stat.get("n", 0) < 2 or h_stat.get("gf_avg", 0) >= 1.3:
+            opt_a_cands.append("H_O15")
+    if 1.30 <= mkt_odds.get("A_O15", 99) <= 1.75 and qprobs.get("A_O15", 0) >= 0.55:
+        if a_stat.get("n", 0) < 2 or a_stat.get("gf_avg", 0) >= 1.3:
+            opt_a_cands.append("A_O15")
 
     cal = calibration or {}
 
     def _cal_prob(mkt_key: str) -> tuple[float, bool]:
         info = cal.get(mkt_key) or {}
-        if info.get("blocked"):
+        # Never block foundational real bookmaker markets
+        is_foundational = mkt_key in {
+            "1", "2", "X", "1X", "X2",
+            "1H_O05", "2H_O05", "1H_H_O05", "1H_A_O05", "2H_H_O05", "2H_A_O05",
+            "H_O05", "A_O05", "H_O15", "A_O15"
+        }
+        if info.get("blocked") and not is_foundational:
             return 0.0, True
-        adj = qprobs[mkt_key] + float(info.get("bias", 0.0))
+        bias = float(info.get("bias", 0.0))
+        adj = qprobs[mkt_key] + max(-0.08, min(0.08, bias))
         return max(0.05, min(0.95, adj)), False
 
     opt_a_valid = []
@@ -351,7 +388,7 @@ def evaluate_match(
         if k not in mkt_odds or k not in qprobs:
             continue
         cp, blk = _cal_prob(k)
-        if not blk and 1.15 <= mkt_odds[k] <= 1.75 and cp >= 0.58:
+        if not blk and 1.15 <= mkt_odds[k] <= 1.75 and cp >= 0.54:
             opt_a_valid.append((k, mkt_odds[k], cp))
 
     # Sort candidates using sweet-spot scoring (targeting ~75%-84% prob and 1.25-1.55 odds with team form alignment)
@@ -375,13 +412,16 @@ def evaluate_match(
     # Best individual pick for daily accuracy tracking ("BOT_DIARIO") — Straight markets only
     safe_pool = []
     for k, odd in mkt_odds.items():
-        if k.startswith("BB_") or not (1.18 <= odd <= 1.75) or k not in qprobs:
+        if k.startswith("BB_") or not (1.15 <= odd <= 1.85) or k not in qprobs:
             continue
         cp, blk = _cal_prob(k)
-        if not blk and cp >= 0.65:
+        if not blk and cp >= 0.52:
             safe_pool.append((k, odd, cp))
     safe_pool.sort(key=lambda x: score_market_candidate(x[0], x[1], x[2], h_stat, a_stat, lam_h, lam_a), reverse=True)
     best_daily_safe = safe_pool[0] if safe_pool else None
+
+    if not best_opt_a and safe_pool:
+        best_opt_a = safe_pool[0]
 
     return {
         "match": m,
